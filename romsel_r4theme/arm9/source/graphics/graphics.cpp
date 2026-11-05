@@ -1,3 +1,4 @@
+#include "common/filetypes.h"
 /*-----------------------------------------------------------------
  Copyright (C) 2015
 	Matthew Scholefield
@@ -45,7 +46,6 @@
 #define CONSOLE_SCREEN_WIDTH 32
 #define CONSOLE_SCREEN_HEIGHT 24
 
-extern bool extension(const std::string_view filename, const std::vector<std::string_view> extensions);
 
 extern bool whiteScreen;
 extern bool blackScreen;

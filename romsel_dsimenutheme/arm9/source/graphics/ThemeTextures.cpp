@@ -23,6 +23,7 @@
 #include "common/lzss.h"
 #include "common/tonccpy.h"
 #include "common/lodepng.h"
+#include "common/startupprofile.h"
 #include "language.h"
 #include "ndsheaderbanner.h"
 #include "ndma.h"
@@ -546,6 +547,7 @@ void ThemeTextures::loadDSiTheme() {
 }
 
 void ThemeTextures::loadVolumeTextures() {
+	startupProfileMark("UI textures");
 	if (dsiFeatures() && !sys().i2cBricked()) {
 		_volume0Texture = std::make_unique<Texture>(TFN_VOLUME0, TFN_FALLBACK_VOLUME0);
 		_volume1Texture = std::make_unique<Texture>(TFN_VOLUME1, TFN_FALLBACK_VOLUME1);
@@ -556,6 +558,7 @@ void ThemeTextures::loadVolumeTextures() {
 }
 
 void ThemeTextures::loadBatteryTextures() {
+	startupProfileMark("volume textures");
 	if (dsiFeatures() && !sys().i2cBricked()) {
 		_batterychargeTexture = std::make_unique<Texture>(TFN_BATTERY_CHARGE, TFN_FALLBACK_BATTERY_CHARGE);
 		_batterychargeblinkTexture = std::make_unique<Texture>(TFN_BATTERY_CHARGE_BLINK, TFN_FALLBACK_BATTERY_CHARGE_BLINK);
@@ -583,6 +586,7 @@ void ThemeTextures::loadBatteryTextures() {
 }
 
 void ThemeTextures::loadUITextures() {
+	startupProfileMark("background textures");
 	_dateTimeFont = std::make_unique<FontGraphic>(((access((TFN_FONT_DATE_TIME).c_str(), F_OK) == 0) ? TFN_FONT_DATE_TIME : TFN_FALLBACK_FONT_DATE_TIME).c_str(), false, false, false);
 	if (access((TFN_FONT_USERNAME).c_str(), F_OK) == 0) {
 		_usernameFont = std::make_unique<FontGraphic>((TFN_FONT_USERNAME).c_str(), false, false, false);

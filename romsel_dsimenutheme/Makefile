@@ -1,9 +1,6 @@
 #---------------------------------------------------------------------------------
 .SUFFIXES:
 #---------------------------------------------------------------------------------
-ifeq ($(strip $(DEVKITARM)),)
-$(error "Please set DEVKITARM in your environment. export DEVKITARM=<path to>devkitARM")
-endif
 
 ifeq ($(strip $(PROJECT)),)
 export PROJECT	:=	$(CURDIR)/../
@@ -12,17 +9,24 @@ endif
 export TARGET	:=	romsel_dsimenutheme
 NITRODATA		:=	nitrofiles
 
-include $(DEVKITARM)/ds_rules
+TWLM_ROOT ?= $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/..)
+include $(TWLM_ROOT)/universal/blocksds.mk
 
 .PHONY: bootloader bootstub clean makearm7 makearm9
 
 all:	bootloader bootstub $(TARGET).nds
 
+.PHONY: profile-startup
+profile-startup: all
+	$(MAKE) -C arm9 BUILD=build-profile TARGET=$(TARGET)-profile PROFILE_STARTUP=1
+	ndstool -u 00030004 -g SRLA 01 "TWLMENUPP" -c $(TARGET)-profile.nds -7 $(TARGET).arm7.elf -9 arm9/$(TARGET)-profile.elf -d $(NITRODATA) \
+	  -b icon.bmp "DSi-based themes;TWiLight Menu++;Rocket Robz"
+
 makearm7:
 	$(MAKE) -C arm7
 	cp arm7/$(TARGET).elf $(TARGET).arm7.elf
 
-makearm9:
+makearm9: bootloader bootstub
 	$(MAKE) -C arm9
 	cp arm9/$(TARGET).elf $(TARGET).arm9.elf
 
@@ -42,6 +46,7 @@ clean:
 	@rm -fr $(BUILD) $(TARGET).elf $(TARGET).nds
 	@rm -fr $(TARGET).arm7.elf
 	@rm -fr $(TARGET).arm9.elf
+	@rm -fr arm9/build-profile arm9/$(TARGET)-profile.elf $(TARGET)-profile.nds
 	@$(MAKE) -C $(PROJECT)/universal/bootloader_menu clean
 	@$(MAKE) -C $(PROJECT)/universal/bootstub clean
 	@$(MAKE) -C arm9 clean

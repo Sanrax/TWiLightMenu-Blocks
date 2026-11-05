@@ -289,15 +289,15 @@ void drawIcon(int num, int Xpos, int Ypos) {
 void loadFixedBanner(bool isSlot1) {
 	if (isSlot1 && memcmp(ndsHeader.gameCode, "ALXX", 4) == 0) {
 		u16 alxxBannerCrc = 0;
-		cardRead(0x75600, &arm9StartSig, 0x10, false);
-		cardRead(0x174602, &alxxBannerCrc, sizeof(u16), false);
+		twlmCardRead(0x75600, &arm9StartSig, 0x10, false);
+		twlmCardRead(0x174602, &alxxBannerCrc, sizeof(u16), false);
 		if ((arm9StartSig[0] == 0xE58D0008
 		 && arm9StartSig[1] == 0xE1500005
 		 && arm9StartSig[2] == 0xBAFFFFC5
 		 && arm9StartSig[3] == 0xE59D100C)
 		 || alxxBannerCrc != 0xBA52) {
 			// It's a SuperCard DSTWO, so use correct banner.
-			//cardRead(0x1843400, &ndsBanner, NDS_BANNER_SIZE_ORIGINAL);
+			//twlmCardRead(0x1843400, &ndsBanner, NDS_BANNER_SIZE_ORIGINAL);
 			FILE *fixedBannerFile = fopen("nitro:/fixedbanners/SuperCard DSTWO.bnr", "rb");
 			fread(&ndsBanner, 1, NDS_BANNER_SIZE_ORIGINAL, fixedBannerFile);
 			fclose(fixedBannerFile);
@@ -445,12 +445,11 @@ void getGameInfo(int num, bool isDir, const char* name, bool fromArgv)
 		fp = fopen(name, "rb");
 		if (fp == NULL) {
 			clearBannerSequence(num);
-			fclose(fp);
 			return;
 		}
 
 		// read each line
-		while ((rc = __getline(&line, &size, fp)) > 0) {
+		while ((rc = getline(&line, &size, fp)) > 0) {
 			// remove comments
 			if ((p = strchr(line, '#')) != NULL)
 				*p = 0;
@@ -501,13 +500,12 @@ void getGameInfo(int num, bool isDir, const char* name, bool fromArgv)
 		bool isSlot1 = (strcmp(name, "slot1") == 0);
 
 		if (isSlot1) {
-			cardRead(0, &ndsHeader, sizeof(ndsHeader), false);
+			twlmCardRead(0, &ndsHeader, sizeof(ndsHeader), false);
 		} else {
 			// open file for reading info
 			fp = fopen(name, "rb");
 			if (fp == NULL) {
 				// banner sequence
-				fclose(fp);
 				return;
 			}
 
@@ -676,7 +674,7 @@ void getGameInfo(int num, bool isDir, const char* name, bool fromArgv)
 		}
 		if (isSlot1) {
 			if (ndsCardHeader.bannerOffset > 0) {
-				cardRead(ndsCardHeader.bannerOffset, &ndsBanner, NDS_BANNER_SIZE_DSi, false);
+				twlmCardRead(ndsCardHeader.bannerOffset, &ndsBanner, NDS_BANNER_SIZE_DSi, false);
 			} else {
 				FILE* bannerFile = fopen("nitro:/noinfo.bnr", "rb");
 				fread(&ndsBanner, 1, NDS_BANNER_SIZE_ZH_KO, bannerFile);
@@ -848,12 +846,11 @@ void iconUpdate(int num, bool isDir, const char* name)
 		if (fp == NULL) {
 			logPrint("Icon not found!\n");
 			clearIcon(num);
-			fclose(fp);
 			return;
 		}
 
 		// read each line
-		while ((rc = __getline(&line, &size, fp)) > 0) {
+		while ((rc = getline(&line, &size, fp)) > 0) {
 			// remove comments
 			if ((p = strchr(line, '#')) != NULL)
 				*p = 0;

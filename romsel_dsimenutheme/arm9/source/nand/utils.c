@@ -1,3 +1,4 @@
+#include <malloc.h>
 
 #include <stdio.h>
 #include <sys/statvfs.h>
@@ -20,14 +21,14 @@ static inline int htoi(char a){
 
 int hex2bytes(uint8_t *out, unsigned byte_len, const char *in){
 	if (strlen(in) < byte_len << 1){
-		iprintf("%s: invalid input length, expecting %u, got %u.\n",
+		printf("%s: invalid input length, expecting %u, got %u.\n",
 			__FUNCTION__, (unsigned)byte_len << 1, (unsigned)strlen(in));
 		return -1;
 	}
 	for (unsigned i = 0; i < byte_len; ++i){
 		int h = htoi(*in++), l = htoi(*in++);
 		if (h == -1 || l == -1){
-			iprintf("%s: invalid input \"%c%c\"\n",
+			printf("%s: invalid input \"%c%c\"\n",
 				__FUNCTION__, *(in - 2), *(in - 1));
 			return -2;
 		}
@@ -42,7 +43,7 @@ const char *to_mebi(size_t size) {
 	if (size % (1024 * 1024)) {
 		sprintf(str_buf, "%.2f", (float)(((double)size) / 1024 / 1024));
 	} else {
-		siprintf(str_buf, "%u", (unsigned)(size >> 20));
+		sprintf(str_buf, "%u", (unsigned)(size >> 20));
 	}
 	return str_buf;
 }
@@ -140,7 +141,7 @@ int load_block_from_file(void *buf, const char *filename, unsigned offset, unsig
 int save_sha1_file(const char *filename) {
 	size_t len_fn = strlen(filename);
 	char *sha1_fn = (char *)malloc(len_fn + 6);
-	siprintf(sha1_fn, "%s.sha1", filename);
+	sprintf(sha1_fn, "%s.sha1", filename);
 	// 20 bytes each use 2 chars, space, asterisk, filename, new line
 	size_t len_buf = 2 * 20 + 1 + 1 + len_fn + 1;
 	char *sha1_buf = (char *)malloc(len_buf + 1); // extra for \0
@@ -148,10 +149,10 @@ int save_sha1_file(const char *filename) {
 	char *digest = (char *)malloc(20);
 	swiSHA1Final(digest, &sha1ctx);
 	for (int i = 0; i < 20; ++i) {
-		p += siprintf(p, "%02X", digest[i]);
+		p += sprintf(p, "%02X", digest[i]);
 	}
 	free(digest);
-	siprintf(p, " *%s\n", filename);
+	sprintf(p, " *%s\n", filename);
 	int ret = save_file(sha1_fn, (u8*)sha1_buf, len_buf, false);
 	free(sha1_fn);
 	free(sha1_buf);
@@ -161,7 +162,7 @@ int save_sha1_file(const char *filename) {
 void print_bytes(const void *buf, size_t len) {
 	const unsigned char *p = (const unsigned char *)buf;
 	for (size_t i = 0; i < len; ++i) {
-		iprintf("%02x", *p++);
+		printf("%02x", *p++);
 	}
 }
 

@@ -134,7 +134,7 @@ int main() {
 
 	irqInit();
 	// Start the RTC tracking IRQ
-	initClockIRQ();
+	initClockIRQTimer(LIBNDS_DEFAULT_TIMER_RTC);
 
 	my_touchInit();
 

@@ -23,7 +23,6 @@
 
 #include <string>
 #include <vector>
-#include <map>
 
 extern bool gbar2Fix;
 
@@ -52,8 +51,16 @@ class CIniFile
     bool m_bLastResult;
     bool m_bModified;
     bool m_bReadOnly;
-    typedef std::map<std::string,size_t> SectionCache;
-    SectionCache m_Cache;
+    struct SectionIndex {
+        std::string name;
+        size_t begin;
+        size_t end;
+        // Line numbers sorted by key. No duplicated key/value strings.
+        std::vector<size_t> items;
+    };
+    std::vector<SectionIndex> m_Index;
+    bool m_IndexValid = false;
+    void BuildIndex();
 
     bool InsertLine(size_t line,const std::string& str);
     bool ReplaceLine(size_t line,const std::string& str);

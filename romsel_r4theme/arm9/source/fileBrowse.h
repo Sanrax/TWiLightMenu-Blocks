@@ -1,3 +1,4 @@
+#include "common/filetypes.h"
 /*-----------------------------------------------------------------
  Copyright (C) 2005 - 2010
 	Michael "Chishm" Chisholm
@@ -27,9 +28,8 @@
 
 //#define EMULATE_FILES
 
-bool extension(const std::string_view filename, const std::vector<std::string_view> extensions);
 
-std::string browseForFile(const std::vector<std::string_view> extensionList);
+std::string browseForFile(const std::vector<std::string_view> &extensionList);
 
 
 

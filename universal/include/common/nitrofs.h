@@ -37,6 +37,16 @@
 #ifndef NITROFS_H
 #define NITROFS_H
 
+#ifdef __BLOCKSDS__
+#include <filesystem.h>
+#ifdef __cplusplus
+extern "C" {
+#endif
+int bootFSInit(const char *ndsfile);
+#ifdef __cplusplus
+}
+#endif
+#else
 #include <sys/dir.h>
 #include <sys/iosupport.h>
 #include <stdio.h>
@@ -119,4 +129,5 @@ extern "C"
 }
 #endif
 
+#endif // __BLOCKSDS__
 #endif

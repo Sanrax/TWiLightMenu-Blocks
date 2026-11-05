@@ -36,7 +36,7 @@ int main(void) {
 	irqInit();
 
 	// Start the RTC tracking IRQ
-	initClockIRQ();
+	initClockIRQTimer(LIBNDS_DEFAULT_TIMER_RTC);
 	fifoInit();
 
 	SetYtrigger(80);

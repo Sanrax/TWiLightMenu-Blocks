@@ -2,11 +2,9 @@
 .SUFFIXES:
 #---------------------------------------------------------------------------------
 
-ifeq ($(strip $(DEVKITARM)),)
-$(error "Please set DEVKITARM in your environment. export DEVKITARM=<path to>devkitARM")
-endif
 
-include $(DEVKITARM)/ds_rules
+TWLM_ROOT ?= $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/../..)
+include $(TWLM_ROOT)/universal/blocksds.mk
 
 CURRENT_SCREEN_MODE := 3
 
@@ -41,6 +39,7 @@ CFLAGS	:=	-g -Wall -O2 \
 
 CFLAGS		+=	$(INCLUDE) -DARM9 -DSTANDALONE -DCURRENT_SCREEN_MODE=$(CURRENT_SCREEN_MODE)
 CXXFLAGS	:= $(CFLAGS) -fno-rtti -fno-exceptions -std=gnu++17
+CPPFLAGS += $(if $(filter 1,$(PROFILE_STARTUP)),-DTWLM_PROFILE_STARTUP)
 
 ASFLAGS	:=	-g $(ARCH) $(INCLUDE)
 LDFLAGS	=	-specs=../$(UNIVERSAL)/arm9/ds_arm9_twlm.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)
@@ -48,7 +47,7 @@ LDFLAGS	=	-specs=../$(UNIVERSAL)/arm9/ds_arm9_twlm.specs -g $(ARCH) -Wl,-Map,$(n
 #---------------------------------------------------------------------------------
 # any extra libraries we wish to link with the project (order is important)
 #---------------------------------------------------------------------------------
-LIBS	:= 	-lfat -lmm9 -lnds9
+LIBS	:= 	-lmm9 -lnds9
  
  
 #---------------------------------------------------------------------------------
@@ -102,6 +101,8 @@ export OFILES	:=	$(addsuffix .o,$(BINFILES)) \
 					$(CPPFILES:.cpp=.o) \
 					$(CFILES:.c=.o) \
 					$(SFILES:.s=.o)
+
+export ASSET_OBJECTS := $(addsuffix .o,$(BINFILES)) $(BMPFILES:.bmp=.o) $(PNGFILES:.png=.o)
 
 export INCLUDE	:=	$(foreach dir,$(INCLUDES),-iquote $(CURDIR)/$(dir)) \
 					$(foreach dir,$(LIBDIRS),-I$(dir)/include) \

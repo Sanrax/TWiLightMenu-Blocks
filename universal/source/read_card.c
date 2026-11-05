@@ -408,7 +408,7 @@ u32 cardGetId() {
 	return iCardId;
 }
 
-void cardRead (u32 src, void* dest, size_t len, bool nandSave)
+void twlmCardRead (u32 src, void* dest, size_t len, bool nandSave)
 {
 	if (!cardInited) {
 		toncset (dest, 0, len);

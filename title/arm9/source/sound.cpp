@@ -1,3 +1,4 @@
+#include <time.h>
 #include "sound.h"
 
 #include "common/twlmenusettings.h"

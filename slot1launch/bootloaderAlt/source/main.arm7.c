@@ -606,9 +606,9 @@ int arm7_loadBinary (void) {
 
 	*(u16*)(0x027ffc40) = 0x1;						// Boot Indicator -- EXTREMELY IMPORTANT!!! Thanks to cReDiAr
 	
-	cardRead(ndsHeader->arm9romOffset, (u32*)ndsHeader->arm9destination, ndsHeader->arm9binarySize);
+	twlmCardRead(ndsHeader->arm9romOffset, (u32*)ndsHeader->arm9destination, ndsHeader->arm9binarySize);
 	//ensureBinaryDecompressed(ndsHeader, (module_params_t*) findModuleParamsOffset(ndsHeader));
-	cardRead(ndsHeader->arm7romOffset, (u32*)ndsHeader->arm7destination, ndsHeader->arm7binarySize);
+	twlmCardRead(ndsHeader->arm7romOffset, (u32*)ndsHeader->arm7destination, ndsHeader->arm7binarySize);
 
 	moduleParams = (module_params_t*)findModuleParamsOffset(ndsHeader);
 

@@ -1,9 +1,6 @@
 #---------------------------------------------------------------------------------
 .SUFFIXES:
 #---------------------------------------------------------------------------------
-ifeq ($(strip $(DEVKITARM)),)
-$(error "Please set DEVKITARM in your environment. export DEVKITARM=<path to>devkitARM")
-endif
 
 ifeq ($(strip $(PROJECT)),)
 export PROJECT	:=	$(CURDIR)/../
@@ -12,7 +9,8 @@ endif
 export TARGET	:=	romsel_aktheme
 NITRODATA		:=	nitrofiles
 
-include $(DEVKITARM)/ds_rules
+TWLM_ROOT ?= $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/..)
+include $(TWLM_ROOT)/universal/blocksds.mk
 
 .PHONY: bootloader bootstub clean makearm7 makearm9
 
@@ -22,7 +20,7 @@ makearm7:
 	$(MAKE) -C arm7
 	cp arm7/$(TARGET).elf $(TARGET).arm7.elf
 
-makearm9:
+makearm9: bootloader bootstub
 	$(MAKE) -C arm9
 	cp arm9/$(TARGET).elf $(TARGET).arm9.elf
 

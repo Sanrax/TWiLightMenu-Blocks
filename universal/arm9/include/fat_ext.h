@@ -6,6 +6,8 @@ extern "C" {
 #endif
 
 #include <stdint.h>
+#include <stdbool.h>
+#include <stddef.h>
 
 #include <nds/disc_io.h>
 
@@ -17,7 +19,8 @@ Get Alias Name
 /*
 Get Alias Path
 */
-extern void fatGetAliasPath (const char* path, char *alias);
+// Returns false and clears alias on lookup failure or insufficient capacity.
+extern bool fatGetAliasPath(const char *path, char *alias, size_t capacity);
 
 #ifdef __cplusplus
 }

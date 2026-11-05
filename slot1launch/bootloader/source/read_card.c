@@ -19,7 +19,6 @@
 #include "read_card.h"
 
 #include <nds.h>
-#include <nds/arm9/cache.h>
 #include <nds/dma.h>
 #include <nds/card.h>
 #include <string.h>
@@ -420,7 +419,7 @@ int cardInit (sNDSHeaderExt* ndsHeader, u32* chipID)
 	return ERR_NONE;
 }
 
-void cardRead (u32 src, u32* dest, size_t size)
+void twlmCardRead (u32 src, u32* dest, size_t size)
 {
 	sNDSHeaderExt* ndsHeader = (sNDSHeaderExt*)headerData;
 

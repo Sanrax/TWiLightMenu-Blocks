@@ -1,11 +1,9 @@
 #---------------------------------------------------------------------------------
 .SUFFIXES:
 #---------------------------------------------------------------------------------
-ifeq ($(strip $(DEVKITARM)),)
-$(error "Please set DEVKITARM in your environment. export DEVKITARM=<path to>devkitARM")
-endif
 
-include $(DEVKITARM)/ds_rules
+TWLM_ROOT ?= $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/../..)
+include $(TWLM_ROOT)/universal/blocksds.mk
 
 #---------------------------------------------------------------------------------
 # BUILD is the directory where object files & intermediate files will be placed
@@ -35,7 +33,7 @@ CXXFLAGS	:=	$(CFLAGS) -fno-rtti -fno-exceptions -fno-rtti
 
 
 ASFLAGS	:=	-g $(ARCH) $(INCLUDE)
-LDFLAGS	=	-specs=ds_arm7.specs -g $(ARCH) -Wl,-Map,$(notdir $*).map
+LDFLAGS	=	-specs=$(BLOCKSDS)/sys/crts/ds_arm7.specs -g $(ARCH) -Wl,-Map,$(notdir $*).map
 
 LIBS	:=	-lnds7
 
@@ -67,6 +65,8 @@ BINFILES	:=	$(foreach dir,$(DATA),$(notdir $(wildcard $(dir)/*.*)))
 export OFILES	:=	$(addsuffix .o,$(BINFILES)) \
 			$(CPPFILES:.cpp=.o) $(CFILES:.c=.o) $(SFILES:.s=.o)
  
+export ASSET_OBJECTS := $(addsuffix .o,$(BINFILES)) $(BMPFILES:.bmp=.o) $(PNGFILES:.png=.o)
+
 export INCLUDE	:=	$(foreach dir,$(INCLUDES),-I$(CURDIR)/$(dir)) \
 			$(foreach dir,$(LIBDIRS),-I$(dir)/include) \
 			-I$(CURDIR)/$(BUILD)
@@ -115,7 +115,7 @@ DEPENDS	:=	$(OFILES:.o=.d)
 
 $(ARM7ELF)	:	$(OFILES)
 	@echo linking $(notdir $@)
-	@$(LD)  $(LDFLAGS) $(OFILES) $(LIBPATHS) $(LIBS) -o $@
+	@$(LD) $(CPUFLAGS) $(LDFLAGS) $(OFILES) $(LIBPATHS) $(BLOCKSDS_LIBPATHS) $(STORAGE_WRAPS) -Wl,--start-group $(if $(findstring g++,$(LD)),-lstdc++) $(LIBS) -lc -Wl,--end-group -o $@
 
 
 #---------------------------------------------------------------------------------

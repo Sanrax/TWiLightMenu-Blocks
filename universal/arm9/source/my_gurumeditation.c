@@ -34,7 +34,7 @@
 #include <stdio.h>
 
 //---------------------------------------------------------------------------------
-unsigned long ARMShift(unsigned long value,unsigned char shift) {
+static unsigned long ARMShift(unsigned long value,unsigned char shift) {
 //---------------------------------------------------------------------------------
 	// no shift at all
 	if (shift == 0x0B) return value ;
@@ -76,7 +76,7 @@ unsigned long ARMShift(unsigned long value,unsigned char shift) {
 
 
 //---------------------------------------------------------------------------------
-u32 getExceptionAddress( u32 opcodeAddress, u32 thumbState) {
+static u32 getExceptionAddress( u32 opcodeAddress, u32 thumbState) {
 //---------------------------------------------------------------------------------
 
 	int Rf, Rb, Rd, Rn, Rm;
@@ -226,7 +226,7 @@ void myGuruMeditationDump() {
 	BG_PALETTE_SUB[0] = RGB15(31,0,0);
 	BG_PALETTE_SUB[255] = RGB15(31,31,31);
 
-	iprintf("\x1b[5CGuru Meditation Error!\n");
+	printf("\x1b[5CGuru Meditation Error!\n");
 	u32	currentMode = getCPSR() & 0x1f;
 	u32 thumbState = ((*(u32*)0x02FFFD90) & 0x20);
 
@@ -235,7 +235,7 @@ void myGuruMeditationDump() {
 	int offset = 8;
 
 	if ( currentMode == 0x17 ) {
-		iprintf ("\x1b[10Cdata abort!\n\n");
+		printf ("\x1b[10Cdata abort!\n\n");
 		codeAddress = exceptionRegisters[15] - offset;
 		if (	(codeAddress > 0x02000000 && codeAddress < 0x02400000) ||
 				(codeAddress > (u32)__itcm_start && codeAddress < (u32)(__itcm_start + 32768)) )
@@ -248,23 +248,23 @@ void myGuruMeditationDump() {
 			offset = 2;
 		else
 			offset = 4;
-		iprintf("\x1b[5Cundefined instruction!\n\n");
+		printf("\x1b[5Cundefined instruction!\n\n");
 		codeAddress = exceptionRegisters[15] - offset;
 		exceptionAddress = codeAddress;
 	}
 
-	iprintf("  pc: %08lX addr: %08lX\n\n",codeAddress,exceptionAddress);
+	printf("  pc: %08lX addr: %08lX\n\n",codeAddress,exceptionAddress);
 
 	int i;
 	for ( i=0; i < 8; i++ ) {
-		iprintf(	"  %s: %08lX   %s: %08lX\n",
+		printf(	"  %s: %08lX   %s: %08lX\n",
 		registerNames[i], exceptionRegisters[i],
 		registerNames[i+8],exceptionRegisters[i+8]);
 	}
-	iprintf("\n");
+	printf("\n");
 	u32 *stack = (u32 *)exceptionRegisters[13];
 	for ( i=0; i<10; i++ ) {
-		iprintf( "\x1b[%d;2H%08lX:  %08lX %08lX", i + 14, (u32)&stack[i*2],stack[i*2], stack[(i*2)+1] );
+		printf( "\x1b[%d;2H%08lX:  %08lX %08lX", i + 14, (u32)&stack[i*2],stack[i*2], stack[(i*2)+1] );
 	}
 
 	SetBrightness(0, 0);

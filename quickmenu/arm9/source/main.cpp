@@ -1,3 +1,7 @@
+#include "common/launchpath.h"
+#include "common/filetypes.h"
+#include "common/storage.h"
+#include <time.h>
 #include <nds.h>
 #include <nds/arm9/dldi.h>
 #include "io_m3_common.h"
@@ -903,16 +907,7 @@ bool preloadNds(const char* filename) {
 	return false;
 } */
 
-bool extension(const std::string_view filename, const std::vector<std::string_view> extensions) {
-	for (std::string_view extension : extensions) {
-		// logPrint("Checking for %s extension in %s\n", extension.data(), filename.data());
-		if ((strlen(filename.data()) > strlen(extension.data())) && (strcasecmp(filename.substr(filename.size() - extension.size()).data(), extension.data()) == 0)) {
-			return true;
-		}
-	}
 
-	return false;
-}
 
 // From NTM
 // https://github.com/Epicpkmn11/NTM/blob/db69aca1b49733da51f64ee857ac9b861b1c468c/arm9/src/sav.c#L7-L93
@@ -1008,8 +1003,8 @@ void directCardLaunch() {
 	/*if (memcmp(ndsCardHeader.gameCode, "ALXX", 4) == 0) {
 		u16 alxxBannerCrc = 0;
 		extern u32 arm9StartSig[4];
-		cardRead(0x75600, &arm9StartSig, 0x10);
-		cardRead(0x174602, &alxxBannerCrc, sizeof(u16));
+		twlmCardRead(0x75600, &arm9StartSig, 0x10);
+		twlmCardRead(0x174602, &alxxBannerCrc, sizeof(u16));
 		if ((arm9StartSig[0] == 0xE58D0008
 		 && arm9StartSig[1] == 0xE1500005
 		 && arm9StartSig[2] == 0xBAFFFFC5
@@ -1165,7 +1160,7 @@ void findPictochatAndDownladPlay() {
 
 	auto mountNand = [nandInited = false]() mutable {
 		if (!nandInited) {
-			fatMountSimple("nand", &io_dsi_nand);
+			twlmMountStorage("nand", &io_dsi_nand);
 			nandInited = true;
 		}
 	};
@@ -2202,7 +2197,7 @@ int dsClassicMenu(void) {
 							};
 							argarray.push_back(getLaunchArgument());
 							int err = runNdsFile(argarray[0], argarray.size(), &argarray[0], sys().isRunFromSD(), true, false, false, true, true, false, -1, sys().commonCache());
-							iprintf (STR_START_FAILED_ERROR.c_str(), err);
+							printf (STR_START_FAILED_ERROR.c_str(), err);
 						}
 						break;
 				}
@@ -2263,12 +2258,6 @@ int dsClassicMenu(void) {
 
 			// Construct a command line
 			getcwd (filePath, PATH_MAX);
-			int pathLen = strlen(filePath);
-			if (pathLen < PATH_MAX && filePath[pathLen - 1] != '/') { // Ensure the path ends in a slash
-				filePath[pathLen] = '/';
-				filePath[pathLen + 1] = '\0';
-				pathLen++;
-			}
 			vector<char*> argarray;
 
 			if (extension(filename[ms().secondaryDevice], {".argv"})) {
@@ -2315,7 +2304,8 @@ int dsClassicMenu(void) {
 				std::string typeToReplace = filename[ms().secondaryDevice].substr(filename[ms().secondaryDevice].rfind('.'));
 
 				char *name = argarray.at(0);
-				strcpy (filePath + pathLen, name);
+				const std::string resolvedPath = launchPath(filePath, name);
+				snprintf(filePath, sizeof(filePath), "%s", resolvedPath.c_str());
 				free(argarray.at(0));
 				argarray.at(0) = filePath;
 
@@ -2566,15 +2556,15 @@ int dsClassicMenu(void) {
 					char sfnPrv[62];
 					char sfnBnr[62];
 					if (ms().secondaryDevice && !bs().b4dsMode && ms().dsiWareToSD && !savFormat && sdFound()) {
-						fatGetAliasPath("sd:/_nds/TWiLightMenu/tempDSiWare.dsi", sfnSrl);
-						fatGetAliasPath("sd:/_nds/TWiLightMenu/tempDSiWare.pub", sfnPub);
-						fatGetAliasPath("sd:/_nds/TWiLightMenu/tempDSiWare.prv", sfnPrv);
-						fatGetAliasPath("sd:/_nds/TWiLightMenu/tempDSiWare.bnr", sfnBnr);
+						fatGetAliasPath("sd:/_nds/TWiLightMenu/tempDSiWare.dsi", sfnSrl, sizeof(sfnSrl));
+						fatGetAliasPath("sd:/_nds/TWiLightMenu/tempDSiWare.pub", sfnPub, sizeof(sfnPub));
+						fatGetAliasPath("sd:/_nds/TWiLightMenu/tempDSiWare.prv", sfnPrv, sizeof(sfnPrv));
+						fatGetAliasPath("sd:/_nds/TWiLightMenu/tempDSiWare.bnr", sfnBnr, sizeof(sfnBnr));
 					} else {
-						fatGetAliasPath(ms().dsiWareSrlPath.c_str(), sfnSrl);
-						fatGetAliasPath(ms().dsiWarePubPath.c_str(), sfnPub);
-						fatGetAliasPath(ms().dsiWarePrvPath.c_str(), sfnPrv);
-						fatGetAliasPath(ms().dsiWareBnrPath.c_str(), sfnBnr);
+						fatGetAliasPath(ms().dsiWareSrlPath.c_str(), sfnSrl, sizeof(sfnSrl));
+						fatGetAliasPath(ms().dsiWarePubPath.c_str(), sfnPub, sizeof(sfnPub));
+						fatGetAliasPath(ms().dsiWarePrvPath.c_str(), sfnPrv, sizeof(sfnPrv));
+						fatGetAliasPath(ms().dsiWareBnrPath.c_str(), sfnBnr, sizeof(sfnBnr));
 					}
 
 					const char *bootstrapinipath = sdFound() ? BOOTSTRAP_INI : BOOTSTRAP_INI_FC;
@@ -2722,7 +2712,8 @@ int dsClassicMenu(void) {
 				}
 
 				char *name = argarray.at(0);
-				strcpy (filePath + pathLen, name);
+				const std::string resolvedPath = launchPath(filePath, name);
+				snprintf(filePath, sizeof(filePath), "%s", resolvedPath.c_str());
 				free(argarray.at(0));
 				argarray.at(0) = filePath;
 				if (!isNdz[ms().secondaryDevice] && !ms().secondaryDevice && !sys().arm7SCFGLocked() && ms().consoleModel == TWLSettings::EDSiRetail && isHomebrew[ms().secondaryDevice] && !(perGameSettings_useBootstrap == -1 ? true : perGameSettings_useBootstrap)) {
@@ -3174,7 +3165,7 @@ int dsClassicMenu(void) {
 						runNds_boostCpu = perGameSettings_boostCpu == -1 ? DEFAULT_BOOST_CPU : perGameSettings_boostCpu;
 						runNds_boostVram = perGameSettings_boostVram == -1 ? DEFAULT_BOOST_VRAM : perGameSettings_boostVram;
 					}
-					//iprintf ("Running %s with %d parameters\n", argarray[0], argarray.size());
+					//printf ("Running %s with %d parameters\n", argarray[0], argarray.size());
 					int err = runNdsFile (argarray[0], argarray.size(), (const char **)&argarray[0], sys().isRunFromSD(), true, true, dsModeSwitch, runNds_boostCpu, runNds_boostVram, false, language, 0);
 					char text[64];
 					snprintf (text, sizeof(text), STR_START_FAILED_ERROR.c_str(), err);

@@ -10,6 +10,7 @@
 #pragma once
 
 #include <nds/ndstypes.h>
+#include <string>
 
 #include "common/picoLoader7.h"
 

@@ -1,9 +1,6 @@
 #---------------------------------------------------------------------------------
 .SUFFIXES:
 #---------------------------------------------------------------------------------
-ifeq ($(strip $(DEVKITARM)),)
-$(error "Please set DEVKITARM in your environment. export DEVKITARM=<path to>devkitARM")
-endif
 
 ifeq ($(strip $(PROJECT)),)
 export PROJECT	:=	$(CURDIR)/../
@@ -12,7 +9,8 @@ endif
 export TARGET := 3dssplash
 NITRODATA	:=	nitrofiles
 
-include $(DEVKITARM)/ds_rules
+TWLM_ROOT ?= $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/..)
+include $(TWLM_ROOT)/universal/blocksds.mk
 
 .PHONY: clean makearm7 makearm9
 

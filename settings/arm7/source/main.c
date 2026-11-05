@@ -28,6 +28,7 @@
 
 ---------------------------------------------------------------------------------*/
 #include <nds.h>
+void my_sdmmc_get_cid(int devicenumber, u32 *cid);
 #include <string.h>
 #include <maxmod7.h>
 #include "card_init.h"
@@ -154,7 +155,7 @@ TWL_CODE void aes(void* in, void* out, void* iv, u32 method){ //this is sort of 
 	//if (method & (AES_CTR_DECRYPT | AES_CTR_ENCRYPT)) add_ctr((u8*)iv);
 }
 
-TWL_CODE void getConsoleID(void) {
+TWL_CODE void twlmGetConsoleKey(void) {
 	// Fix duplicated line bug on 3DS
 	while (REG_VCOUNT != 191);
 	while (REG_VCOUNT == 191);
@@ -206,7 +207,7 @@ int main() {
 
 	irqInit();
 	// Start the RTC tracking IRQ
-	initClockIRQ();
+	initClockIRQTimer(LIBNDS_DEFAULT_TIMER_RTC);
 
 	my_touchInit();
 	fifoInit();
@@ -258,7 +259,8 @@ int main() {
 									| BIT_SET(*(vu32*)0x4004820, SCFGSDMMC_BIT)
 									| BIT_SET(!!(pmBacklight & BIT(4) || pmBacklight & BIT(5) || pmBacklight & BIT(6) || pmBacklight & BIT(7)), BACKLIGHT_BIT)
 									| BIT_SET(isPhat(), DSPHAT_BIT)
-									| BIT_SET(i2cBricked, I2CBRICKED_BIT));
+									| BIT_SET(i2cBricked, I2CBRICKED_BIT)
+									| BIT_SET((readPowerManagement(PM_CONTROL_REG) & (PM_BACKLIGHT_TOP | PM_BACKLIGHT_BOTTOM)) == 0, BACKLIGHTS_OFF_BIT));
 
 	*(vu32*)0x4004820 = 0;
 
@@ -266,7 +268,7 @@ int main() {
 	fifoSendValue32(FIFO_USER_03, status);
 
 	if (isDSiMode()) {
-		getConsoleID();
+		twlmGetConsoleKey();
 	}
 
 	fifoSetValue32Handler(FIFO_USER_02, menuValue32Handler, 0);
@@ -333,7 +335,7 @@ int main() {
 		}
 
 		if (*(u32*)(0x2FFFD0C) == 0x454D4D43) {
-			sdmmc_nand_cid((u32*)0x2FFD7BC);	// Get eMMC CID
+			my_sdmmc_get_cid(1, (u32*)0x2FFD7BC);	// Get eMMC CID
 			*(u32*)(0x2FFFD0C) = 0;
 		}
 		swiWaitForVBlank();

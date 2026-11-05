@@ -10,8 +10,8 @@ void my_touchReadXY(touchPosition *touchPos);
 bool my_touchPenDown();
 
 enum{
-	KEY_TOUCH = (1<<6),
-	KEY_LID = (1<<7)
+	EXT_KEY_TOUCH = (1<<6),
+	EXT_KEY_LID = (1<<7)
 }Keys;
 
 void my_inputGetAndSend(void){
@@ -25,25 +25,25 @@ void my_inputGetAndSend(void){
 
 
 	if (!my_touchPenDown()) {
-		keys |= KEY_TOUCH;
+		keys |= EXT_KEY_TOUCH;
   	} else {
-		keys &= ~KEY_TOUCH;
+		keys &= ~EXT_KEY_TOUCH;
 	}
 
 	msg.SystemInput.keys = keys;
 
-	if (!(keys & KEY_TOUCH)) {
-		msg.SystemInput.keys |= KEY_TOUCH;
+	if (!(keys & EXT_KEY_TOUCH)) {
+		msg.SystemInput.keys |= EXT_KEY_TOUCH;
 
 		my_touchReadXY(&tempPos);	
 
 		if (tempPos.rawx && tempPos.rawy) {
-			msg.SystemInput.keys &= ~KEY_TOUCH;
+			msg.SystemInput.keys &= ~EXT_KEY_TOUCH;
 			msg.SystemInput.touch = tempPos;
 		}
 	}	
 
-	/* if (keys & KEY_LID) 
+	/* if (keys & EXT_KEY_LID)
 		sleepCounter++;
 	else
 		sleepCounter = 0;

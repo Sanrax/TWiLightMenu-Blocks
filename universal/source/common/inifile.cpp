@@ -19,352 +19,282 @@
 */
 
 #include "common/inifile.h"
-#include "common/stringtool.h"
 
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
+#include <string_view>
+#include <utility>
 
 bool gbar2Fix = false;
 
-static bool freadLine(FILE *f, std::string &str)
+static std::string_view trim(std::string_view text)
 {
-	str.clear();
-__read:
-	char p = 0;
-
-	size_t readed = fread(&p, 1, 1, f);
-	if (0 == readed) {
-		str = "";
-		return false;
-	}
-	if ('\n' == p || '\r' == p) {
-		str = "";
-		return true;
-	}
-
-	while (p != '\n' && p != '\r' && readed) {
-		str += p;
-		readed = fread(&p, 1, 1, f);
-	}
-
-	if (str.empty() || "" == str) {
-		goto __read;
-	}
-
-	return true;
+    const size_t first = text.find_first_not_of(" \t");
+    if (first == text.npos) return {};
+    return text.substr(first, text.find_last_not_of(" \t") - first + 1);
 }
 
-static void trimString(std::string &str)
+static std::string_view itemName(std::string_view line)
 {
-	size_t first = str.find_first_not_of(" \t"), last;
-	if (first == str.npos) {
-		str = "";
-	} else {
-		last = str.find_last_not_of(" \t");
-		if (first > 0 || (last + 1) < str.length())
-			str = str.substr(first, last - first + 1);
-	}
+    const std::string_view key = line.substr(0, line.find('='));
+    const size_t last = key.find_last_not_of(" \t");
+    return last == key.npos ? std::string_view() : key.substr(0, last + 1);
 }
 
-CIniFile::CIniFile()
+CIniFile::CIniFile() : m_bLastResult(false), m_bModified(false), m_bReadOnly(false) {}
+
+CIniFile::CIniFile(const std::string &filename) : CIniFile()
 {
-	m_bLastResult = false;
-	m_bModified = false;
-	m_bReadOnly = false;
+    LoadIniFile(filename);
 }
 
-CIniFile::CIniFile(const std::string &filename)
-{
-	m_sFileName = filename;
-	m_bLastResult = false;
-	m_bModified = false;
-	m_bReadOnly = false;
-	LoadIniFile(m_sFileName);
-}
-
-CIniFile::~CIniFile()
-{
-	if (m_FileContainer.size() > 0) {
-		m_FileContainer.clear();
-	}
-}
+CIniFile::~CIniFile() = default;
 
 void CIniFile::SetString(const std::string &Section, const std::string &Item, const std::string &Value)
 {
-	if (GetFileString(Section, Item) != Value) {
-		SetFileString(Section, Item, Value);
-		m_bModified = true;
-	}
+    const std::string previous = GetFileString(Section, Item);
+    if (!m_bReadOnly && (!m_bLastResult || previous != Value)) {
+        SetFileString(Section, Item, Value);
+        m_bModified = true;
+    }
 }
 
 void CIniFile::SetInt(const std::string &Section, const std::string &Item, int Value)
 {
-	std::string strtemp = formatString("%d", Value);
-
-	if (GetFileString(Section, Item) != strtemp) {
-		SetFileString(Section, Item, strtemp);
-		m_bModified = true;
-	}
+    SetString(Section, Item, std::to_string(Value));
 }
 
 std::string CIniFile::GetString(const std::string &Section, const std::string &Item)
 {
-	return GetFileString(Section, Item);
+    return GetFileString(Section, Item);
 }
 
 std::string CIniFile::GetString(const std::string &Section, const std::string &Item, const std::string &DefaultValue)
 {
-	std::string temp = GetString(Section, Item);
-	if (!m_bLastResult) {
-		SetString(Section, Item, DefaultValue);
-		temp = DefaultValue;
-	}
-	return temp;
+    std::string value = GetFileString(Section, Item);
+    if (!m_bLastResult) {
+        SetString(Section, Item, DefaultValue);
+        return DefaultValue;
+    }
+    return value;
 }
 
 void CIniFile::GetStringVector(const std::string &Section, const std::string &Item, std::vector<std::string> &strings, char delimiter)
 {
-	std::string strValue = GetFileString(Section, Item);
-	strings.clear();
-	size_t pos;
-	while ((pos = strValue.find(delimiter), strValue.npos != pos)) {
-		const std::string string = strValue.substr(0, pos);
-		if (string.length()) {
-			strings.push_back(string);
-		}
-		strValue = strValue.substr(pos + 1, strValue.npos);
-	}
-	if (strValue.length()) {
-		strings.push_back(strValue);
-	}
+    const std::string value = GetFileString(Section, Item);
+    strings.clear();
+    size_t start = 0;
+    while (start < value.size()) {
+        const size_t end = value.find(delimiter, start);
+        const size_t length = (end == value.npos ? value.size() : end) - start;
+        if (length) strings.emplace_back(value, start, length);
+        if (end == value.npos) break;
+        start = end + 1;
+    }
 }
 
 void CIniFile::SetStringVector(const std::string &Section, const std::string &Item, std::vector<std::string> &strings, char delimiter)
 {
-	std::string strValue;
-	for (size_t ii = 0; ii < strings.size(); ++ii) {
-		if (ii)
-			strValue += delimiter;
-		strValue += strings[ii];
-	}
-	SetString(Section, Item, strValue);
+    std::string value;
+    for (size_t i = 0; i < strings.size(); i++) {
+        if (i) value += delimiter;
+        value += strings[i];
+    }
+    SetString(Section, Item, value);
 }
 
 int CIniFile::GetInt(const std::string &Section, const std::string &Item)
 {
-	std::string value = GetFileString(Section, Item);
-	if (value.size() > 2 && '0' == value[0] && ('x' == value[1] || 'X' == value[1]))
-		return strtol(value.c_str(), NULL, 16);
-	else
-		return strtol(value.c_str(), NULL, 10);
+    const std::string value = GetFileString(Section, Item);
+    const int base = value.size() > 2 && value[0] == '0' && (value[1] == 'x' || value[1] == 'X') ? 16 : 10;
+    return strtol(value.c_str(), nullptr, base);
 }
 
 int CIniFile::GetInt(const std::string &Section, const std::string &Item, int DefaultValue)
 {
-	int temp;
-	temp = GetInt(Section, Item);
-	if (!m_bLastResult) {
-		SetInt(Section, Item, DefaultValue);
-		temp = DefaultValue;
-	}
-	return temp;
+    const int value = GetInt(Section, Item);
+    if (!m_bLastResult) {
+        SetInt(Section, Item, DefaultValue);
+        return DefaultValue;
+    }
+    return value;
 }
 
 bool CIniFile::LoadIniFile(const std::string &FileName)
 {
-	//dbg_printf("load %s\n",FileName.c_str());
-	if (FileName != "")
-		m_sFileName = FileName;
+    if (!FileName.empty()) m_sFileName = FileName;
+    FILE *file = fopen(m_sFileName.c_str(), "rb");
+    if (!file) return false;
 
-	FILE *f = fopen(FileName.c_str(), "rb");
+    StringArray lines;
+    std::string line;
+    auto finishLine = [&]() {
+        const std::string_view text = trim(line);
+        if (!text.empty() && text[0] != ';' && text[0] != '/' && text[0] != '!')
+            lines.emplace_back(text);
+        line.clear();
+    };
 
-	if (NULL == f)
-		return false;
-
-	//check for utf8 bom.
-	char bom[3];
-	if (fread(bom, 3, 1, f) == 1 && bom[0] == 0xef && bom[1] == 0xbb && bom[2] == 0xbf)
-		;
-	else
-		fseek(f, 0, SEEK_SET);
-
-	std::string strline("");
-	m_FileContainer.clear();
-
-	while (freadLine(f, strline)) {
-		trimString(strline);
-		if (strline != "" && ';' != strline[0] && '/' != strline[0] && '!' != strline[0])
-			m_FileContainer.push_back(strline);
-	}
-
-	fclose(f);
-
-	m_bLastResult = false;
-	m_bModified = false;
-
-	return true;
+    char buffer[4096];
+    bool firstBlock = true;
+    size_t count;
+    while ((count = fread(buffer, 1, sizeof(buffer), file)) != 0) {
+        const char *current = buffer;
+        const char *end = buffer + count;
+        if (firstBlock && count >= 3 && static_cast<unsigned char>(buffer[0]) == 0xEF
+            && static_cast<unsigned char>(buffer[1]) == 0xBB && static_cast<unsigned char>(buffer[2]) == 0xBF)
+            current += 3;
+        firstBlock = false;
+        while (current != end) {
+            const char *newline = std::find_if(current, end, [](char c) { return c == '\r' || c == '\n'; });
+            line.append(current, newline);
+            if (newline == end) break;
+            finishLine();
+            current = newline + 1;
+        }
+    }
+    const bool ok = !ferror(file);
+    const bool closed = fclose(file) == 0;
+    if (!ok || !closed) return false;
+    if (!line.empty()) finishLine();
+    m_FileContainer.swap(lines);
+    m_Index.clear();
+    m_IndexValid = false;
+    m_bLastResult = false;
+    m_bModified = false;
+    return true;
 }
 
 bool CIniFile::SaveIniFileModified(const std::string &FileName)
 {
-	if (m_bModified == true) {
-		return SaveIniFile(FileName);
-	}
-
-	return true;
+    return !m_bModified || SaveIniFile(FileName);
 }
 
 bool CIniFile::SaveIniFile(const std::string &FileName)
 {
-	if (FileName != "")
-		m_sFileName = FileName;
+    if (!FileName.empty()) m_sFileName = FileName;
+    FILE *file = fopen(m_sFileName.c_str(), "wb");
+    if (!file) return false;
 
-	FILE *f = fopen(m_sFileName.c_str(), "wb");
-	if (NULL == f) {
-		return false;
-	}
+    const std::string_view newline = gbar2Fix ? "\n" : "\r\n";
+    bool ok = true;
+    auto write = [&](std::string_view text) {
+        if (ok && fwrite(text.data(), 1, text.size(), file) != text.size()) ok = false;
+    };
+    for (size_t i = 0; i < m_FileContainer.size() && ok; i++) {
+        const std::string &line = m_FileContainer[i];
+        const size_t start = line.find_first_not_of(' ');
+        if (start == line.npos) continue;
+        const std::string_view text(line.data() + start, line.size() - start);
+        if (text[0] == '[' && i > 0 && !m_FileContainer[i - 1].empty()) write(newline);
+        write(text);
+        write(newline);
+    }
+    if (fclose(file) != 0) ok = false;
+    if (ok) m_bModified = false;
+    return ok;
+}
 
-	for (size_t ii = 0; ii < m_FileContainer.size(); ii++) {
-		std::string &strline = m_FileContainer[ii];
-		size_t notSpace = strline.find_first_not_of(' ');
-		strline = strline.substr(notSpace);
-		if (strline.find('[') == 0 && ii > 0) {
-			if (!m_FileContainer[ii - 1].empty() && m_FileContainer[ii - 1] != "")
-				fwrite((gbar2Fix ? "\n" : "\r\n"), 1, 2-gbar2Fix, f);
-		}
-		if (!strline.empty() && strline != "") {
-			fwrite(strline.c_str(), 1, strline.length(), f);
-			fwrite((gbar2Fix ? "\n" : "\r\n"), 1, 2-gbar2Fix, f);
-		}
-	}
-
-	fclose(f);
-
-	m_bModified = false;
-
-	return true;
+void CIniFile::BuildIndex()
+{
+    if (m_IndexValid) return;
+    m_Index.clear();
+    for (size_t i = 0; i < m_FileContainer.size(); i++) {
+        const std::string &line = m_FileContainer[i];
+        if (line.empty() || line[0] != '[') continue;
+        const size_t bracket = line.find(']');
+        if (bracket == line.npos || bracket == 0) continue;
+        const std::string_view name(line.data() + 1, bracket - 1);
+        // As before, the first occurrence of a section and of each key wins.
+        if (std::find_if(m_Index.begin(), m_Index.end(), [&](const SectionIndex &s) { return s.name == name; }) != m_Index.end())
+            continue;
+        SectionIndex section{std::string(name), i + 1, m_FileContainer.size(), {}};
+        for (size_t j = i + 1; j < m_FileContainer.size(); j++) {
+            const std::string &item = m_FileContainer[j];
+            if (item.find('=') != item.npos) section.items.push_back(j);
+            else if (!item.empty() && item[0] == '[') {
+                section.end = j;
+                break;
+            }
+        }
+        std::stable_sort(section.items.begin(), section.items.end(), [&](size_t a, size_t b) {
+            return itemName(m_FileContainer[a]) < itemName(m_FileContainer[b]);
+        });
+        m_Index.push_back(std::move(section));
+    }
+    m_IndexValid = true;
 }
 
 std::string CIniFile::GetFileString(const std::string &Section, const std::string &Item)
 {
-	std::string strline;
-	std::string strSection;
-	std::string strItem;
-	std::string strValue;
-
-	size_t ii = 0;
-	size_t iFileLines = m_FileContainer.size();
-
-	if (m_bReadOnly) {
-		SectionCache::iterator it = m_Cache.find(Section);
-		if ((it != m_Cache.end()))
-			ii = it->second;
-	}
-
-	m_bLastResult = false;
-
-	if (iFileLines >= 0) {
-		while (ii < iFileLines) {
-			strline = m_FileContainer[ii++];
-
-			size_t rBracketPos = 0;
-			if ('[' == strline[0])
-				rBracketPos = strline.find(']');
-			if (rBracketPos > 0 && rBracketPos != std::string::npos) {
-				strSection = strline.substr(1, rBracketPos - 1);
-				if (m_bReadOnly)
-					m_Cache.insert(std::make_pair(strSection, ii - 1));
-				if (strSection == Section) {
-					while (ii < iFileLines) {
-						strline = m_FileContainer[ii++];
-						size_t equalsignPos = strline.find('=');
-						if (equalsignPos != strline.npos) {
-							size_t last = equalsignPos ? strline.find_last_not_of(" \t", equalsignPos - 1) : strline.npos;
-							if (last == strline.npos)
-								strItem = "";
-							else
-								strItem = strline.substr(0, last + 1);
-
-							if (strItem == Item) {
-								size_t first = strline.find_first_not_of(" \t", equalsignPos + 1);
-								if (first == strline.npos)
-									strValue = "";
-								else
-									strValue = strline.substr(first);
-								m_bLastResult = true;
-								return strValue;
-							}
-						} else if ('[' == strline[0]) {
-							break;
-						}
-					}
-					break;
-				}
-			}
-		}
-	}
-	return std::string("");
+    BuildIndex();
+    m_bLastResult = false;
+    for (const SectionIndex &section : m_Index) {
+        if (section.name != Section) continue;
+        const auto found = std::lower_bound(section.items.begin(), section.items.end(), Item,
+            [&](size_t line, const std::string &key) { return itemName(m_FileContainer[line]) < key; });
+        if (found != section.items.end() && itemName(m_FileContainer[*found]) == Item) {
+            const std::string &line = m_FileContainer[*found];
+            const size_t first = line.find_first_not_of(" \t", line.find('=') + 1);
+            m_bLastResult = true;
+            return first == line.npos ? std::string() : line.substr(first);
+        }
+        break;
+    }
+    return {};
 }
 
 void CIniFile::SetFileString(const std::string &Section, const std::string &Item, const std::string &Value)
 {
-	std::string strline;
-	std::string strSection;
-	std::string strItem;
-
-	if (m_bReadOnly)
-		return;
-
-	size_t ii = 0;
-	size_t iFileLines = m_FileContainer.size();
-
-	while (ii < iFileLines) {
-		strline = m_FileContainer[ii++];
-
-		size_t rBracketPos = 0;
-		if ('[' == strline[0])
-			rBracketPos = strline.find(']');
-		if (rBracketPos > 0 && rBracketPos != std::string::npos) {
-			strSection = strline.substr(1, rBracketPos - 1);
-			if (strSection == Section) {
-				while (ii < iFileLines) {
-					strline = m_FileContainer[ii++];
-					size_t equalsignPos = strline.find('=');
-					if (equalsignPos != strline.npos) {
-						size_t last = equalsignPos ? strline.find_last_not_of(" \t", equalsignPos - 1) : strline.npos;
-						if (last == strline.npos)
-							strItem = "";
-						else
-							strItem = strline.substr(0, last + 1);
-
-						if (Item == strItem) {
-							ReplaceLine(ii - 1, Item + (gbar2Fix ? "=" : " = ") + Value);
-							return;
-						}
-					} else if ('[' == strline[0]) {
-						InsertLine(ii - 1, Item + (gbar2Fix ? "=" : " = ") + Value);
-						return;
-					}
-				}
-				InsertLine(ii, Item + (gbar2Fix ? "=" : " = ") + Value);
-				return;
-			}
-		}
-	}
-
-	InsertLine(ii, "[" + Section + "]");
-	InsertLine(ii + 1, Item + (gbar2Fix ? "=" : " = ") + Value);
-	return;
+    if (m_bReadOnly) return;
+    BuildIndex();
+    const std::string replacement = Item + (gbar2Fix ? "=" : " = ") + Value;
+    for (const SectionIndex &section : m_Index) {
+        if (section.name != Section) continue;
+        const auto found = std::lower_bound(section.items.begin(), section.items.end(), Item,
+            [&](size_t line, const std::string &key) { return itemName(m_FileContainer[line]) < key; });
+        if (found != section.items.end() && itemName(m_FileContainer[*found]) == Item) {
+            ReplaceLine(*found, replacement);
+        } else {
+            InsertLine(section.end, replacement);
+        }
+        return;
+    }
+    const size_t end = m_FileContainer.size();
+    InsertLine(end, "[" + Section + "]");
+    InsertLine(end + 1, replacement);
 }
 
 bool CIniFile::InsertLine(size_t line, const std::string &str)
 {
-	m_FileContainer.insert(m_FileContainer.begin() + line, str);
-	return true;
+    m_FileContainer.insert(m_FileContainer.begin() + line, str);
+    if (!str.empty() && str[0] == '[') m_IndexValid = false;
+    if (m_IndexValid) {
+        const bool hasKey = str.find('=') != str.npos;
+        for (SectionIndex &section : m_Index) {
+            const bool contains = section.begin <= line && line <= section.end;
+            for (size_t &item : section.items) if (item >= line) item++;
+            if (contains && hasKey) {
+                const auto position = std::lower_bound(section.items.begin(), section.items.end(), line,
+                    [&](size_t a, size_t b) {
+                        const auto ka = itemName(m_FileContainer[a]), kb = itemName(m_FileContainer[b]);
+                        return ka < kb || (ka == kb && a < b);
+                    });
+                section.items.insert(position, line);
+            }
+            if (section.begin > line) section.begin++;
+            if (section.end >= line) section.end++;
+        }
+    }
+    return true;
 }
 
 bool CIniFile::ReplaceLine(size_t line, const std::string &str)
 {
-	m_FileContainer[line] = str;
-	return true;
+    const std::string &previous = m_FileContainer[line];
+    if ((!previous.empty() && previous[0] == '[') || (!str.empty() && str[0] == '[')
+        || itemName(previous) != itemName(str)) m_IndexValid = false;
+    m_FileContainer[line] = str;
+    return true;
 }

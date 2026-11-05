@@ -1,11 +1,9 @@
 #---------------------------------------------------------------------------------
 .SUFFIXES:
 #---------------------------------------------------------------------------------
-ifeq ($(strip $(DEVKITARM)),)
-$(error "Please set DEVKITARM in your environment. export DEVKITARM=<path to>devkitARM)
-endif
 
--include $(DEVKITARM)/ds_rules
+TWLM_ROOT ?= $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/../..)
+include $(TWLM_ROOT)/universal/blocksds.mk
 
 #---------------------------------------------------------------------------------
 # BUILD is the directory where object files & intermediate files will be placed
@@ -33,7 +31,7 @@ CFLAGS	:=	-g -Wall -O2 \
 CFLAGS	+=	$(INCLUDE) $(EXTRA_CFLAGS) -DARM7
 
 ASFLAGS	:=	-g $(ARCH) -flto $(EXTRA_CFLAGS) $(INCLUDE)
-LDFLAGS	=	-nostartfiles -T $(TOPDIR)/load.ld -g $(ARCH) -Wl,-Map,$(TARGET).map
+LDFLAGS	=	-specs=picolibc.specs -Wl,--gc-sections -nostartfiles -T $(TOPDIR)/load.ld -g $(ARCH) -Wl,-Map,$(TARGET).map
 
 LIBS	:=	-lnds7
 
@@ -69,6 +67,8 @@ SFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.s)))
  
 export OFILES	:=	$(CPPFILES:.cpp=.o) $(CFILES:.c=.o) $(SFILES:.s=.o)
  
+export ASSET_OBJECTS := $(addsuffix .o,$(BINFILES)) $(BMPFILES:.bmp=.o) $(PNGFILES:.png=.o)
+
 export INCLUDE	:=	$(foreach dir,$(INCLUDES),-I$(CURDIR)/$(dir)) \
 					$(foreach dir,$(LIBDIRS),-I$(dir)/include) \
 					-I$(CURDIR)/$(BUILD)
@@ -109,7 +109,7 @@ $(LOADBIN)	:	$(LOADELF)
 
 $(LOADELF)	: $(OFILES)
 	@echo linking $(notdir $@)
-	@$(LD)  $(LDFLAGS) $(OFILES) $(LIBPATHS) $(LIBS) -o $@
+	@$(LD) $(CPUFLAGS) $(LDFLAGS) $(OFILES) $(LIBPATHS) $(BLOCKSDS_LIBPATHS) $(STORAGE_WRAPS) -Wl,--start-group $(if $(findstring g++,$(LD)),-lstdc++) $(LIBS) -lc -Wl,--end-group -o $@
 
 arm9mpu_reset.o: mpu_reset.bin
 

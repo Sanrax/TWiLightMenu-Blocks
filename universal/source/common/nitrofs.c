@@ -1,3 +1,4 @@
+#ifndef __BLOCKSDS__
 /*
     nitrofs.c - eris's wai ossum nitro filesystem device driver
         Based on information found at http://frangoassado.org/ds/rom_spec.txt and from the #dsdev ppls
@@ -548,3 +549,4 @@ int bootFSChdir(struct _reent *r, const char *name)
 	bootNitro = false;
 	return res;
 }
+#endif // __BLOCKSDS__

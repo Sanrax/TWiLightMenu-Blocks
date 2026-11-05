@@ -47,6 +47,7 @@ u8 my_i2cWriteRegister(u8 device, u8 reg, u8 data);
 
 volatile int timeTilVolumeLevelRefresh = 0;
 static int soundVolume = 127;
+static int soundFadeStep = 0;
 volatile int rebootTimer = 0;
 volatile u32 status = 0;
 static bool i2cBricked = false;
@@ -57,7 +58,7 @@ static bool i2cBricked = false;
 //---------------------------------------------------------------------------------
 void soundFadeOut() {
 //---------------------------------------------------------------------------------
-	soundVolume -= 3;
+	soundVolume -= soundFadeStep;
 	if (soundVolume < 0) {
 		soundVolume = 0;
 	}
@@ -114,7 +115,11 @@ static void menuValue32Handler(u32 value, void* data) {
 void VblankHandler(void) {
 //---------------------------------------------------------------------------------
 	resyncClock();
-	if (fifoCheckValue32(FIFO_USER_01)) {
+	while (fifoCheckValue32(FIFO_USER_01)) {
+		const u32 fadeMode = fifoGetValue32(FIFO_USER_01);
+		soundFadeStep = fadeMode == 2 ? 8 : fadeMode ? 3 : 0;
+	}
+	if (soundFadeStep) {
 		soundFadeOut();
 	} else {
 		soundVolume = 127;
@@ -163,7 +168,7 @@ TWL_CODE void aes(void* in, void* out, void* iv, u32 method){ //this is sort of 
 	//if (method & (AES_CTR_DECRYPT | AES_CTR_ENCRYPT)) add_ctr((u8*)iv);
 }
 
-TWL_CODE void getConsoleID(u32 offset) {
+TWL_CODE void twlmGetConsoleKey(u32 offset) {
 	// Fix duplicated line bug on 3DS
 	while (REG_VCOUNT != 191);
 	while (REG_VCOUNT == 191);
@@ -212,7 +217,7 @@ int main() {
 
 	irqInit();
 	// Start the RTC tracking IRQ
-	initClockIRQ();
+	initClockIRQTimer(LIBNDS_DEFAULT_TIMER_RTC);
 
 	my_touchInit();
 	fifoInit();
@@ -342,7 +347,7 @@ int main() {
 			my_sdmmc_get_cid(true, (u32*)0x2FFD7BC);	// Get eMMC CID
 			*(u32*)(0x2FFFD0C) = 0;
 		} else if (*(u32*)(0x2FFFD0C) == 0x44494347) { // 'GCID'
-			getConsoleID(*(u32*)0x2FFFD08);
+			twlmGetConsoleKey(*(u32*)0x2FFFD08);
 			*(u32*)(0x2FFFD0C) = 0;
 		} else if (reset_pico) {
 			resetDSPico();

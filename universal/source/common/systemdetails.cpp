@@ -1,3 +1,4 @@
+#include "common/storage.h"
 #include "common/systemdetails.h"
 #include "common/flashcard.h"
 #include "common/arm7status.h"
@@ -38,6 +39,7 @@ SystemDetails::SystemDetails()
 	_isRegularDS = true;
 	_isDSPhat = false;
 	_hasRegulableBacklight = true;
+	_backlightsInitiallyOff = false;
 	_i2cBricked = false;
 	_nitroFsInitOk = false;
 	_fatInitOk = false;
@@ -66,6 +68,7 @@ SystemDetails::SystemDetails()
 	_isDSPhat = CHECK_BIT(status, DSPHAT_BIT) != 0;
 
 	_hasRegulableBacklight = CHECK_BIT(status, BACKLIGHT_BIT) != 0;
+	_backlightsInitiallyOff = CHECK_BIT(status, BACKLIGHTS_OFF_BIT) != 0;
 
 	_i2cBricked = CHECK_BIT(status, I2CBRICKED_BIT) != 0;
 
@@ -131,20 +134,23 @@ void SystemDetails::initFilesystem(const char *runningPath)
 	*(u32*)(0x2FFFD0C) = 0x54494D52;	// Run reboot timer
 	if (isDSiMode() && memcmp(io_dldi_data->friendlyName, "CycloDS iEvolution", 18) == 0) {
 		*(u32*)(0x2FFFA04) = 0x49444C44;
-		fatMountSimple("fat", &__my_io_dsisd);
+		twlmMountStorage("fat", &__my_io_dsisd);
 		_fatInitOk = flashcardFound();
 	} else {
-		if (!sys().isRegularDS()) fatMountSimple("sd", &__my_io_dsisd);
-		fatMountSimple("fat", dldiGetInternal());
+		if (!sys().isRegularDS()) twlmMountStorage("sd", &__my_io_dsisd);
+		twlmMountStorage("fat", dldiGetInternal());
 		_fatInitOk = (sdFound() || flashcardFound());
 	}
 	*(u32*)(0x2FFFD0C) = 0;
-	_isRunFromSD = (strncmp(runningPath, "sd:/", 4) == 0);
+	_isRunFromSD = (runningPath && strncmp(runningPath, "sd:/", 4) == 0);
 	chdir(_isRunFromSD ? "sd:/" : "fat:/");
 
 	if (!_nitroFsInitOk && runningPath != NULL) {
 		_nitroFsInitOk = nitroFSInit(runningPath) == 1;
 	}
+	// Native NitroFS selects nitro:/ as the default device. Menu paths rooted
+	// at /_nds must continue to refer to the card, as they did with libfat.
+	chdir(_isRunFromSD ? "sd:/" : "fat:/");
 }
 
 u32* SystemDetails::allocCommonCache(const u32 tag, u32 allocSize)

@@ -4,65 +4,57 @@
 #include "common/twlmenusettings.h"
 #include "common/lodepng.h"
 // #include "common/ColorLut.h"
-#include <math.h>
+#include <cstdint>
+#include <vector>
 
 extern bool useTwlCfg;
 extern u16* colorTable;
 
-Texture::Texture(const std::string &filePath, const std::string &fallback1, const std::string &fallback2)
-	: _paletteLength(0), _texLength(0), _texCmpLength(0), _texHeight(0), _texWidth(0), _type(TextureType::Unknown) {
-	std::string pngPath;
-	FILE *file = NULL;
-	const std::string *paths[] = {&filePath, &fallback1, &fallback2};
-	int i = 0;
-	do {
-		for (const char *extension : extensions) {
-			file = fopen((*paths[i] + extension).c_str(), "rb");
-			if (file) {
-				_type = findType(file);
-				if (_type == TextureType::Unknown) {
-					fclose(file);
-				} else {
-					pngPath = *paths[i] + extension;
-					break;
-				}
-			}
-		}
-	} while (!file && ++i < 3);
-
-	switch (_type) {
-	case TextureType::PalettedGrf:
-		nocashMessage("loading paletted");
-		loadPaletted(file);
-		break;
-	case TextureType::Bmp:
-	case TextureType::PalettedBmp:
-		nocashMessage("loading bmp");
-		loadBitmap(file);
-		break;
-	case TextureType::Png:
-		nocashMessage("loading png");
-		loadPNG(pngPath);
-		break;
-	case TextureType::CompressedGrf:
-		nocashMessage("loading compressed");
-		loadCompressed(file);
-		break;
-	case TextureType::Unknown:
-	case TextureType::Bitmap: // ingore the bitfields
-	case TextureType::Paletted:
-	case TextureType::Compressed:
-		break;
-	}
-
-	fclose(file);
+Texture::Texture(const std::string &filePath, const std::string &fallback1, const std::string &fallback2) noexcept
+    : _paletteLength(0), _texLength(0), _texCmpLength(0), _texHeight(0), _texWidth(0), _type(TextureType::Unknown) {
+    const std::string *paths[] = {&filePath, &fallback1, &fallback2};
+    for (const std::string *path : paths) {
+        if (path->empty()) continue;
+        for (const char *extension : extensions) {
+            FILE *file = fopen((*path + extension).c_str(), "rb");
+            if (!file) continue;
+            _type = findType(file);
+            bool loaded = false;
+            switch (_type) {
+            case TextureType::PalettedGrf:
+                loadPaletted(file);
+                loaded = true;
+                break;
+            case TextureType::Bmp:
+            case TextureType::PalettedBmp:
+                loaded = loadBitmap(file);
+                break;
+            case TextureType::Png:
+                loaded = loadPNG(file);
+                break;
+            case TextureType::CompressedGrf:
+                loadCompressed(file);
+                loaded = true;
+                break;
+            default:
+                break;
+            }
+            fclose(file);
+            if (loaded) return;
+            _palette.reset();
+            _texture.reset();
+            _paletteLength = 0;
+            _texLength = _texCmpLength = _texHeight = _texWidth = 0;
+            _type = TextureType::Unknown;
+        }
+    }
 }
 
 TextureType Texture::findType(FILE *file) {
 
 	fseek(file, 0, SEEK_SET);
 	u32 magic[12] = {0};
-	fread(&magic, sizeof(u32), 12, file);
+	if (fread(&magic, sizeof(u32), 12, file) != 12) return TextureType::Unknown;
 
 	if (((u16)magic[0] & 0xffff) == BMP_ID('B', 'M')) {
 		// Only 4 and 16 bit are supported currently
@@ -91,92 +83,99 @@ TextureType Texture::findType(FILE *file) {
 	return TextureType::Unknown;
 }
 
-void Texture::loadBitmap(FILE *file) noexcept {
-	// SKIP 'B' 'M' Idenifier
-	fseek(file, sizeof(u16), SEEK_SET);
-
-	u16 offset = 0, headerSize = 0;
-	u16 bitDepth = 0;
-	u32 texLength = 0;
-
-	fseek(file, 2 * sizeof(u32), SEEK_CUR);
-	fread(&offset, sizeof(u32), 1, file);
-	fread(&headerSize, sizeof(u32), 1, file);
-
-	fread(&_texWidth, sizeof(u32), 1, file);
-	fread(&_texHeight, sizeof(u32), 1, file);
-
-	fseek(file, sizeof(u16), SEEK_CUR);
-
-	fread(&bitDepth, sizeof(u16), 1, file);
-
-	fseek(file, sizeof(u32), SEEK_CUR);
-
-	fread(&texLength, sizeof(u32), 1, file);
-
-	_texLength = texLength >> 1;
-	_texture = std::make_unique<u16[]>(_texLength);
-
-	// Load palette
-	if (bitDepth <= 8) {
-		fseek(file, sizeof(u32) * 2, SEEK_CUR);
-		u32 paletteLength;
-		fread(&paletteLength, sizeof(u32), 1, file);
-		if (paletteLength == 0)
-			_paletteLength = 1 << bitDepth;
-		else
-			_paletteLength = paletteLength;
-
-		fseek(file, 0xE + headerSize, SEEK_SET);
-
-		_palette = std::make_unique<u16[]>(_paletteLength);
-
-		for (int i = 0; i < _paletteLength; i++) {
-			u32 color;
-			fread(&color, sizeof(u32), 1, file);
-			u8 r = lroundf(((color >> 16) & 0xFF) * 31 / 255.0f) & 0x1F;
-			u8 g = lroundf(((color >> 8) & 0xFF) * 31 / 255.0f) & 0x1F;
-			u8 b = lroundf((color & 0xFF) * 31 / 255.0f) & 0x1F;
-
-			_palette[i] = BIT(15) | b << 10 | g << 5 | r;
-			if (colorTable) {
-				_palette[i] = colorTable[_palette[i] % 0x8000] | BIT(15);
-			}
-		}
-	}
-
-	for (uint y = 0; y < _texHeight; y++) {
-		fseek(file, offset + ((_texHeight - y - 1) * _texWidth) * bitDepth / 8, SEEK_SET);
-		fread((u8 *)_texture.get() + (y * _texWidth) * bitDepth / 8, 1, _texWidth * bitDepth / 8, file);
-
-		if (bitDepth == 16) { // Filter
-			for (uint x = 0; x < _texWidth; x++) {
-				_texture[(y * _texWidth) + x] = bmpToDS(_texture[(y * _texWidth) + x]);
-			}
-		} else if (bitDepth == 4) { // Swap nibbles
-			for (uint x = 0; x < _texWidth; x += 2) {
-				u8 *px = (u8 *)_texture.get() + ((y * _texWidth) + x) / 2;
-				*px = *px << 4 | *px >> 4;
-			}
-		}
-	}
+namespace {
+u16 read16(const u8 *p) { return p[0] | (u16(p[1]) << 8); }
+u32 read32(const u8 *p) { return read16(p) | (u32(read16(p + 2)) << 16); }
 }
 
-void Texture::loadPNG(const std::string &path) {
-	std::vector<unsigned char> buffer;
-	unsigned width, height;
-	lodepng::decode(buffer, width, height, path);
-	_texWidth = width;
-	_texHeight = height;
-	_texLength = _texWidth * _texHeight;
+bool Texture::loadBitmap(FILE *file) noexcept {
+    u8 header[54];
+    if (fseek(file, 0, SEEK_SET) || fread(header, 1, sizeof(header), file) != sizeof(header)) return false;
+    // BMP offsets and DIB sizes are 32-bit fields, including on ARM.
+    const u32 offset = read32(header + 10), headerSize = read32(header + 14);
+    const u32 width = read32(header + 18);
+    const int32_t height = int32_t(read32(header + 22));
+    const u16 bitDepth = read16(header + 28);
+    const u32 compression = read32(header + 30);
+    if (headerSize < 40 || !width || width > INT32_MAX || !height || height == INT32_MIN
+        || read16(header + 26) != 1 || (bitDepth != 4 && bitDepth != 16)
+        || (compression != 0 && (bitDepth != 16 || compression != 3))) return false;
+    const u32 rows = height < 0 ? -height : height;
+    const uint64_t pixels = uint64_t(width) * rows;
+    const uint64_t stride = ((uint64_t(width) * bitDepth + 31) / 32) * 4;
+    if (pixels > UINT32_MAX / 2 || fseek(file, 0, SEEK_END)) return false;
+    const long size = ftell(file);
+    if (size < 0 || uint64_t(offset) + stride * rows > uint64_t(size)
+        || uint64_t(headerSize) + 14 > offset) return false;
 
-	// Convert to DS bitmap format
-	_texture = std::make_unique<u16[]>(_texWidth * _texHeight);
-	for (uint i=0;i<buffer.size()/4;i++) {
-		if (buffer[(i * 4) + 3] == 0xFF) { // Only keep full opacity pixels
-			_texture[i] = bmpToDS((buffer[i * 4] >> 3) << 10 | (buffer[(i * 4) + 1] >> 3) << 5 | buffer[(i * 4) + 2] >> 3);
-		}
-	}
+    bool rgb565 = false;
+    if (compression == 3) {
+        u8 masks[12];
+        if (offset < 66 || fseek(file, 54, SEEK_SET) || fread(masks, 1, 12, file) != 12) return false;
+        rgb565 = read32(masks) == 0xF800 && read32(masks + 4) == 0x07E0 && read32(masks + 8) == 0x001F;
+        const bool rgb555 = read32(masks) == 0x7C00 && read32(masks + 4) == 0x03E0 && read32(masks + 8) == 0x001F;
+        if (!rgb565 && !rgb555) return false;
+    }
+    if (bitDepth == 4) {
+        const u32 colors = read32(header + 46) ? read32(header + 46) : 16;
+        if (colors > 16 || uint64_t(headerSize) + 14 + colors * 4 > offset) return false;
+        _paletteLength = colors;
+        _palette = std::make_unique<u16[]>(colors);
+        if (fseek(file, 14 + headerSize, SEEK_SET)) return false;
+        for (u32 i = 0; i < colors; i++) {
+            u8 color[4];
+            if (fread(color, 1, 4, file) != 4) return false;
+            const u16 r = (color[2] * 31 + 127) / 255;
+            const u16 g = (color[1] * 31 + 127) / 255;
+            const u16 b = (color[0] * 31 + 127) / 255;
+            _palette[i] = BIT(15) | (b << 10) | (g << 5) | r;
+            if (colorTable) _palette[i] = colorTable[_palette[i] & 0x7FFF] | BIT(15);
+        }
+    }
+    _texWidth = width;
+    _texHeight = rows;
+    _texLength = bitDepth == 16 ? pixels : (pixels + 3) / 4;
+    _texture = std::make_unique<u16[]>(_texLength);
+    std::vector<u8> row(stride);
+    if (fseek(file, offset, SEEK_SET)) return false;
+    // Read in file order: no backward seek for every bottom-up row.
+    for (u32 fileRow = 0; fileRow < rows; fileRow++) {
+        if (fread(row.data(), 1, row.size(), file) != row.size()) return false;
+        const u32 y = height < 0 ? fileRow : rows - fileRow - 1;
+        for (u32 x = 0; x < width; x++) {
+            const u32 pixel = y * width + x;
+            if (bitDepth == 16) {
+                u16 color = read16(row.data() + x * 2);
+                if (rgb565) color = ((color >> 11) << 10) | (((color >> 6) & 31) << 5) | (color & 31);
+                _texture[pixel] = bmpToDS(color);
+            } else {
+                const u8 index = (row[x / 2] >> ((x & 1) ? 0 : 4)) & 15;
+                if (index >= _paletteLength) return false;
+                reinterpret_cast<u8 *>(_texture.get())[pixel / 2] |= index << ((pixel & 1) * 4);
+            }
+        }
+    }
+    return true;
+}
+
+bool Texture::loadPNG(FILE *file) noexcept {
+    if (fseek(file, 0, SEEK_END)) return false;
+    const long size = ftell(file);
+    if (size <= 0 || fseek(file, 0, SEEK_SET)) return false;
+    std::vector<unsigned char> encoded(size), buffer;
+    if (fread(encoded.data(), 1, encoded.size(), file) != encoded.size()) return false;
+    unsigned width = 0, height = 0;
+    if (lodepng::decode(buffer, width, height, encoded.data(), encoded.size()) || !width || !height
+        || uint64_t(width) * height > UINT32_MAX / 4 || buffer.size() != uint64_t(width) * height * 4) return false;
+    _texWidth = width;
+    _texHeight = height;
+    _texLength = width * height;
+    _texture = std::make_unique<u16[]>(_texLength);
+    for (u32 i = 0; i < _texLength; i++) {
+        if (buffer[i * 4 + 3] == 0xFF)
+            _texture[i] = bmpToDS((buffer[i * 4] >> 3) << 10 | (buffer[i * 4 + 1] >> 3) << 5 | (buffer[i * 4 + 2] >> 3));
+    }
+    return true;
 }
 
 void Texture::loadPaletted(FILE *file) noexcept {
@@ -229,7 +228,7 @@ void Texture::loadCompressed(FILE *file) noexcept {
 	// read chunk length
 	fread(&_texCmpLength, sizeof(u32), 1, file); // this includes size of the header word
 
-	_texture = std::make_unique<u16[]>(_texCmpLength >> 1);
+	_texture = std::make_unique<u16[]>((_texCmpLength + 1) / 2);
 	fread(_texture.get(), sizeof(u8), _texCmpLength, file);
 	
 	_texLength = (*((u32*)_texture.get()) >> 9); // palette length in ints sizeof(unsigned int);  
@@ -284,10 +283,12 @@ void Texture::copy(u16 *dst, bool vram) const {
 		case TextureType::PalettedGrf:
 		case TextureType::PalettedBmp:
 			for (u32 i = 0; i < _texWidth * _texHeight / 2; i++) {
-				u8 byte = ((u8 *)_texture.get())[i];
-				*(dst++) = _palette[byte & 0xF];
+				const u8 byte = reinterpret_cast<const u8 *>(_texture.get())[i];
+				*(dst++) = _palette[byte & 15];
 				*(dst++) = _palette[byte >> 4];
 			}
+			if ((_texWidth * _texHeight) & 1)
+				*dst = _palette[reinterpret_cast<const u8 *>(_texture.get())[_texWidth * _texHeight / 2] & 15];
 			break;
 		case TextureType::Bmp:
 		case TextureType::Png:

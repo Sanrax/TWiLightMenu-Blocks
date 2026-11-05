@@ -4,13 +4,35 @@
 #---------------------------------------------------------------------------------
 PACKAGE		:=	7zfile
 export PROJECT	:=	$(CURDIR)
+.DEFAULT_GOAL := all
 
 #---------------------------------------------------------------------------------
 # Goals for Build
 #---------------------------------------------------------------------------------
-.PHONY: all package booter booter_fc 3dssplash gbapatcher quickmenu manual resources romsel_aktheme romsel_dsimenutheme romsel_r4theme settings slot1launch title
+.PHONY: all package booter booter_fc 3dssplash gbapatcher quickmenu manual imageview resources romsel_aktheme romsel_dsimenutheme romsel_r4theme settings slot1launch title
 
-all:	booter booter_fc 3dssplash gbapatcher quickmenu manual resources romsel_aktheme romsel_dsimenutheme romsel_r4theme settings slot1launch title
+.PHONY: test
+test:
+	python3 tests/run.py
+
+.PHONY: check-build
+check-build:
+	python3 tests/check_build.py
+
+.PHONY: profile-startup
+profile-startup: shared-loaders
+	@$(MAKE) -C romsel_dsimenutheme profile-startup
+
+all:	booter booter_fc 3dssplash gbapatcher quickmenu manual imageview resources romsel_aktheme romsel_dsimenutheme romsel_r4theme settings slot1launch title
+
+# Shared loaders must finish before parallel component builds copy their binaries.
+.PHONY: shared-loaders
+shared-loaders:
+	@$(MAKE) -C universal/bootloader_menu
+	@$(MAKE) -C universal/bootloader_app
+	@$(MAKE) -C universal/bootstub
+
+booter booter_fc 3dssplash gbapatcher quickmenu manual imageview romsel_aktheme romsel_dsimenutheme romsel_r4theme settings slot1launch title: shared-loaders
 
 package:
 	@$(MAKE) -C booter dist
@@ -79,6 +101,7 @@ title:
 
 clean:
 	@echo clean build directories
+	@$(MAKE) -C tools clean
 	@$(MAKE) -C booter clean
 	@$(MAKE) -C booter_fc clean
 	@$(MAKE) -C 3dssplash clean

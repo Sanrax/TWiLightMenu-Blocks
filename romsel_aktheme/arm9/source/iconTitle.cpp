@@ -1096,12 +1096,11 @@ void getGameInfo(int num, int fileOffset, bool isDir, const char* name, bool fro
 			clearTitle(num);
 			if (customIcon[num] != 2)
 				clearBannerSequence(num);
-			fclose(fp);
 			return;
 		}
 
 		// read each line
-		while ((rc = __getline(&line, &size, fp)) > 0) {
+		while ((rc = getline(&line, &size, fp)) > 0) {
 			// remove comments
 			if ((p = strchr(line, '#')) != NULL)
 				*p = 0;
@@ -1160,7 +1159,6 @@ void getGameInfo(int num, int fileOffset, bool isDir, const char* name, bool fro
 		// open file for reading info
 		fp = fopen(name, "rb");
 		if (!fp) {
-			fclose(fp);
 			return;
 		}
 
@@ -1175,7 +1173,6 @@ void getGameInfo(int num, int fileOffset, bool isDir, const char* name, bool fro
 		// open file for reading info
 		fp = fopen(name, "rb");
 		if (!fp) {
-			fclose(fp);
 			return;
 		}
 
@@ -1191,7 +1188,6 @@ void getGameInfo(int num, int fileOffset, bool isDir, const char* name, bool fro
 			clearTitle(num);
 			if (customIcon[num] != 2)
 				clearBannerSequence(num); // banner sequence
-			fclose(fp);
 			return;
 		}
 
@@ -1544,12 +1540,11 @@ void iconUpdate(int num, bool isDir, const char* name)
 		if (fp == NULL) {
 			logPrint("Icon not found!\n");
 			clearIcon(num);
-			fclose(fp);
 			return;
 		}
 
 		// read each line
-		while ((rc = __getline(&line, &size, fp)) > 0) {
+		while ((rc = getline(&line, &size, fp)) > 0) {
 			// remove comments
 			if ((p = strchr(line, '#')) != NULL)
 				*p = 0;

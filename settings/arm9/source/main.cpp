@@ -1,8 +1,11 @@
+#include "common/filetypes.h"
+#include <time.h>
 #include <nds.h>
 #include <nds/arm9/dldi.h>
 #include <cstdio>
 #include <fat.h>
 #include <sys/stat.h>
+#include <dirent.h>
 #include <limits.h>
 #include <variant>
 #include <string.h>
@@ -128,16 +131,7 @@ std::string ReplaceAll(std::string str, const std::string &from, const std::stri
 	return str;
 }
 
-bool extension(const std::string_view filename, const std::vector<std::string_view> extensions) {
-	for (std::string_view extension : extensions) {
-		// logPrint("Checking for %s extension in %s\n", extension.data(), filename.data());
-		if ((strlen(filename.data()) > strlen(extension.data())) && (strcasecmp(filename.substr(filename.size() - extension.size()).data(), extension.data()) == 0)) {
-			return true;
-		}
-	}
 
-	return false;
-}
 
 void launchSystemSettings()
 {
@@ -1008,12 +1002,10 @@ void customSleep() {
 		powerOff(PM_BACKLIGHT_TOP);
 	}
 	powerOff(PM_BACKLIGHT_BOTTOM);
-	irqDisable(IRQ_VBLANK & IRQ_VCOUNT);
 	while (keysHeld() & KEY_LID) {
 		scanKeys();
 		swiWaitForVBlank();
 	}
-	irqEnable(IRQ_VBLANK & IRQ_VCOUNT);
 	if(!wasBacklightOff) {
 		if (!currentMacroMode) {
 			powerOn(PM_BACKLIGHT_TOP);
@@ -1050,7 +1042,9 @@ int settingsMode(void)
 	snd().init();
 	keysSetRepeat(25, 5);
 	
-	wasBacklightOff = sys().isRegularDS() && (REG_POWERCNT & 0xC) == 0;
+	// ARM9 POWCNT1 bits 2/3 control the 3D engine, not the backlights.
+	// Read the initial PMIC state reported by ARM7 instead.
+	wasBacklightOff = sys().backlightsInitiallyOff();
 
 	bool widescreenFound = false;
 	bool lumaFound = false;

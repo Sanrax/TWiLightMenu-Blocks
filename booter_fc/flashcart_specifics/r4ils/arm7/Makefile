@@ -6,11 +6,9 @@ VERSTRING	:=	$(ARM7_MAJOR).$(ARM7_MINOR).$(ARM7_PATCH)
 #---------------------------------------------------------------------------------
 .SUFFIXES:
 #---------------------------------------------------------------------------------
-ifeq ($(strip $(DEVKITARM)),)
-$(error "Please set DEVKITARM in your environment. export DEVKITARM=<path to>devkitARM)
-endif
 
-include $(DEVKITARM)/ds_rules
+TWLM_ROOT ?= $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/../../../..)
+include $(TWLM_ROOT)/universal/blocksds.mk
 #---------------------------------------------------------------------------------
 # TARGET is the name of the output
 # BUILD is the directory where object files & intermediate files will be placed
@@ -37,7 +35,7 @@ CFLAGS	:=	-g -Wall -O2 \
 CFLAGS	+=	$(INCLUDE) -DARM7 -DNO_SDMMC
 
 ASFLAGS	:=	-g $(ARCH) -flto
-LDFLAGS	=	-specs=ds_arm7.specs -g $(ARCH) -Wl,--nmagic -Wl,-Map,$(notdir $*).map
+LDFLAGS	=	-specs=$(BLOCKSDS)/sys/crts/ds_arm7.specs -g $(ARCH) -Wl,--nmagic -Wl,-Map,$(notdir $*).map
 
 
 #---------------------------------------------------------------------------------
@@ -67,6 +65,8 @@ CPPFILES	:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.cpp)))
 SFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.s)))
 
 export OFILES	:=	$(CPPFILES:.cpp=.o) $(CFILES:.c=.o) $(SFILES:.s=.o)
+
+export ASSET_OBJECTS := $(addsuffix .o,$(BINFILES)) $(BMPFILES:.bmp=.o) $(PNGFILES:.png=.o)
 
 export INCLUDE	:=	$(foreach dir,$(INCLUDES),-I$(CURDIR)/$(dir)) \
 			$(foreach dir,$(LIBDIRS),-I$(dir)/include) \

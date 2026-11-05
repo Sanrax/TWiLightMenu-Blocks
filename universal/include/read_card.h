@@ -46,7 +46,7 @@ extern u32 cardNandRwStart;
 int cardInit ();
 int cardInitWithoutSlotReset ();
 
-void cardRead (u32 src, void* dest, size_t len, bool nandSave);
+void twlmCardRead (u32 src, void* dest, size_t len, bool nandSave);
 
 u32 cardGetId ();
 

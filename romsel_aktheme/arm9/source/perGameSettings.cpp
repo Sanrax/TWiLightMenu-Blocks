@@ -1,3 +1,5 @@
+#include "common/filetypes.h"
+#include <limits.h>
 #include "perGameSettings.h"
 #include <vector>
 #include <algorithm>
@@ -79,7 +81,7 @@ static char SET_AS_DONOR_ROM[32];
 char pergamefilepath[256];
 
 extern void RemoveTrailingSlashes(std::string &path);
-bool extension(const std::string_view filename, const std::vector<std::string_view> extensions);
+
 
 extern void bgOperations(bool waitFrame);
 

@@ -23,7 +23,7 @@
 
 
 
-extern const unsigned int font_16x16_texcoords[] = {
+extern const unsigned short font_16x16_texcoords[] = {
 	0, 0, 8, TEXT_SY, // Space
 	16, 0, CAPS_SX, TEXT_SY, // 1
 	32, 0, CAPS_SX, TEXT_SY, // 2

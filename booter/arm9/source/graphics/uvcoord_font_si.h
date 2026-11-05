@@ -31,7 +31,7 @@
 //	Format:
 //	U,V,Width,Height
 
-extern const unsigned int font_si_texcoords[] = {
+extern const unsigned short font_si_texcoords[] = {
 	0, 0, 6, S_TEXT_SYS, // Space
 	8, 0, 3, S_TEXT_SYS, // !
 	16, 0, 5, S_TEXT_SYS, // "

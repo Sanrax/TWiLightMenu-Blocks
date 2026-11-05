@@ -30,7 +30,7 @@ void nandio_set_fat_sig_fix(u32 offset) {
 	fat_sig_fix_offset = offset;
 }
 
-void getConsoleID(u8 *consoleID){
+void twlmGetConsoleKey(u8 *consoleID){
 	u8 *fifo=(u8*)crypt_buf; //shared mem address that has our computed key3 stuff
 	DC_InvalidateRange(fifo, 0x400);
 	*(u32*)(0xCFFFD08) = (u32)fifo;
@@ -136,7 +136,7 @@ bool nandio_startup() {
 	u8 consoleIDfixed[8];
 
 	// Get ConsoleID
-	getConsoleID(consoleID);
+	twlmGetConsoleKey(consoleID);
 	for (int i = 0; i < 8; i++) {
 		consoleIDfixed[i] = consoleID[7-i];
 	}

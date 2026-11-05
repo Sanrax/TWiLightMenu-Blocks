@@ -11,8 +11,8 @@ off_t getFileSize(const char *fileName)
 		fseek(fp, 0, SEEK_END);
 		fsize = ftell(fp);			// Get source file's size
 		fseek(fp, 0, SEEK_SET);
+		fclose(fp);
 	}
-	fclose(fp);
 
 	return fsize;
 }
@@ -28,14 +28,12 @@ int fcopy(const char *sourcePath, const char *destinationPath)
 		fsize = ftell(sourceFile);			// Get source file's size
 		fseek(sourceFile, 0, SEEK_SET);
 	} else {
-		fclose(sourceFile);
 		return 1;
 	}
 
 	FILE* destinationFile = fopen(destinationPath, "wb");
 	if (!destinationFile) {
 		fclose(sourceFile);
-		fclose(destinationFile);
 		return 1;
 	}
 

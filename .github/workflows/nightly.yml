@@ -15,8 +15,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    container: devkitpro/devkitarm:20241104
-    name: Build with Docker using devkitARM
+    container: skylyrac/blocksds:slim-v1.24.0
+    name: Build with Docker using BlocksDS
     steps:
       - name: Checkout repo
         uses: actions/checkout@v7
@@ -25,9 +25,8 @@ jobs:
           fetch-depth: 0
       - name: Install tools
         run: |
-          sudo sed -i "/bullseye-security/d" /etc/apt/sources.list
-          sudo apt-get update
-          sudo apt-get install p7zip-full python -y
+          apt-get update
+          apt-get install curl p7zip-full python3 g++ -y
       - name: Setup environment
         run: |
           git config --global safe.directory '*'
@@ -37,8 +36,12 @@ jobs:
           curl -LO https://github.com/DS-Homebrew/twilight-manual/releases/download/pages/pages.7z
           7z x pages.7z
           rm pages.7z
+      - name: Host regression tests
+        run: make test
       - name: Build TWiLightMenu++
         run: make package
+      - name: Check linked images
+        run: make check-build
       - name: Make booter and TWiLightMenu CIAs
         id: make-cias
         run: |

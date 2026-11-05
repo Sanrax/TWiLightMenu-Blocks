@@ -1,3 +1,4 @@
+#include <time.h>
 #include <nds.h>
 #include <nds/arm9/dldi.h>
 #include <fat.h>

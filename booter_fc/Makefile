@@ -1,9 +1,7 @@
+.NOTPARALLEL:
 #---------------------------------------------------------------------------------
 .SUFFIXES:
 #---------------------------------------------------------------------------------
-ifeq ($(strip $(DEVKITARM)),)
-$(error "Please set DEVKITARM in your environment. export DEVKITARM=<path to>devkitARM")
-endif
 
 ifeq ($(strip $(PROJECT)),)
 export PROJECT	:=	$(CURDIR)/../
@@ -21,7 +19,8 @@ endif
 
 export TARGET := booter
 
-include $(DEVKITARM)/ds_rules
+TWLM_ROOT ?= $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/..)
+include $(TWLM_ROOT)/universal/blocksds.mk
 
 .PHONY: bootloader bootstub clean makearm7_fc makearm7_r4ils makearm9_fc makearm9_r4ig makearm9_acekard2 makearm9_r4idsn
 
@@ -35,20 +34,20 @@ makearm7_r4ils:
 	$(MAKE) -C flashcart_specifics/r4ils/arm7
 	cp flashcart_specifics/r4ils/arm7/$(TARGET).elf $(TARGET)_r4ils.arm7.elf
 
-makearm9_fc:
+makearm9_fc: bootloader bootstub
 	$(MAKE) -C arm9
 	cp arm9/$(TARGET).elf $(TARGET)_fc.arm9.elf
 
-makearm9_r4ig:
+makearm9_r4ig: bootloader bootstub
 	$(MAKE) -C flashcart_specifics/r4ig/arm9
 	cp flashcart_specifics/r4ig/arm9/$(TARGET).elf $(TARGET)_r4ig.arm9.elf
 
-makearm9_acekard2:
+makearm9_acekard2: bootloader bootstub
 	$(MAKE) -C flashcart_specifics/address_adapt/arm9 CRT0=0x02000450
 	cp flashcart_specifics/address_adapt/arm9/$(TARGET).elf $(TARGET)_acekard2.arm9.elf
 	$(MAKE) -C flashcart_specifics/address_adapt/arm9 clean
 
-makearm9_r4idsn:
+makearm9_r4idsn: bootloader bootstub
 	$(MAKE) -C flashcart_specifics/address_adapt/arm9 CRT0=0x02000000
 	cp flashcart_specifics/address_adapt/arm9/$(TARGET).elf $(TARGET)_r4idsn.arm9.elf
 	$(MAKE) -C flashcart_specifics/address_adapt/arm9 clean
@@ -65,7 +64,11 @@ dist:	all autoboot
 	@cp $(TARGET)_r4idsn.arm9.elf ../7zfile/debug/$(TARGET)_r4idsn.arm9.elf
 
 .SILENT: autoboot
-autoboot:
+.PHONY: r4denc-tool
+r4denc-tool:
+	$(MAKE) -C $(TWLM_ROOT)/tools
+
+autoboot: r4denc-tool
 	### Special carts first
 	#### Acekard 2, 2.1, 2i
 	cp booter_acekard2.nds akmenu4.nds
@@ -108,14 +111,14 @@ autoboot:
 
 	#### Ace3DS+, Ace3DS X, R4iLS, r4isdhc.com.cn cards, r4isdhc.hk 2021, R4infinity 2, R4i-XDS 2014 white version, R4xMP
 	dlditool flashcart_specifics/DLDI/acep.dldi booter_r4ils.nds
-	r4denc -k 0x4002 booter_r4ils.nds _DS_MENU.dat
+	$(TWLM_ROOT)/tools/build/r4denc -k 0x4002 booter_r4ils.nds _DS_MENU.dat
 	mkdir -p "../7zfile/Flashcard users/Autoboot/Ace3DS+/"
 	mv _DS_MENU.dat "../7zfile/Flashcard users/Autoboot/Ace3DS+/_DS_MENU.dat"
 	
 	##### Some carts require gamecode to be R4XX, but are still considered as Ace3DS+ clones
 	ndstool -c _DSMENU.nds -7 $(TARGET)_r4ils.arm7.elf -9 $(TARGET)_fc.arm9.elf -h 0x200 -g "####" "##" "R4XX" -b icon.bmp "TWiLight Menu++;Rocket Robz"
 	dlditool flashcart_specifics/DLDI/acep.dldi _DSMENU.nds
-	r4denc -k 0x4002 _DSMENU.nds _DSMENU.dat
+	$(TWLM_ROOT)/tools/build/r4denc -k 0x4002 _DSMENU.nds _DSMENU.dat
 	mv _DSMENU.dat "../7zfile/Flashcard users/Autoboot/Ace3DS+/_DSMENU.dat"
 	# no longer need _DSMENU.nds
 	rm -f _DSMENU.nds
@@ -123,7 +126,7 @@ autoboot:
 	#### Gateway Blue
 	ndstool -c _DSMENU.nds -7 $(TARGET)_r4ils.arm7.elf -9 $(TARGET)_fc.arm9.elf -h 0x200 -g "####" "##" "R4IT" -b icon.bmp "TWiLight Menu++;Rocket Robz"
 	dlditool flashcart_specifics/DLDI/acep.dldi _DSMENU.nds
-	r4denc -k 0x4002 _DSMENU.nds _DSMENU.dat
+	$(TWLM_ROOT)/tools/build/r4denc -k 0x4002 _DSMENU.nds _DSMENU.dat
 	mkdir -p "../7zfile/Flashcard users/Autoboot/Gateway Blue"
 	mv _DSMENU.dat "../7zfile/Flashcard users/Autoboot/Gateway Blue/_DSMENU.dat"
 	# no longer need _DSMENU.nds
@@ -141,7 +144,7 @@ autoboot:
 	dlditool flashcart_specifics/DLDI/r4tf.dldi _DS_MENU.nds
 
 	#### R4 / M3 Simply
-	r4denc _DS_MENU.nds
+	$(TWLM_ROOT)/tools/build/r4denc _DS_MENU.nds
 	mkdir -p "../7zfile/Flashcard users/Autoboot/Original R4 & M3 Simply/"
 	mv _DS_MENU.dat "../7zfile/Flashcard users/Autoboot/Original R4 & M3 Simply/_DS_MENU.dat"
 

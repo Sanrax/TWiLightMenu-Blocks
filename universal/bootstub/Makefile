@@ -1,4 +1,5 @@
-include $(DEVKITARM)/base_tools
+TWLM_ROOT ?= $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/../..)
+include $(TWLM_ROOT)/universal/blocksds.mk
 
 TARGET	:=	bootstub
 export BOOTSTUB	?= $(TARGET).bin

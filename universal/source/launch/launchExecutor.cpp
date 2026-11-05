@@ -1,3 +1,4 @@
+#include "common/filetypes.h"
 /*
     launch/launchExecutor.cpp
 
@@ -37,7 +38,6 @@ extern char copyBuf[0x8000];
 extern void s2RamAccess(bool open);
 extern void gbaSramAccess(bool open);
 
-extern bool extension(const std::string_view filename, const std::vector<std::string_view> extensions);
 
 static unsigned fileSizeOf(const char *path)
 {

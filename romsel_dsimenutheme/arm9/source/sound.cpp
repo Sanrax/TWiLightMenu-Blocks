@@ -5,6 +5,7 @@
 #include "common/twlmenusettings.h"
 #include "common/systemdetails.h"
 #include "common/logging.h"
+#include "common/startupprofile.h"
 #include "graphics/fontHandler.h"
 #include "language.h"
 #include "fileCopy.h"
@@ -13,6 +14,8 @@
 #include "common/tonccpy.h"
 #include <algorithm>
 #include <sys/stat.h>
+#include <new>
+#include "common/soundbank.h"
 
 #define SFX_STARTUP		0
 #define SFX_WRONG		1
@@ -56,53 +59,54 @@ extern volatile u32 sample_delay_count;
 volatile char* SFX_DATA = (char*)NULL;
 mm_word SOUNDBANK[MSL_BANKSIZE] = {0};
 
-// Open the sound effect bank for the current theme/music setting and read it
-// into SFX_DATA. Also records how many samples the bank actually holds, so that
-// banks predating the lid sounds keep working.
-void SoundControl::readSfxBank() {
-	FILE* soundbank_file;
+// Built-in banks use Maxmod's file loader, so unused jingles do not have to be
+// read or kept in RAM. Custom paths can exceed that loader's 64-character
+// filename limit; retain the memory-bank interface for those themes.
+bool SoundControl::readSfxBank() {
+	sfxFilePath = ms().theme == TWLSettings::EThemeSaturn
+		? TFN_SATURN_SOUND_EFFECTBANK : TFN_DEFAULT_SOUND_EFFECTBANK;
+	FILE* soundbank_file = nullptr;
+	if (ms().theme != TWLSettings::EThemeSaturn && ms().dsiMusic == 3) {
+		soundbank_file = fopen(std::string(TFN_SOUND_EFFECTBANK).c_str(), "rb");
+		if (soundbank_file) sfxFilePath = nullptr;
+	}
+	if (!soundbank_file) soundbank_file = fopen(sfxFilePath, "rb");
+	if (!soundbank_file) return false;
 
-	if (ms().theme == TWLSettings::EThemeSaturn) {
-		soundbank_file = fopen(std::string(TFN_SATURN_SOUND_EFFECTBANK).c_str(), "rb");
-	} else {
-		switch(ms().dsiMusic) {
-			case 3:
-				soundbank_file = fopen(std::string(TFN_SOUND_EFFECTBANK).c_str(), "rb");
-				if (soundbank_file) break; // fallthrough if soundbank_file fails.
-			case 1:
-			case 2:
-			default:
-				soundbank_file = fopen(std::string(TFN_DEFAULT_SOUND_EFFECTBANK).c_str(), "rb");
-				break;
+	u8 bytes[20] = {};
+	soundbank::Header header{};
+	bool valid = fread(bytes, 1, sizeof(bytes), soundbank_file) == sizeof(bytes)
+		&& soundbank::readHeader(bytes, sizeof(bytes), header);
+	if (valid && !sfxFilePath) {
+		valid = fseek(soundbank_file, 0, SEEK_END) == 0;
+		const long size = valid ? ftell(soundbank_file) : -1;
+		valid = size >= long(sizeof(bytes)) && fseek(soundbank_file, 0, SEEK_SET) == 0;
+		if (valid) {
+			SFX_DATA = new (std::nothrow) char[size];
+			valid = SFX_DATA && fread((void*)SFX_DATA, 1, size, soundbank_file) == size_t(size)
+				&& soundbank::validEffects((const void*)SFX_DATA, size);
 		}
 	}
-
-	fseek(soundbank_file, 0, SEEK_END);
-	size_t sfxDataSize = ftell(soundbank_file);
-	fseek(soundbank_file, 0, SEEK_SET);
-
-	SFX_DATA = new char[sfxDataSize > 0x7D000 ? 0x7D000 : sfxDataSize];
-	fread((void*)SFX_DATA, 1, sfxDataSize, soundbank_file);
-
 	fclose(soundbank_file);
-
-	// An mmutil soundbank starts with the sample count as a u16, followed by
-	// the module count and the "*maxmod*" signature.
-	// https://github.com/devkitPro/mmutil/blob/master/source/msl.c
-	sfxSampleCount = *(u16*)SFX_DATA;
+	if (!valid) {
+		delete[] SFX_DATA;
+		SFX_DATA = nullptr;
+		return false;
+	}
+	sfxSampleCount = header.sampleCount;
+	startup_sample_length = header.startupSamples;
+	return true;
 }
 
-// mmLoadEffect() every sample in the bank and fill in the mm_sound_effect
-// structs. The lid sounds are skipped for banks that do not carry them.
+// Preload navigation and lid sounds. The larger launch and startup effects
+// are loaded on their first use; older banks can omit the lid sounds.
 void SoundControl::loadSfxEffects() {
-	mmLoadEffect(SFX_LAUNCH);
-	mmLoadEffect(SFX_SELECT);
-	mmLoadEffect(SFX_STOP);
-	mmLoadEffect(SFX_WRONG);
-	mmLoadEffect(SFX_BACK);
-	mmLoadEffect(SFX_SWITCH);
-	mmLoadEffect(SFX_STARTUP);
-	// mmLoadEffect(SFX_MENU);
+	loadEffect(SFX_SELECT);
+	loadEffect(SFX_STOP);
+	loadEffect(SFX_WRONG);
+	loadEffect(SFX_BACK);
+	loadEffect(SFX_SWITCH);
+	startupProfileMark("navigation SFX");
 
 	snd_launch = {
 	    {SFX_LAUNCH},	    // id
@@ -156,8 +160,10 @@ void SoundControl::loadSfxEffects() {
 
 	if (!sfxHasLidSounds()) return;
 
-	mmLoadEffect(SFX_LIDCLOSE);
-	mmLoadEffect(SFX_LIDOPEN);
+	loadEffect(SFX_LIDCLOSE);
+	startupProfileMark("lid close SFX");
+	loadEffect(SFX_LIDOPEN);
+	startupProfileMark("lid open SFX");
 
 	snd_lidClose = {
 	    {SFX_LIDCLOSE},	     // id
@@ -176,7 +182,8 @@ void SoundControl::loadSfxEffects() {
 }
 
 SoundControl::SoundControl()
-	: stream_is_playing(false), stream_source(NULL), startup_sample_length(0), seekPos(0)
+	: sfxDataLoaded(false), sfxSampleCount(0), loadedEffects(0), sfxFilePath(nullptr),
+	  stream_is_playing(false), stream_source(NULL), startup_sample_length(0), seekPos(0)
  {
 
 	sndSys.mod_count = MSL_NSONGS;
@@ -184,24 +191,9 @@ SoundControl::SoundControl()
 	sndSys.mem_bank = SOUNDBANK;
 	sndSys.fifo_channel = FIFO_MAXMOD;
 
-	readSfxBank();
-
-	// Since SFX_STARTUP is the first sample, it begins at 0x10 after the
-	// *maxmod* header. Subtract the size of the sample header,
-	// and divide by two to get length in samples.
-	// https://github.com/devkitPro/mmutil/blob/master/source/msl.c#L80
-	
-	startup_sample_length = (((*(u32*)(SFX_DATA + 0x10)) - 20) >> 1);
-
-	// sprintf(debug_buf, "Read sample length %li for startup", startup_sample_length);
-    // nocashMessage(debug_buf);
-
 	mmInit(&sndSys);
-	mmSoundBankInMemory((mm_addr)SFX_DATA);
-
-	loadSfxEffects();
-
-	sfxDataLoaded = true;
+	startupProfileMark("Maxmod init");
+	reloadSfxData();
 }
 
 void SoundControl::loadStream(const bool prepMsg) {
@@ -427,12 +419,12 @@ void SoundControl::loadStream(const bool prepMsg) {
 }
 
 void SoundControl::reloadSfxData() {
-	readSfxBank();
-
-	mmSoundBankInMemory((mm_addr)SFX_DATA);
-
+	if (sfxDataLoaded || !readSfxBank()) return;
+	startupProfileMark("SFX bank header");
+	if (sfxFilePath) mmSoundBankInFiles(sfxFilePath);
+	else mmSoundBankInMemory((mm_addr)SFX_DATA);
+	loadedEffects = 0;
 	loadSfxEffects();
-
 	sfxDataLoaded = true;
 }
 
@@ -440,34 +432,41 @@ void SoundControl::unloadSfxData() {
 	if (!sfxDataLoaded) return;
 	sfxDataLoaded = false;
 
-	mmUnloadEffect(SFX_LAUNCH);
-	mmUnloadEffect(SFX_SELECT);
-	mmUnloadEffect(SFX_STOP);
-	mmUnloadEffect(SFX_WRONG);
-	mmUnloadEffect(SFX_BACK);
-	mmUnloadEffect(SFX_SWITCH);
-	mmUnloadEffect(SFX_STARTUP);
-	// mmUnloadEffect(SFX_MENU);
-
-	if (sfxHasLidSounds()) {
-		mmUnloadEffect(SFX_LIDCLOSE);
-		mmUnloadEffect(SFX_LIDOPEN);
+	fifoSendValue32(FIFO_USER_02, 0x4F444E53); // 'SNDO': Stop all sound channels.
+	swiWaitForVBlank(); // Let ARM7 stop playback before the file loader frees samples.
+	for (unsigned id = 0; id < MSL_NSAMPS; ++id) {
+		if (loadedEffects & BIT(id)) mmUnloadEffect(id);
 	}
-
-	fifoSendValue32(FIFO_USER_02, 0x4F444E53); // 'SNDO': Turn off all sound channels in case sound effects are still playing
-
+	loadedEffects = 0;
 	delete[] SFX_DATA;
+	SFX_DATA = nullptr;
 }
 
-mm_sfxhand SoundControl::playLaunch(u8 panning)  { if (!sfxDataLoaded) return (mm_sfxhand)NULL; snd_launch.panning = panning;  return mmEffectEx(&snd_launch); }
-mm_sfxhand SoundControl::playSelect(u8 panning)  { if (!sfxDataLoaded) return (mm_sfxhand)NULL; snd_select.panning = panning;  return mmEffectEx(&snd_select); }
-mm_sfxhand SoundControl::playBack(u8 panning)    { if (!sfxDataLoaded) return (mm_sfxhand)NULL; snd_back.panning = panning;    return mmEffectEx(&snd_back); }
-mm_sfxhand SoundControl::playSwitch(u8 panning)  { if (!sfxDataLoaded) return (mm_sfxhand)NULL; snd_switch.panning = panning;  return mmEffectEx(&snd_switch); }
-mm_sfxhand SoundControl::playStartup(u8 panning) { if (!sfxDataLoaded) return (mm_sfxhand)NULL; mus_startup.panning = panning; return mmEffectEx(&mus_startup); }
-mm_sfxhand SoundControl::playStop(u8 panning)    { if (!sfxDataLoaded) return (mm_sfxhand)NULL; snd_stop.panning = panning;    return mmEffectEx(&snd_stop); }
-mm_sfxhand SoundControl::playWrong(u8 panning)   { if (!sfxDataLoaded) return (mm_sfxhand)NULL; snd_wrong.panning = panning;   return mmEffectEx(&snd_wrong); }
-mm_sfxhand SoundControl::playLidClose(u8 panning) { if (!sfxDataLoaded || !sfxHasLidSounds()) return (mm_sfxhand)NULL; snd_lidClose.panning = panning; return mmEffectEx(&snd_lidClose); }
-mm_sfxhand SoundControl::playLidOpen(u8 panning)  { if (!sfxDataLoaded || !sfxHasLidSounds()) return (mm_sfxhand)NULL; snd_lidOpen.panning = panning;  return mmEffectEx(&snd_lidOpen); }
+bool SoundControl::loadEffect(unsigned id) {
+	if (id >= MSL_NSAMPS || id >= sfxSampleCount) return false;
+	if (!(loadedEffects & BIT(id))) {
+		if (mmLoadEffect(id) != 0) return false;
+		DC_FlushAll(); // ARM7 reads the newly loaded sample directly from main RAM.
+		loadedEffects |= BIT(id);
+	}
+	return true;
+}
+
+mm_sfxhand SoundControl::playEffect(mm_sound_effect &effect, u8 panning) {
+	if (!sfxDataLoaded || !loadEffect(effect.id)) return MM_SFXHAND_INVALID;
+	effect.panning = panning;
+	return mmEffectEx(&effect);
+}
+
+mm_sfxhand SoundControl::playLaunch(u8 panning)  { return playEffect(snd_launch, panning); }
+mm_sfxhand SoundControl::playSelect(u8 panning)  { return playEffect(snd_select, panning); }
+mm_sfxhand SoundControl::playBack(u8 panning)    { return playEffect(snd_back, panning); }
+mm_sfxhand SoundControl::playSwitch(u8 panning)  { return playEffect(snd_switch, panning); }
+mm_sfxhand SoundControl::playStartup(u8 panning) { return playEffect(mus_startup, panning); }
+mm_sfxhand SoundControl::playStop(u8 panning)    { return playEffect(snd_stop, panning); }
+mm_sfxhand SoundControl::playWrong(u8 panning)   { return playEffect(snd_wrong, panning); }
+mm_sfxhand SoundControl::playLidClose(u8 panning) { return sfxHasLidSounds() ? playEffect(snd_lidClose, panning) : MM_SFXHAND_INVALID; }
+mm_sfxhand SoundControl::playLidOpen(u8 panning)  { return sfxHasLidSounds() ? playEffect(snd_lidOpen, panning) : MM_SFXHAND_INVALID; }
 
 void SoundControl::beginStream() {
 	if (!stream_source || stream_is_playing) return;
@@ -494,12 +493,13 @@ void SoundControl::unloadStream() {
 	free_streaming_buf();
 }
 
-void SoundControl::fadeOutStream() {
+void SoundControl::fadeOutStream(bool fast) {
 	//fade_out = true; // Bugged
-	fifoSendValue32(FIFO_USER_01, 1); // Fade out on ARM7 side
+	fifoSendValue32(FIFO_USER_01, fast ? 2 : 1); // Fade out on ARM7 side
 }
 
 void SoundControl::cancelFadeOutStream() {
+	fifoSendValue32(FIFO_USER_01, 0);
 	//fade_out = false;
 	//fade_counter = FADE_STEPS;
 }
@@ -527,7 +527,18 @@ void SoundControl::setStreamDelay(u32 delay) {
 // filled_samples <= STREAMING_BUF_LENGTH
 // filled_samples <= streaming_buf_ptr
 // fill_requested == false
-volatile void SoundControl::updateStream() {
+static volatile bool stopSoundPending = false;
+
+void queueStopSound() {
+	stopSoundPending = true;
+}
+
+void SoundControl::updateStream() {
+	const int irqState = enterCriticalSection();
+	const bool playQueuedStop = stopSoundPending;
+	stopSoundPending = false;
+	leaveCriticalSection(irqState);
+	if (playQueuedStop) playStop();
 	
 	if (!stream_is_playing) return;
 	if (fill_requested && filled_samples < STREAMING_BUF_LENGTH) {

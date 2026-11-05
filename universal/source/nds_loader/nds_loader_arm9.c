@@ -19,6 +19,7 @@
 
 ------------------------------------------------------------------*/
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <nds.h>
 #include <nds/arm9/dldi.h>
@@ -443,7 +444,6 @@ int runNdsFile (
 ) {
 	struct stat st;
 	char filePath[PATH_MAX];
-	int pathLen;
 	const char* args[1];
 
 
@@ -453,13 +453,12 @@ int runNdsFile (
 
 	if (argc <= 0 || !argv) {
 		// Construct a command line if we weren't supplied with one
-		if (!getcwd (filePath, PATH_MAX)) {
+		if (!realpath(filename, filePath)) {
 			return 2;
 		}
-		pathLen = strlen (filePath);
-		strcpy (filePath + pathLen, filename);
 		args[0] = filePath;
 		argv = args;
+		argc = 1;
 	}
 
 	if (strncmp(filename, "sd", 2) != 0 && strncmp(filename, "fat", 3) != 0) {

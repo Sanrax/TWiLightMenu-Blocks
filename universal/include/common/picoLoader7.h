@@ -1,5 +1,7 @@
 #pragma once
 
+#include <nds/ndstypes.h>
+
 /// @brief The Pico Loader API version supported by this header file.
 #define PICO_LOADER_API_VERSION     3
 

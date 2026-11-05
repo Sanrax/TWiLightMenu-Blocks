@@ -1,3 +1,8 @@
+#include "common/launchpath.h"
+#include "common/startupprofile.h"
+#include "common/storage.h"
+#include <time.h>
+#include <sys/statvfs.h>
 #include <nds.h>
 #include <nds/arm9/dldi.h>
 #include "io_m3_common.h"
@@ -147,7 +152,7 @@ static bool findSystemApp(const char* const* apps, int appCount, const char* nds
 	static bool nandInited = false;
 	static bool nandMounted = false;
 	if (!nandInited) {
-		nandMounted = fatMountSimple("nand", &io_dsi_nand) && (access("nand:/", F_OK) == 0);
+		nandMounted = twlmMountStorage("nand", &io_dsi_nand) && (access("nand:/", F_OK) == 0);
 		nandInited = true;
 	}
 	if (!nandMounted) {
@@ -249,7 +254,6 @@ int spawnedtitleboxes = 0;
 
 bool showColon = true;
 
-struct statvfs st[2];
 bool gbaBiosFound[2] = {false};
 
 touchPosition touch;
@@ -1251,6 +1255,7 @@ static void launchWithConfig(const CustomLauncher *launcher, const std::string &
 int dsiMenuTheme(void) {
 	ms().loadSettings();
 	bs().loadSettings();
+	startupProfileMark("settings");
 	logInit();
 	if (sdFound() && ms().consoleModel >= 2 && (!isDSiMode() || !sys().arm7SCFGLocked())) {
 		CIniFile lumaConfig("sd:/luma/config.ini");
@@ -1264,15 +1269,19 @@ int dsiMenuTheme(void) {
 
 	// Before any texture is loaded, as the NAND key from ARM7 is kept in main RAM
 	findPictochatAndDownloadPlay();
+	startupProfileMark("system apps");
 
 	tfn(); //
 	tc().loadConfig();
 	tex().videoSetup(); // allocate texture pointers
+	startupProfileMark("skin configuration");
 
 	fontInit();
+	startupProfileMark("fonts");
 	logPrint("\n");
 
 	langInit();
+	startupProfileMark("language");
 
 	if (ms().theme == TWLSettings::EThemeSaturn || ms().theme == TWLSettings::EThemeHBL) {
 		whiteScreen = false;
@@ -1289,17 +1298,17 @@ int dsiMenuTheme(void) {
 	}
 
 	srand(time(NULL));
+	startupProfileMark("theme textures");
 	
 	graphicsInit();
 	iconManagerInit();
+	startupProfileMark("graphics/icons");
 
 	keysSetRepeat(10, 2);
 
 	ms().gbaR3Test = (access(sys().isRunFromSD() ? "sd:/_nds/TWiLightMenu/emulators/GBARunner3.nds" : "fat:/_nds/TWiLightMenu/emulators/GBARunner3.nds", F_OK) == 0);
 
 	if (sdFound()) {
-		statvfs("sd:/", &st[0]);
-
 		gbaBiosFound[0] = (access("sd:/_gba/bios.bin", F_OK) == 0);
 		if (!ms().gbaR3Test) {
 			if (!gbaBiosFound[0]) gbaBiosFound[0] = (access("sd:/gba/bios.bin", F_OK) == 0);
@@ -1308,8 +1317,6 @@ int dsiMenuTheme(void) {
 		logPrint(gbaBiosFound[0] ? "GBA BIOS found on sd\n" : "GBA BIOS not found on sd\n");
 	}
 	if (flashcardFound()) {
-		statvfs("fat:/", &st[1]);
-
 		gbaBiosFound[1] = (access("fat:/_gba/bios.bin", F_OK) == 0);
 		if (!ms().gbaR3Test) {
 			if (!gbaBiosFound[1]) gbaBiosFound[1] = (access("fat:/gba/bios.bin", F_OK) == 0);
@@ -1319,6 +1326,7 @@ int dsiMenuTheme(void) {
 	}
 
 	loadCustomLaunchers();	// User-defined file-type launchers from _nds/TWiLightMenu/extras/config.<ext>.ini
+	startupProfileMark("launchers");
 
 	std::string filename;
 
@@ -1416,9 +1424,11 @@ int dsiMenuTheme(void) {
 
 		logPrint("snd()\n");
 		snd();
+		startupProfileMark("sound effects");
 		snd().loadStream(true);
 	}
 
+	startupProfileMark("sound");
 	while (1) {
 		std::vector<std::string_view> extensionList = {
 			".nds", ".ndz", ".dsi", ".ids", ".srl", ".app", ".argv" // NDS
@@ -1468,16 +1478,10 @@ int dsiMenuTheme(void) {
 
 			// Construct a command line
 			getcwd(filePath, PATH_MAX);
-			int pathLen = strlen(filePath);
-			if (pathLen < PATH_MAX && filePath[pathLen - 1] != '/') { // Ensure the path ends in a slash
-				filePath[pathLen] = '/';
-				filePath[pathLen + 1] = '\0';
-				pathLen++;
-			}
 
 			bool isArgv = false;
 			if (extension(filename, {".argv"})) {
-				ms().romPath[ms().secondaryDevice] = std::string(filePath) + std::string(filename);
+				ms().romPath[ms().secondaryDevice] = launchPath(filePath, filename);
 
 				FILE *argfile = fopen(filename.c_str(), "rb");
 				char str[PATH_MAX], *pstr;
@@ -1523,7 +1527,8 @@ int dsiMenuTheme(void) {
 				std::string typeToReplace = filename.substr(filename.rfind('.'));
 
 				char *name = argarray.at(0);
-				strcpy(filePath + pathLen, name);
+				const std::string resolvedPath = launchPath(filePath, name);
+				snprintf(filePath, sizeof(filePath), "%s", resolvedPath.c_str());
 				free(argarray.at(0));
 				argarray.at(0) = filePath;
 
@@ -1821,15 +1826,15 @@ int dsiMenuTheme(void) {
 					char sfnPrv[62];
 					char sfnBnr[62];
 					if (ms().secondaryDevice && !bs().b4dsMode && ms().dsiWareToSD && !savFormat && sdFound()) {
-						fatGetAliasPath("sd:/_nds/TWiLightMenu/tempDSiWare.dsi", sfnSrl);
-						fatGetAliasPath("sd:/_nds/TWiLightMenu/tempDSiWare.pub", sfnPub);
-						fatGetAliasPath("sd:/_nds/TWiLightMenu/tempDSiWare.prv", sfnPrv);
-						fatGetAliasPath("sd:/_nds/TWiLightMenu/tempDSiWare.bnr", sfnBnr);
+						fatGetAliasPath("sd:/_nds/TWiLightMenu/tempDSiWare.dsi", sfnSrl, sizeof(sfnSrl));
+						fatGetAliasPath("sd:/_nds/TWiLightMenu/tempDSiWare.pub", sfnPub, sizeof(sfnPub));
+						fatGetAliasPath("sd:/_nds/TWiLightMenu/tempDSiWare.prv", sfnPrv, sizeof(sfnPrv));
+						fatGetAliasPath("sd:/_nds/TWiLightMenu/tempDSiWare.bnr", sfnBnr, sizeof(sfnBnr));
 					} else {
-						fatGetAliasPath(ms().dsiWareSrlPath.c_str(), sfnSrl);
-						fatGetAliasPath(ms().dsiWarePubPath.c_str(), sfnPub);
-						fatGetAliasPath(ms().dsiWarePrvPath.c_str(), sfnPrv);
-						fatGetAliasPath(ms().dsiWareBnrPath.c_str(), sfnBnr);
+						fatGetAliasPath(ms().dsiWareSrlPath.c_str(), sfnSrl, sizeof(sfnSrl));
+						fatGetAliasPath(ms().dsiWarePubPath.c_str(), sfnPub, sizeof(sfnPub));
+						fatGetAliasPath(ms().dsiWarePrvPath.c_str(), sfnPrv, sizeof(sfnPrv));
+						fatGetAliasPath(ms().dsiWareBnrPath.c_str(), sfnBnr, sizeof(sfnBnr));
 					}
 
 					const char *bootstrapinipath = sdFound() ? BOOTSTRAP_INI : BOOTSTRAP_INI_FC;
@@ -1996,7 +2001,8 @@ int dsiMenuTheme(void) {
 				}
 
 				char *name = argarray.at(0);
-				strcpy(filePath + pathLen, name);
+				const std::string resolvedPath = launchPath(filePath, name);
+				snprintf(filePath, sizeof(filePath), "%s", resolvedPath.c_str());
 				free(argarray.at(0));
 				argarray.at(0) = filePath;
 				if (!isNdz[CURPOS] && !ms().secondaryDevice && !sys().arm7SCFGLocked() && ms().consoleModel == TWLSettings::EDSiRetail && isHomebrew[CURPOS] && !(perGameSettings_useBootstrap == -1 ? true : perGameSettings_useBootstrap)) {

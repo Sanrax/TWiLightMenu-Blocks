@@ -7,6 +7,9 @@
 #include "common/singleton.h"
 #include <cstdio>
 
+// Called by VBlank; playback happens on the main thread in updateStream().
+void queueStopSound();
+
 // Sound effect banks from older themes only contain the first 7 samples.
 // Banks that also carry the lid sounds have 9.
 #define MSL_NSAMPS_BASE	7
@@ -35,13 +38,13 @@ class SoundControl {
         bool sfxHasLidSounds() const { return sfxSampleCount >= MSL_NSAMPS_LID; }
         
         // Refill the stream buffers
-        volatile void updateStream();
+        void updateStream();
 
         void loadStream(const bool prepMsg);
         void beginStream();
         void stopStream();
         void unloadStream();
-        void fadeOutStream();
+        void fadeOutStream(bool fast = false);
         void cancelFadeOutStream();
 
         // Sets the number of samples of silence to
@@ -51,7 +54,9 @@ class SoundControl {
         u32 getStartupSoundLength() { return startup_sample_length; }
       
     private:
-        void readSfxBank();
+        bool readSfxBank();
+        bool loadEffect(unsigned id);
+        mm_sfxhand playEffect(mm_sound_effect &effect, u8 panning);
         void loadSfxEffects();
 
         mm_sound_effect snd_launch;
@@ -66,6 +71,8 @@ class SoundControl {
 		mm_ds_system sndSys;
         bool sfxDataLoaded;
         u16 sfxSampleCount;
+        u16 loadedEffects;
+        const char* sfxFilePath;
         bool stream_is_playing;
         bool loopingPoint;
         //mm_sound_effect snd_loading;

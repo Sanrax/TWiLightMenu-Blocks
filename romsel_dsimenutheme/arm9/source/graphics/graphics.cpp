@@ -1,3 +1,4 @@
+#include <time.h>
 /*-----------------------------------------------------------------
  Copyright (C) 2015
 	Matthew Scholefield
@@ -37,6 +38,7 @@
 #include "common/systemdetails.h"
 #include "common/my_rumble.h"
 #include "common/logging.h"
+#include "common/startupprofile.h"
 #include "myDSiMode.h"
 #include "date.h"
 #include "iconHandler.h"
@@ -1484,7 +1486,7 @@ void vBlankHandler() {
 
 			if (currentBg == 1 && tc().playStopSound() && needToPlayStopSound &&
 				waitForNeedToPlayStopSound == 0) {
-				snd().playStop();
+				queueStopSound();
 				waitForNeedToPlayStopSound = 1;
 				needToPlayStopSound = false;
 			}
@@ -1717,16 +1719,18 @@ void loadPhoto(const std::string &path) {
 	bool alternatePixel = false;
 	bool alternatePixel2 = false;
 
-	lodepng::decode(image, photoWidth, photoHeight, path);
+	unsigned error = lodepng::decode(image, photoWidth, photoHeight, path);
 
-	if (photoWidth > 208 || photoHeight > 156) {
+	if (error || !photoWidth || !photoHeight || photoWidth > 208 || photoHeight > 156) {
 		image.clear();
-		// Image is too big, load the default
+		// Invalid or oversized photos use the language's default image.
 		char path[64];
 		snprintf(path, sizeof(path), "nitro:/languages/%s/photo_default.png", ms().getGuiLanguageString().c_str());
 		currentPhotoPath = path;
-		lodepng::decode(image, photoWidth, photoHeight, path);
+		error = lodepng::decode(image, photoWidth, photoHeight, path);
 	}
+	if (error || !photoWidth || !photoHeight || photoWidth > 208 || photoHeight > 156
+		|| image.size() != photoWidth * photoHeight * 4) return;
 
 	u16* topBorderBuffer = tex().topBorderBuffer();
 	u16* topBorderBuffer2 = tex().topBorderBuffer2();
@@ -1747,65 +1751,62 @@ void loadPhoto(const std::string &path) {
 	// Start loading
 	uint startX = 24 + (208 - photoWidth) / 2;
 	for (int b = 0; b < boxArtColorDeband+1; b++) {
-		uint y = 24 + ((156 - photoHeight) / 2);
-		uint x = startX;
-		for (uint i=0;i<image.size()/4;i++) {
-			if (x >= startX + photoWidth) {
-				x = startX;
-				y++;
-			}
+		const uint startY = 24 + ((156 - photoHeight) / 2);
+		for (uint row = 0; row < photoHeight; row++) {
+			const uint y = startY + row;
+			for (uint col = 0; col < photoWidth; col++) {
+				const uint x = startX + col;
+				const uint i = row * photoWidth + col;
 
-			const u8 oldR = image[(i*4)];
-			const u8 oldG = image[(i*4)+1];
-			const u8 oldB = image[(i*4)+2];
-			const u8 oldAlpha = image[(i*4)+3];
-			u8 newR = oldR;
-			u8 newG = oldG;
-			u8 newB = oldB;
-			u8 newAlpha = oldAlpha;
-			if (alternatePixel) {
-				if (oldR >= 4 && oldR < 0xFC) newR += 4;
-				if (oldG >= 4 && oldG < 0xFC) newG += 4;
-				if (oldB >= 4 && oldB < 0xFC) newB += 4;
-				if (oldAlpha >= 4 && oldAlpha < 0xFC) newAlpha += 4;
-			}
-			if (alternatePixel2 && boxArtColorDeband) {
-				if (oldR >= 2 && newR < 0xFE) newR += 2;
-				if (oldG >= 2 && newG < 0xFE) newG += 2;
-				if (oldB >= 2 && newB < 0xFE) newB += 2;
-				if (oldAlpha >= 2 && newAlpha < 0xFE) newAlpha += 2;
-			}
-			const u16 color = newR>>3 | (newG>>3)<<5 | (newB>>3)<<10 | BIT(15);
-			if (b == 0) {
-				u16* dst = topBorderBuffer+(y * 256 + x);
-				if (oldAlpha == 255) {
-					*dst = color;
-				} else {
-					*dst = alphablend(color, 0, newAlpha);
+				const u8 oldR = image[(i*4)];
+				const u8 oldG = image[(i*4)+1];
+				const u8 oldB = image[(i*4)+2];
+				const u8 oldAlpha = image[(i*4)+3];
+				u8 newR = oldR;
+				u8 newG = oldG;
+				u8 newB = oldB;
+				u8 newAlpha = oldAlpha;
+				if (alternatePixel) {
+					if (oldR >= 4 && oldR < 0xFC) newR += 4;
+					if (oldG >= 4 && oldG < 0xFC) newG += 4;
+					if (oldB >= 4 && oldB < 0xFC) newB += 4;
+					if (oldAlpha >= 4 && oldAlpha < 0xFC) newAlpha += 4;
 				}
-				if (colorTable) {
-					*dst = colorTable[*dst % 0x8000] | BIT(15);
+				if (alternatePixel2 && boxArtColorDeband) {
+					if (oldR >= 2 && newR < 0xFE) newR += 2;
+					if (oldG >= 2 && newG < 0xFE) newG += 2;
+					if (oldB >= 2 && newB < 0xFE) newB += 2;
+					if (oldAlpha >= 2 && newAlpha < 0xFE) newAlpha += 2;
 				}
-				bgSubBuffer[y * 256 + x] = *dst;
-			} else if (boxArtColorDeband) {
-				u16* dst = topBorderBuffer2+(y * 256 + x);
-				if (oldAlpha == 255) {
-					*dst = color;
-				} else {
-					*dst = alphablend(color, 0, newAlpha);
+				const u16 color = newR>>3 | (newG>>3)<<5 | (newB>>3)<<10 | BIT(15);
+				if (b == 0) {
+					u16* dst = topBorderBuffer+(y * 256 + x);
+					if (oldAlpha == 255) {
+						*dst = color;
+					} else {
+						*dst = alphablend(color, 0, newAlpha);
+					}
+					if (colorTable) {
+						*dst = colorTable[*dst % 0x8000] | BIT(15);
+					}
+					bgSubBuffer[y * 256 + x] = *dst;
+				} else if (boxArtColorDeband) {
+					u16* dst = topBorderBuffer2+(y * 256 + x);
+					if (oldAlpha == 255) {
+						*dst = color;
+					} else {
+						*dst = alphablend(color, 0, newAlpha);
+					}
+					if (colorTable) {
+						*dst = colorTable[*dst % 0x8000] | BIT(15);
+					}
+					bgSubBuffer2[y * 256 + x] = *dst;
 				}
-				if (colorTable) {
-					*dst = colorTable[*dst % 0x8000] | BIT(15);
-				}
-				bgSubBuffer2[y * 256 + x] = *dst;
-			}
-			if ((i % photoWidth) == photoWidth-1) {
 				alternatePixel = !alternatePixel;
 				alternatePixel2 = !alternatePixel2;
 			}
 			alternatePixel = !alternatePixel;
 			alternatePixel2 = !alternatePixel2;
-			x++;
 		}
 		alternatePixel = !alternatePixel;
 	}
@@ -2012,11 +2013,13 @@ void graphicsInit() {
 	drawCurrentTime();
 
 	// printf("drawn bgload");
+	startupProfileMark("background/name/date");
 	// while (1) {}
 	if (!ms().macroMode && ms().showPhoto && tc().renderPhoto()) {
 		srand(time(NULL));
 		loadPhotoList();
 	}
+	startupProfileMark("photo");
 
 	if (ms().theme == TWLSettings::EThemeHBL) {
 		u16* newPalette = (u16*)bubblesPal;

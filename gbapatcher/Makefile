@@ -1,9 +1,6 @@
 #---------------------------------------------------------------------------------
 .SUFFIXES:
 #---------------------------------------------------------------------------------
-ifeq ($(strip $(DEVKITARM)),)
-$(error "Please set DEVKITARM in your environment. export DEVKITARM=<path to>devkitARM")
-endif
 
 ifeq ($(strip $(PROJECT)),)
 export PROJECT	:=	$(CURDIR)/../
@@ -12,7 +9,8 @@ endif
 export TARGET	:=	gbapatcher
 NITRODATA		:=	nitrofiles
 
-include $(DEVKITARM)/ds_rules
+TWLM_ROOT ?= $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/..)
+include $(TWLM_ROOT)/universal/blocksds.mk
 
 .PHONY: bootloader bootstub clean makearm7 makearm9
 
@@ -22,7 +20,7 @@ makearm7:
 	$(MAKE) -C arm7
 	cp arm7/$(TARGET).elf $(TARGET).arm7.elf
 
-makearm9:
+makearm9: bootloader bootstub
 	$(MAKE) -C arm9
 	cp arm9/$(TARGET).elf $(TARGET).arm9.elf
 
@@ -32,9 +30,12 @@ dist:	all
 	@cp $(TARGET).arm7.elf ../7zfile/debug/$(TARGET).arm7.elf
 	@cp $(TARGET).arm9.elf ../7zfile/debug/$(TARGET).arm9.elf
 
-$(TARGET).nds:	makearm7 makearm9
+data/banner.bin: icon.bmp ../tools/make_banner.py | data
+	python3 ../tools/make_banner.py $< "GBA patcher;TWiLight Menu++;RocketRobz" $@
+
+$(TARGET).nds:	makearm7 makearm9 data/banner.bin
 	ndstool	-u 00030004 -g HBLA -c $(TARGET).nds -7 $(TARGET).arm7.elf -9 $(TARGET).arm9.elf -d $(NITRODATA) \
-  -b icon.bmp "GBA patcher;TWiLight Menu++;RocketRobz"
+  -t data/banner.bin
 
 clean:
 	@echo clean ...

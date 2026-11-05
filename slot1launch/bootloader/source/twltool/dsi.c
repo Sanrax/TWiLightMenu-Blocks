@@ -28,7 +28,7 @@ void dsi_add_ctr( dsi_context* ctx,
 
 	for (i = 3; i >= 0; i--) {
 		sum = counter[i] + carry;
-		carry = (uint)(sum < counter[i]);
+		carry = (unsigned int)(sum < counter[i]);
 
 		counter[i] = sum;
 	}

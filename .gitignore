@@ -34,6 +34,10 @@ settings/arm9/include/version.h
 # Build Directory
 build/
 data/
+__pycache__/
+/universal/bootloader_menu/load.bin
+/universal/bootloader_app/load.bin
+/universal/bootstub/bootstub.bin
 
 # Project Files
 .idea/
@@ -90,3 +94,6 @@ ipch/
 # Crowdin In-Context
 */nitrofiles/languages/ic
 romsel_aktheme/nitrofiles/language/lang_ic
+
+# Separate diagnostic build of the DSi/3DS menu
+romsel_dsimenutheme/arm9/build-profile/

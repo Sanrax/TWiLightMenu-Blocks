@@ -1,3 +1,8 @@
+#include "common/filetypes.h"
+#include "common/startupprofile.h"
+#include <limits.h>
+#include <sys/stat.h>
+#include "common/storage.h"
 #include "fileBrowse.h"
 #include <algorithm>
 #include <dirent.h>
@@ -191,18 +196,9 @@ void chdirFake(const char *dir) {
 }
 #endif
 
-bool extension(const std::string_view filename, const std::vector<std::string_view> extensions) {
-	for (std::string_view extension : extensions) {
-		// logPrint("Checking for %s extension in %s\n", extension.data(), filename.data());
-		if ((strlen(filename.data()) > strlen(extension.data())) && (strcasecmp(filename.substr(filename.size() - extension.size()).data(), extension.data()) == 0)) {
-			return true;
-		}
-	}
 
-	return false;
-}
 
-bool nameEndsWith(const std::string_view name, const std::vector<std::string_view> extensionList) {
+bool nameEndsWith(const std::string_view name, const std::vector<std::string_view> &extensionList) {
 	if (name.size() == 0)
 		return false;
 
@@ -212,11 +208,7 @@ bool nameEndsWith(const std::string_view name, const std::vector<std::string_vie
 	if (name.substr(0, 2) == "._")
 		return false; // Don't show macOS's index files
 
-	for (const std::string_view &ext : extensionList) {
-		if (name.length() > ext.length() && strcasecmp(name.substr(name.length() - ext.length()).data(), ext.data()) == 0)
-			return true;
-	}
-	return false;
+	return extension(name, extensionList);
 }
 
 void recalculateBoxesCount() {
@@ -276,7 +268,7 @@ void updateDirectoryContents(vector<DirEntry> &dirContents) {
 	pageLoaded[PAGENUM] = true;
 }
 
-void getDirectoryContents(std::vector<DirEntry> &dirContents, const std::vector<std::string_view> extensionList = {}) {
+void getDirectoryContents(std::vector<DirEntry> &dirContents, const std::vector<std::string_view> &extensionList = {}) {
 	dirContents.clear();
 
 	file_count = 0;
@@ -297,7 +289,7 @@ void getDirectoryContents(std::vector<DirEntry> &dirContents, const std::vector<
 		dirInfoIniFound = false;
 	}
 
-	DIR *pdir = opendir(".");
+	TWLDirectory *pdir = twlmOpenDirectory(".");
 
 	if (pdir == nullptr) {
 		printSmall(false, 4, 4, STR_UNABLE_TO_OPEN_DIRECTORY);
@@ -307,23 +299,8 @@ void getDirectoryContents(std::vector<DirEntry> &dirContents, const std::vector<
 		while (1) {
 			bgOperations(false);
 
-			// This has to be done *before* readdir, since readdir increments
-			// the internal state's DIR_ENTRY for the next time
-			int attrs = 0;
-			if (!ms().showHidden) {
-				// Get FAT attrs, this is equivalent to FAT_getAttr(pent->d_name)
-				// but much quicker since we don't have to search the filesystem
-				// for the name.
-				// It's also *very* heavily dependant on internal libfat structs
-				// being exactly as they are now.
-				static_assert(_LIBFAT_MAJOR_ == 1 && _LIBFAT_MINOR_ == 1 && _LIBFAT_PATCH_ == 5, "libfat updated! Check that this is still correct");
-
-				// state->currentEntry.entryData[DIR_ENTRY_attributes]
-				u8 *state = (u8 *)pdir->dirData->dirStruct;
-				attrs = state[4 + 0xB];
-			}
-
-			dirent *pent = readdir(pdir);
+			uint8_t attrs = 0;
+			const dirent *pent = twlmReadDirectory(pdir, &attrs);
 			if (pent == nullptr || file_count > ((dsiFeatures() || sys().dsDebugRam()) ? 1024 : 512)) {
 				logPrint("End of listing, Sorting: ");
 				break;
@@ -467,7 +444,7 @@ void getDirectoryContents(std::vector<DirEntry> &dirContents, const std::vector<
 		if (backFound) {
 			dirContents.insert(dirContents.begin(), {"..", true, backPos, false});
 		}
-		closedir(pdir);
+		twlmCloseDirectory(pdir);
 	}
 }
 
@@ -508,10 +485,9 @@ void displayNowLoading(void) {
 // window again, which is what left the leftmost box rendering another entry's
 // icon.
 //
-// waitVBlank is for the "Now Loading" paths, which want a frame between reads so
-// the progress bar animates. The touch and drag paths must pass false, or they
-// stall the scroll by a vblank per icon.
-static void refreshGridIcons(const std::vector<DirEntry> &entries, int centre, bool waitVBlank) {
+// Loading paths pump audio and background work between icons. Rendering already
+// advances in VBlank; waiting a full frame for every icon only adds latency.
+static void refreshGridIcons(const std::vector<DirEntry> &entries, int centre, bool pumpBackground) {
 	const int first = std::max(centre - ICON_GRID_MAX_OFFSET, 0);
 	const int last = std::min(centre + ICON_GRID_MAX_OFFSET, 39);
 
@@ -520,15 +496,15 @@ static void refreshGridIcons(const std::vector<DirEntry> &entries, int centre, b
 		// idx only increases, so nothing further can be in range.
 		if (idx >= file_count || idx >= (int)entries.size())
 			break;
-		if (waitVBlank)
-			bgOperations(true);
+		if (pumpBackground)
+			bgOperations(false);
 		iconUpdate(entries[idx].isDirectory, entries[idx].name.c_str(), pos);
 	}
 }
 
 static inline void refreshGridIcons(SwitchState scrn, const std::vector<std::vector<DirEntry>> &dirContents,
-					int centre, bool waitVBlank) {
-	refreshGridIcons(dirContents[scrn], centre, waitVBlank);
+					int centre, bool pumpBackground) {
+	refreshGridIcons(dirContents[scrn], centre, pumpBackground);
 }
 
 // The non-blocking half of moveCursor(), for the stylus drag. moveCursor spins
@@ -556,7 +532,7 @@ static void moveHeldCursor(bool right, const std::vector<DirEntry> &entries) {
 	settingsChanged = true;
 }
 
-void moveCursor(bool right, const std::vector<DirEntry> dirContents, int maxEntry = 0xFFFF) {
+void moveCursor(bool right, const std::vector<DirEntry> &dirContents, int maxEntry = 0xFFFF) {
 	if ((right && CURPOS >= last_used_box) || (!right && CURPOS <= 0)) {
 		if (ms().theme != TWLSettings::EThemeSaturn && !edgeBumpSoundPlayed)
 			snd().playWrong();
@@ -730,8 +706,11 @@ void launchDsClassicMenu(void) {
 	controlTopBright = true;
 
 	fadeType = false;		  // Fade to white
-	snd().fadeOutStream();
-	for (int i = 0; i < 60; i++) {
+	fadeSpeed = true;
+	snd().fadeOutStream(true);
+	// Sixteen frames fade the sound from 127 to zero. Continue only if the
+	// selected theme still needs frames to complete its visual fade.
+	for (int i = 0; i < 16 || !screenFadedOut(); i++) {
 		bgOperations(true);
 	}
 	snd().stopStream();
@@ -1353,9 +1332,9 @@ void launchInternetBrowser(const vector<DirEntry>& dirContents) {
 				fadeType = false; // Fade to white
 			}
 
-			fatGetAliasPath(ms().internetBrowserPath.c_str(), sfnSrl);
-			fatGetAliasPath(savepathPub.c_str(), sfnPub);
-			fatGetAliasPath(savepathPrv.c_str(), sfnPrv);
+			fatGetAliasPath(ms().internetBrowserPath.c_str(), sfnSrl, sizeof(sfnSrl));
+			fatGetAliasPath(savepathPub.c_str(), sfnPub, sizeof(sfnPub));
+			fatGetAliasPath(savepathPrv.c_str(), sfnPrv, sizeof(sfnPrv));
 		} else {
 			createSaveFile(savepath.c_str(), false, browserTid);
 		}
@@ -1601,7 +1580,7 @@ void launchGba(void) {
 			}
 			if (perGameSettings_useBootstrap == -1 ? ms().useBootstrap : perGameSettings_useBootstrap) {
 				int err = runNdsFile(gbar2Path, 0, NULL, sys().isRunFromSD(), true, true, false, true, false, -1, 0);
-				iprintf("Start failed. Error %i\n", err);
+				printf("Start failed. Error %i\n", err);
 			} else {
 				loadGameOnFlashcard(gbar2Path, false);
 			}
@@ -2846,7 +2825,7 @@ bool selectMenu(void) {
 	return false;
 }
 
-void getFileInfo(SwitchState scrn, vector<vector<DirEntry>> dirContents, bool reSpawnBoxes) {
+void getFileInfo(SwitchState scrn, const vector<vector<DirEntry>> &dirContents, bool reSpawnBoxes) {
 	if (nowLoadingDisplaying) {
 		clearText();
 		showProgressBar = true;
@@ -2855,11 +2834,15 @@ void getFileInfo(SwitchState scrn, vector<vector<DirEntry>> dirContents, bool re
 	}
 	if (reSpawnBoxes)
 		spawnedtitleboxes = 0;
+	// A missing icons directory otherwise causes two failed path lookups for
+	// every entry. Recheck per page, preserving newly installed overrides.
+	const bool checkCustomIcons = ms().showCustomIcons && access(sys().isRunFromSD()
+		? "sd:/_nds/TWiLightMenu/icons" : "fat:/_nds/TWiLightMenu/icons", F_OK) == 0;
 	for (int i = 0; i < 40; i++) {
 		if (i + PAGENUM * 40 < file_count) {
 			isDirectory[i] = dirContents[scrn][i + PAGENUM * 40].isDirectory;
 			const std::string &std_romsel_filename = dirContents[scrn][i + PAGENUM * 40].name;
-			getGameInfo(isDirectory[i], std_romsel_filename.c_str(), i);
+			getGameInfo(isDirectory[i], std_romsel_filename.c_str(), i, false, checkCustomIcons);
 
 			if (isDirectory[i]) {
 				bnrWirelessIcon[i] = 0;
@@ -3120,7 +3103,7 @@ static void endMoveMode(SwitchState scrn, std::vector<std::vector<DirEntry>> &di
 	titleboxXdest[ms().secondaryDevice] = titleboxXpos[ms().secondaryDevice] = CURPOS * titleboxXspacing;
 }
 
-static bool previousPage(SwitchState scrn, vector<vector<DirEntry>> dirContents) {
+static bool previousPage(SwitchState scrn, const vector<vector<DirEntry>> &dirContents) {
 	if (CURPOS == 0 && !showLshoulder) {
 		snd().playWrong();
 		return false;
@@ -3165,7 +3148,7 @@ static bool previousPage(SwitchState scrn, vector<vector<DirEntry>> dirContents)
 	return showLshoulder;
 }
 
-static bool nextPage(SwitchState scrn, vector<vector<DirEntry>> dirContents) {
+static bool nextPage(SwitchState scrn, const vector<vector<DirEntry>> &dirContents) {
 	if (CURPOS == (file_count - 1) - PAGENUM * 40 && !showRshoulder) {
 		snd().playWrong();
 		return false;
@@ -3344,7 +3327,7 @@ bool setDefaultDirectory(std::string_view directory_path)
 	return true;
 }
 
-std::string browseForFile(const std::vector<std::string_view> extensionList) {
+std::string browseForFile(const std::vector<std::string_view> &extensionList) {
 	displayNowLoading();
 	gameOrderIniPath = std::string(sys().isRunFromSD() ? "sd" : "fat") + ":/_nds/TWiLightMenu/extras/gameorder.ini";
 	recentlyPlayedIniPath = std::string(sys().isRunFromSD() ? "sd" : "fat") + ":/_nds/TWiLightMenu/extras/recentlyplayed.ini";
@@ -3358,6 +3341,7 @@ std::string browseForFile(const std::vector<std::string_view> extensionList) {
 	vector<vector<DirEntry>> dirContents(scrn.SIZE);
 
 	getDirectoryContents(dirContents[scrn], extensionList);
+	startupProfileMark("directory");
 	
 	if (CURPOS > last_used_box)
 	{
@@ -3371,6 +3355,7 @@ std::string browseForFile(const std::vector<std::string_view> extensionList) {
 	while (1) {
 		updateDirectoryContents(dirContents[scrn]);
 		getFileInfo(scrn, dirContents, true);
+		startupProfileMark("ROM metadata");
 		if (!vramSafeToUnmap()) swiWaitForVBlank(); // unmaps VRAM E/F/G while it copies
 			reloadIconPalettes();
 		if (ms().theme != TWLSettings::EThemeSaturn && ms().theme != TWLSettings::EThemeHBL) {
@@ -3537,6 +3522,7 @@ std::string browseForFile(const std::vector<std::string_view> extensionList) {
 				buttonArrowTouched[0] = ((keysHeld() & KEY_TOUCH) && touch.py > 171 && touch.px < 19);
 				buttonArrowTouched[1] = ((keysHeld() & KEY_TOUCH) && touch.py > 171 && touch.px > 236);
 				bgOperations(true);
+				startupProfileEnd();
 				/*if (REG_SCFG_MC != current_SCFG_MC) {
 					break;
 				}*/
@@ -4193,9 +4179,8 @@ std::string browseForFile(const std::vector<std::string_view> extensionList) {
 					}
 
 					// If SD card's cluster size is less than 32KB, then show warning for DS games with nds-bootstrap
-					extern struct statvfs st[2];
 					if ((useBootstrapAnyway || isDSiWare[CURPOS]) && !isNdz[CURPOS] && bnrRomType[CURPOS] == 0 && (!isDSiWare[CURPOS] || (ms().secondaryDevice && (!sdFound() || !ms().dsiWareToSD || bs().b4dsMode))) && isHomebrew[CURPOS] == 0
-					 && proceedToLaunch && st[ms().secondaryDevice].f_bsize < (32 << 10) && !ms().dontShowClusterWarning) {
+					 && proceedToLaunch && !ms().dontShowClusterWarning && (twlmStorageClusterSize(ms().secondaryDevice) != 0 && twlmStorageClusterSize(ms().secondaryDevice) < (32 << 10))) {
 						if (ms().theme == TWLSettings::EThemeSaturn) {
 							snd().playStartup();
 							fadeType = false; // Fade to black

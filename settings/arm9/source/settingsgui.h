@@ -6,6 +6,7 @@
 #include "settingspage.h"
 #include "graphics/fontHandler.h"
 #include "common/singleton.h"
+#include "common/systemdetails.h"
 
 #define MAX_ELEMENTS 9
 
@@ -23,10 +24,13 @@ public:
     // Read nds-bootstrap version
     FILE* bsVerFile;
     for (int i = 0; i < 2; i++) {
-      if (i == 1) {
-        bsVerFile = fopen("/_nds/nightly-bootstrap.ver", "rb");
-      } else {
-        bsVerFile = fopen("/_nds/release-bootstrap.ver", "rb");
+      const char* name = i ? "nightly-bootstrap.ver" : "release-bootstrap.ver";
+      char path[64];
+      snprintf(path, sizeof(path), "%s:/_nds/%s", sys().isRunFromSD() ? "sd" : "fat", name);
+      bsVerFile = fopen(path, "rb");
+      if (!bsVerFile) {
+        snprintf(path, sizeof(path), "%s:/_nds/%s", sys().isRunFromSD() ? "fat" : "sd", name);
+        bsVerFile = fopen(path, "rb");
       }
       if (bsVerFile) {
 		uint len = 7;
@@ -35,11 +39,12 @@ public:
 			len = ftell(bsVerFile);
 			fseek(bsVerFile, 0, SEEK_SET);
 		}
-        fread(bsVerText[i], 1, (i == 1) ? len : std::max(len, sizeof(bsVerText[i]) - 1), bsVerFile);
+        const size_t count = fread(bsVerText[i], 1, std::min<size_t>(len, sizeof(bsVerText[i]) - 1), bsVerFile);
+        bsVerText[i][count] = '\0';
+        fclose(bsVerFile);
       } else {
         snprintf(bsVerText[i], sizeof(bsVerText[i]), "%s", "No version available");
       }
-      fclose(bsVerFile);
     }
   }
   ~SettingsGUI() {}

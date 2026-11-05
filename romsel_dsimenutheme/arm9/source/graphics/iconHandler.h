@@ -71,14 +71,9 @@ void iconManagerInit();
  * num must be in the range [0, NDS_ICON_BANK_COUNT - 1] else this
  * function does nothing.
  * 
- * If init is true, then the palettes will be copied into
- * texture memory before being bound with
- * glColorTableEXT. 
- * 
- * Otherwise, they will be replacing the existing palette
- * using glColorTableSubEXT at the same memory location.
- * 
- * texHeight must be a power of two, or bad things will happen.
+ * Reuses the pixel and palette allocations made by iconManagerInit().
+ * No allocator or GL state changes occur during VBlank updates.
+ * texHeight is the number of rows to copy (up to TWL_TEX_HEIGHT).
  */
 void glLoadIcon(int num, const u16 *palette, const u8 *tiles, int texHeight = 32);
 

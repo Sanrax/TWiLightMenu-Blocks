@@ -2,9 +2,6 @@
 .SUFFIXES:
 #---------------------------------------------------------------------------------
 
-ifeq ($(strip $(DEVKITARM)),)
-$(error "Please set DEVKITARM in your environment. export DEVKITARM=<path to>devkitARM")
-endif
 
 # If on a tagged commit, use just the tag
 ifneq ($(shell echo $(shell git tag -l --points-at HEAD) | head -c 1),)
@@ -24,7 +21,8 @@ ifeq (,$(findstring $(GIT_VER), $(shell cat include/version.h)))
 $(shell printf "#ifndef VERSION_H\n#define VERSION_H\n\n#define VER_NUMBER \"$(GIT_VER)\"\n\n#endif\n" > include/version.h)
 endif
 
-include $(DEVKITARM)/ds_rules
+TWLM_ROOT ?= $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/../..)
+include $(TWLM_ROOT)/universal/blocksds.mk
 
 CURRENT_SCREEN_MODE := 1
 
@@ -66,7 +64,7 @@ LDFLAGS	=	-specs=../$(UNIVERSAL)/arm9/ds_arm9_twlm.specs -g $(ARCH) -Wl,-Map,$(n
 #---------------------------------------------------------------------------------
 # any extra libraries we wish to link with the project (order is important)
 #---------------------------------------------------------------------------------
-LIBS	:= 	-lfat -lmm9 -lnds9
+LIBS	:= 	-lmm9 -lnds9
  
  
 #---------------------------------------------------------------------------------
@@ -117,6 +115,8 @@ export OFILES	:=	$(addsuffix .o,$(BINFILES)) \
 					$(BMPFILES:.bmp=.o) \
 					$(PNGFILES:.png=.o) \
 					$(CPPFILES:.cpp=.o) $(CFILES:.c=.o) $(SFILES:.s=.o)
+
+export ASSET_OBJECTS := $(addsuffix .o,$(BINFILES)) $(BMPFILES:.bmp=.o) $(PNGFILES:.png=.o)
 
 export INCLUDE	:=	$(foreach dir,$(INCLUDES),-iquote $(CURDIR)/$(dir)) \
 					$(foreach dir,$(LIBDIRS),-I$(dir)/include) \

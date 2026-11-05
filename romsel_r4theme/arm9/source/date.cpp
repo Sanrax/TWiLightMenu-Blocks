@@ -1,3 +1,4 @@
+#include <time.h>
 #include "date.h"
 
 #include "graphics/fontHandler.h"

@@ -44,6 +44,7 @@ void ndmaCopyWordsAsynch(uint8 ndmaSlot, const void* src, void* dest, uint32 siz
 	*(vu32*)((u32)0x400411C+0x1C*ndmaSlot) = 0x90070000;
 }
 
+#ifndef __BLOCKSDS__
 static inline 
 bool ndmaBusy(uint8 ndmaSlot) {
 	switch (ndmaSlot) {
@@ -58,6 +59,8 @@ bool ndmaBusy(uint8 ndmaSlot) {
 			return	(*(vu32*)(0x4004160) & BIT(31)) == 0x80000000;
 	}
 }
+
+#endif
 
 static inline 
 bool ndmaEnabled(void) {

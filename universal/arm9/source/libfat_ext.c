@@ -1,167 +1,43 @@
-#include <sys/iosupport.h>
-#include <unistd.h>
+#include <fat.h>
+#include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
-#include <limits.h>
-#include <malloc.h>
+#include <unistd.h>
 
-static inline void* _FAT_mem_allocate (size_t size) {
-	return malloc (size);
-}
+#include "fat_ext.h"
 
-static inline void* _FAT_mem_align (size_t size) {
-	return malloc (size);
-}
-
-static inline void _FAT_mem_free (void* mem) {
-	free (mem);
-}
-
-#include "directory.h"
-#include "partition.h"
-#include "common/tonccpy.h"
-
-//static int timesRan = 0;
-
-static int fatGetAlias (const char* drive, const char* name, const char* nameEnd, char *alias) {
-	devoptab_t *devops;
-	PARTITION* partition;
-	DIR_ENTRY entry;
-	char *buf;
-	int drivelen/*,namelen*/,i;
-
-	if (!drive || !name)
-		return -1;
-
-	drivelen = strlen(drive);
-	//namelen = strlen(name);
-	buf=(char*)_FAT_mem_allocate(sizeof(char)*drivelen+2);	
-	strcpy(buf,drive);
-
-	if (drive[drivelen-1] == '/') {
-		buf[drivelen-1]='\0';
-		drivelen--;
+bool fatGetAliasPath(const char *path, char *alias, size_t capacity) {
+	if (!alias || !capacity) return false;
+	alias[0] = '\0';
+	if (!path) return false;
+	char *full = realpath(path, NULL);
+	if (!full) return false;
+	char *component = strchr(full, ':');
+	if (!component || component[1] != '/') goto fail;
+	component += 2;
+	size_t used = component - full;
+	if (used >= capacity) goto fail;
+	memcpy(alias, full, used);
+	alias[used] = '\0';
+	while (*component) {
+		char *end = strchr(component, '/');
+		if (end) *end = '\0';
+		char shortName[FAT_SHORT_FILE_NAME_MAX + 1];
+		bool ok = FAT_getShortNameFor(full, shortName);
+		if (end) *end = '/';
+		if (!ok) goto fail;
+		size_t length = strlen(shortName);
+		if (length + (end ? 1 : 0) >= capacity - used) goto fail;
+		memcpy(alias + used, shortName, length);
+		used += length;
+		if (end) alias[used++] = '/';
+		alias[used] = '\0';
+		if (!end) break;
+		component = end + 1;
 	}
-
-	if (drive[drivelen-1] != ':') {
-		buf[drivelen]=':';
-		buf[drivelen+1]='\0';
-	}
-
-	/*if (name[namelen-1] == '/') {
-		name[namelen-1]='\0';
-		namelen--;
-	}*/
-
-	devops = (devoptab_t*)GetDeviceOpTab(buf);
-
-	for (i=0;buf[i]!='\0' && buf[i]!=':';i++);  
-	if (!devops || strncasecmp(buf,devops->name,i)) {
-		_FAT_mem_free(buf);
-		return -1;
-	}
-
-	_FAT_mem_free(buf);
-
-	partition = (PARTITION*)devops->deviceData;
-
-	int resultLen = 0;
-
-	if (_FAT_directory_entryFromPath(partition, &entry, name, nameEnd)) { 
-		tonccpy(alias,&entry.entryData,8);
-		int i = 0;
-		if (strncmp((char*)entry.entryData+8, "   ", 3) != 0) {
-			for (i = 0; i < 8; i++) {
-				if (entry.entryData[i] == ' ') {
-					break;
-				}
-			}
-			int extLen = 1;
-			alias[i] = '.';
-			for (extLen = 1; extLen <= 3; extLen++) {
-				const int pos = 7+extLen;
-				if (entry.entryData[pos] == ' ') {
-					break;
-				} else {
-					alias[i+extLen] = entry.entryData[pos];
-				}
-			}
-			const int pos = i+extLen;
-			if (_FAT_directory_isDirectory(&entry)) {
-				alias[pos] = '\x2F';
-				resultLen = pos+1;
-			} else {
-				alias[pos] = '\0';
-				resultLen = pos;
-			}
-		} else {
-			for (i = 0; i <= 8; i++) {
-				if (entry.entryData[i] == ' ') {
-					alias[i] = _FAT_directory_isDirectory(&entry) ? '\x2F' : '\0';
-					break;
-				}
-			}
-			resultLen = i+1;
-		}
-		/*tonccpy((char*)0x02800000+(timesRan*0x20), entry.entryData, 0x20);
-		tonccpy((char*)0x02800100+(timesRan*0x10), alias, 12);
-		timesRan++;*/
-	}
-
-	return resultLen;
-}
-
-/* void fatGetAliasName (const char* drive, const char* name, char *alias) {
-	fatGetAlias (drive, name, NULL, alias);
-} */
-
-void fatGetAliasPath (const char* path, char *alias) {
-	if (access(path, F_OK) != 0) {
-		alias[0] = '\0';
-		return;
-	}
-
-	int drivelen = 0;
-	for (int i = 0; i < strlen(path); i++) {
-		if (path[i] == '\x2F') {
-			drivelen = i+1;
-			break;
-		}
-	}
-
-	char drive[8] = {0};
-	tonccpy(drive, path, drivelen);
-
-	char dirBak[PATH_MAX];
-	getcwd(dirBak, PATH_MAX);
-	chdir(drive);
-
-	char name[128];
-	int len = drivelen;
-	int lfnLen = len;
-	if (path[0] == '\x2F') {
-		len = 1;
-		lfnLen = len;
-	}
-	int nameEnd = 0;
-	tonccpy(alias, drive, len);
-
-	for (int i = len; i < 256; i++) {
-		for (nameEnd = 0; nameEnd < 128; nameEnd++) {
-			name[nameEnd] = path[i+nameEnd];
-			if (path[i+nameEnd] == '\0' || path[i+nameEnd] == '\x2F' /*|| path[i+nameEnd] == '\x5C'*/) {
-				name[nameEnd] = '\0';
-				break;
-			}
-		}
-		//tonccpy((char*)0x02800040+(timesRan*0x10), name, nameEnd);
-		len += fatGetAlias (drive, path+lfnLen, path+lfnLen+nameEnd, alias+len);
-		lfnLen += nameEnd+1;
-		i += nameEnd;
-		//timesRan++;
-		if (path[i] == '\0') break;
-		chdir(name);
-	}
-
-	chdir(dirBak);
+	free(full);
+	return true;
+fail:
+	free(full);
+	alias[0] = '\0';
+	return false;
 }

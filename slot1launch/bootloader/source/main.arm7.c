@@ -778,8 +778,8 @@ int arm7_loadBinary (const tDSiHeader* dsiHeaderTemp) {
 		tonccpy((char*)NDS_HEADER_POKEMON+0xC, gameCodePokemon, 4);
 	}
 
-	cardRead(dsiHeaderTemp->ndshdr.arm9romOffset, (u32*)dsiHeaderTemp->ndshdr.arm9destination, dsiHeaderTemp->ndshdr.arm9binarySize);
-	cardRead(dsiHeaderTemp->ndshdr.arm7romOffset, (u32*)dsiHeaderTemp->ndshdr.arm7destination, dsiHeaderTemp->ndshdr.arm7binarySize);
+	twlmCardRead(dsiHeaderTemp->ndshdr.arm9romOffset, (u32*)dsiHeaderTemp->ndshdr.arm9destination, dsiHeaderTemp->ndshdr.arm9binarySize);
+	twlmCardRead(dsiHeaderTemp->ndshdr.arm7romOffset, (u32*)dsiHeaderTemp->ndshdr.arm7destination, dsiHeaderTemp->ndshdr.arm7binarySize);
 
 	moduleParams = (module_params_t*)findModuleParamsOffset(&dsiHeaderTemp->ndshdr);
 
@@ -977,10 +977,10 @@ void arm7_main (void) {
 		if (dsiHeaderTemp->arm9ibinarySize > 0) {
 			memset_addrs_arm7(0x02800000, 0x02810004);
 
-			cardRead((u32)dsiHeaderTemp->arm9iromOffset, (u32*)dsiHeaderTemp->arm9idestination, dsiHeaderTemp->arm9ibinarySize);
+			twlmCardRead((u32)dsiHeaderTemp->arm9iromOffset, (u32*)dsiHeaderTemp->arm9idestination, dsiHeaderTemp->arm9ibinarySize);
 		}
 		if (dsiHeaderTemp->arm7ibinarySize > 0) {
-			cardRead((u32)dsiHeaderTemp->arm7iromOffset, (u32*)dsiHeaderTemp->arm7idestination, dsiHeaderTemp->arm7ibinarySize);
+			twlmCardRead((u32)dsiHeaderTemp->arm7iromOffset, (u32*)dsiHeaderTemp->arm7idestination, dsiHeaderTemp->arm7ibinarySize);
 		}
 
 		#ifdef FULL_DSI_MODE_ENABLED

@@ -1,3 +1,7 @@
+#include "common/filetypes.h"
+#include "common/storage.h"
+#include <limits.h>
+#include <sys/stat.h>
 /*-----------------------------------------------------------------
  Copyright (C) 2005 - 2013
 	Michael "Chishm" Chisholm
@@ -134,18 +138,9 @@ struct DirEntry {
 	bool customPos;
 };
 
-bool extension(const std::string_view filename, const std::vector<std::string_view> extensions) {
-	for (std::string_view extension : extensions) {
-		// logPrint("Checking for %s extension in %s\n", extension.data(), filename.data());
-		if ((strlen(filename.data()) > strlen(extension.data())) && (strcasecmp(filename.substr(filename.size() - extension.size()).data(), extension.data()) == 0)) {
-			return true;
-		}
-	}
 
-	return false;
-}
 
-bool nameEndsWith(const std::string_view name, const std::vector<std::string_view> extensionList) {
+bool nameEndsWith(const std::string_view name, const std::vector<std::string_view> &extensionList) {
 	if (name.size() == 0)
 		return false;
 
@@ -155,11 +150,7 @@ bool nameEndsWith(const std::string_view name, const std::vector<std::string_vie
 	if (name.substr(0, 2) == "._")
 		return false; // Don't show macOS's index files
 
-	for (const std::string_view &ext : extensionList) {
-		if (name.length() > ext.length() && strcasecmp(name.substr(name.length() - ext.length()).data(), ext.data()) == 0)
-			return true;
-	}
-	return false;
+	return extension(name, extensionList);
 }
 
 bool dirEntryPredicate(const DirEntry &lhs, const DirEntry &rhs) {
@@ -179,40 +170,25 @@ bool dirEntryPredicate(const DirEntry &lhs, const DirEntry &rhs) {
 	return strcasecmp(lhs.name.c_str(), rhs.name.c_str()) < 0;
 }
 
-void getDirectoryContents(std::vector<DirEntry> &dirContents, const std::vector<std::string_view> extensionList = {}) {
+void getDirectoryContents(std::vector<DirEntry> &dirContents, const std::vector<std::string_view> &extensionList = {}) {
 	dirContents.clear();
 	resetPreloadedBannerIcons();
 
 	file_count = 0;
 	fileStartPos = 0;
 
-	DIR *pdir = opendir(".");
+	TWLDirectory *pdir = twlmOpenDirectory(".");
 
 	if (pdir == nullptr) {
-		iprintf("Unable to open the directory.\n");
+		printf("Unable to open the directory.\n");
 	} else {
 		bool backFound = false;
 		int backPos = 0;
 		while (1) {
 			bgOperations(false);
 
-			// This has to be done *before* readdir, since readdir increments
-			// the internal state's DIR_ENTRY for the next time
-			int attrs = 0;
-			if (!ms().showHidden) {
-				// Get FAT attrs, this is equivalent to FAT_getAttr(pent->d_name)
-				// but much quicker since we don't have to search the filesystem
-				// for the name.
-				// It's also *very* heavily dependant on internal libfat structs
-				// being exactly as they are now.
-				static_assert(_LIBFAT_MAJOR_ == 1 && _LIBFAT_MINOR_ == 1 && _LIBFAT_PATCH_ == 5, "libfat updated! Check that this is still correct");
-
-				// state->currentEntry.entryData[DIR_ENTRY_attributes]
-				u8 *state = (u8 *)pdir->dirData->dirStruct;
-				attrs = state[4 + 0xB];
-			}
-
-			dirent *pent = readdir(pdir);
+			uint8_t attrs = 0;
+			const dirent *pent = twlmReadDirectory(pdir, &attrs);
 			if (pent == nullptr || file_count > ((dsiFeatures() || sys().dsDebugRam()) ? 1024 : 512)) {
 				logPrint("End of listing, Sorting: ");
 				break;
@@ -366,7 +342,7 @@ void getDirectoryContents(std::vector<DirEntry> &dirContents, const std::vector<
 		if (backFound) {
 			dirContents.insert(dirContents.begin(), {"..", true, backPos, false});
 		}
-		closedir(pdir);
+		twlmCloseDirectory(pdir);
 	}
 }
 
@@ -1360,7 +1336,7 @@ bool dsiWareCompatibleB4DS(void) {
 	return res;
 }
 
-std::string browseForFile(const std::vector<std::string_view> extensionList) {
+std::string browseForFile(const std::vector<std::string_view> &extensionList) {
 	gameOrderIniPath = std::string(sys().isRunFromSD() ? "sd" : "fat") + ":/_nds/TWiLightMenu/extras/gameorder.ini";
 	recentlyPlayedIniPath = std::string(sys().isRunFromSD() ? "sd" : "fat") + ":/_nds/TWiLightMenu/extras/recentlyplayed.ini";
 	timesPlayedIniPath = std::string(sys().isRunFromSD() ? "sd" : "fat") + ":/_nds/TWiLightMenu/extras/timesplayed.ini";
@@ -1822,9 +1798,9 @@ std::string browseForFile(const std::vector<std::string_view> extensionList) {
 				}
 
 				// If SD card's cluster size is less than 32KB, then show warning for DS games with nds-bootstrap
-				extern struct statvfs st[2];
+
 				if ((useBootstrapAnyway || isDSiWare[cursorPosOnScreen]) && !isNdz[cursorPosOnScreen] && bnrRomType[cursorPosOnScreen] == 0 && (!isDSiWare[cursorPosOnScreen] || (ms().secondaryDevice && (!sdFound() || !ms().dsiWareToSD || bs().b4dsMode))) && isHomebrew[cursorPosOnScreen] == 0
-				 && proceedToLaunch && st[ms().secondaryDevice].f_bsize < (32 << 10) && !ms().dontShowClusterWarning) {
+				 && proceedToLaunch && !ms().dontShowClusterWarning && twlmStorageClusterSize(ms().secondaryDevice) != 0 && twlmStorageClusterSize(ms().secondaryDevice) < (32 << 10)) {
 					dialogboxHeight = 5;
 					showdialogbox = true;
 					clearText(false);

@@ -2,11 +2,9 @@
 .SUFFIXES:
 #---------------------------------------------------------------------------------
 
-ifeq ($(strip $(DEVKITARM)),)
-$(error "Please set DEVKITARM in your environment. export DEVKITARM=<path to>devkitARM")
-endif
 
-include $(DEVKITARM)/ds_rules
+TWLM_ROOT ?= $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/../../../..)
+include $(TWLM_ROOT)/universal/blocksds.mk
 
 # define SFX_WRONG	0
 # define SFX_LAUNCH	1

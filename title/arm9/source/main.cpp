@@ -1,3 +1,8 @@
+#include "common/filetypes.h"
+#include "common/storage.h"
+#include <sys/stat.h>
+#include <limits.h>
+#include <time.h>
 #include <nds.h>
 #include <nds/arm9/dldi.h>
 #include "fat_ext.h"
@@ -82,14 +87,14 @@ int subscreenmode = 0;
 
 touchPosition touch;
 
-// Used to switch MPU region 6 from 16 MB to 32 MB. This region is the one that
+// Used to switch the uncached MPU region from 16 MB to 32 MB. It is the one that
 // starts at address 0xC000000, and we need it to check if we have 16 or 32 MB
 // available.
 //
 // If the loader of TWiLightMenu doesn't set SCFG_EXT9 bits 14-15 to 3, the crt0
 // of libnds will get confused and only map 16 MB. To be sure that the code
 // never crashes, even with buggy loaders, we need to manually set it to 32 MB.
-extern "C" void CP15_ExtendRegion6(void);
+extern "C" void CP15_ExtendUncachedRam(void);
 
 using namespace std;
 
@@ -125,7 +130,7 @@ void loadMainMenu()
 	controlBottomBright = true;
 	fadeType = false;
 	fifoSendValue32(FIFO_USER_01, 1); // Fade out sound
-	for (int i = 0; i < 25; i++)
+	while (!screenFadedOut())
 		swiWaitForVBlank();
 	fifoSendValue32(FIFO_USER_01, 0); // Cancel sound fade out
 
@@ -144,7 +149,7 @@ void loadROMselect(void)
 	controlBottomBright = true;
 	fadeType = false;
 	fifoSendValue32(FIFO_USER_01, 1); // Fade out sound
-	for (int i = 0; i < 25; i++)
+	while (!screenFadedOut())
 		swiWaitForVBlank();
 	fifoSendValue32(FIFO_USER_01, 0); // Cancel sound fade out
 
@@ -184,16 +189,7 @@ void loadROMselect(void)
 	}
 }*/
 
-bool extension(const std::string_view filename, const std::vector<std::string_view> extensions) {
-	for (std::string_view extension : extensions) {
-		// logPrint("Checking for %s extension in %s\n", extension.data(), filename.data());
-		if ((strlen(filename.data()) > strlen(extension.data())) && (strcasecmp(filename.substr(filename.size() - extension.size()).data(), extension.data()) == 0)) {
-			return true;
-		}
-	}
 
-	return false;
-}
 
 // Unlaunch needs the path in 16 bit unicode so this function is
 // from the FontGraphic class, but as that's not used in title
@@ -443,8 +439,8 @@ void wideCheck(const int useWidescreen, bool checkCheatData) {
 			mkdir("sd:/_nds/TWiLightMenu/TwlBg", 0777);
 			if (rename("sd:/luma/sysmodules/TwlBg.cxi", "sd:/_nds/TWiLightMenu/TwlBg/Widescreen.cxi") != 0) {
 				consoleDemoInit();
-				iprintf("Failed to rename TwlBg.cxi\n");
-				iprintf("back to Widescreen.cxi\n");
+				printf("Failed to rename TwlBg.cxi\n");
+				printf("back to Widescreen.cxi\n");
 				for (int i = 0; i < 60*3; i++) swiWaitForVBlank();
 			}
 			if (access("sd:/_nds/TWiLightMenu/TwlBg/TwlBg.cxi.bak", F_OK) == 0) {
@@ -458,8 +454,8 @@ void wideCheck(const int useWidescreen, bool checkCheatData) {
 static void gbaNativeStart(void)
 {
 	consoleDemoInit();
-	iprintf("Now Loading...\n");
-	iprintf("\n");
+	printf("Now Loading...\n");
+	printf("\n");
 	fadeType = true;
 }
 
@@ -551,6 +547,7 @@ void lastRunROM()
 		u8 unitCode = 0;
 
 		FILE *f_nds_file = fopen(filename.c_str(), "rb");
+		if (!f_nds_file) return;
 		fseek(f_nds_file, offsetof(sNDSHeaderExt, gameTitle), SEEK_SET);
 		fread(game_TID, 1, 4, f_nds_file);
 		const bool isNdz = (memcmp(game_TID, "NDZ1", 4) == 0);
@@ -606,8 +603,8 @@ void lastRunROM()
 
 			if ((orgsavesize == 0 && savesize > 0) || (orgsavesize < savesize)) {
 				consoleDemoInit();
-				iprintf((orgsavesize == 0) ? "Creating save file...\n" : "Expanding save file...\n");
-				iprintf ("\n");
+				printf((orgsavesize == 0) ? "Creating save file...\n" : "Expanding save file...\n");
+				printf ("\n");
 				fadeType = true;
 
 				FILE *pFile = fopen(savepath.c_str(), orgsavesize > 0 ? "r+" : "wb");
@@ -616,7 +613,7 @@ void lastRunROM()
 					fputc('\0', pFile);
 					fclose(pFile);
 				}
-				iprintf((orgsavesize == 0) ? "Save file created!\n" : "Save file expanded!\n");
+				printf((orgsavesize == 0) ? "Save file created!\n" : "Save file expanded!\n");
 
 				for (int i = 0; i < 30; i++) {
 					swiWaitForVBlank();
@@ -696,8 +693,8 @@ void lastRunROM()
 
 				if ((orgsavesize == 0 && savesize > 0) || (orgsavesize < savesize)) {
 					consoleDemoInit();
-					iprintf((orgsavesize == 0) ? "Creating save file...\n" : "Expanding save file...\n");
-					iprintf ("\n");
+					printf((orgsavesize == 0) ? "Creating save file...\n" : "Expanding save file...\n");
+					printf ("\n");
 					fadeType = true;
 
 					FILE *pFile = fopen(savepath.c_str(), orgsavesize > 0 ? "r+" : "wb");
@@ -706,7 +703,7 @@ void lastRunROM()
 						fputc('\0', pFile);
 						fclose(pFile);
 					}
-					iprintf((orgsavesize == 0) ? "Save file created!\n" : "Save file expanded!\n");
+					printf((orgsavesize == 0) ? "Save file created!\n" : "Save file expanded!\n");
 
 					for (int i = 0; i < 30; i++) {
 						swiWaitForVBlank();
@@ -1002,7 +999,7 @@ void lastRunROM()
 				if (savFormat) {
 					if ((getFileSize(ms().dsiWarePubPath.c_str()) == 0) && ((NDSHeader.pubSavSize > 0) || (NDSHeader.prvSavSize > 0))) {
 						consoleDemoInit();
-						iprintf("Creating save file...\n\n");
+						printf("Creating save file...\n\n");
 						fadeType = true;
 
 						FILE *pFile = fopen(ms().dsiWarePubPath.c_str(), "wb");
@@ -1013,7 +1010,7 @@ void lastRunROM()
 							fclose(pFile);
 						}
 
-						iprintf("Save file created!\n");
+						printf("Save file created!\n");
 
 						for (int i = 0; i < 30; i++) {
 							swiWaitForVBlank();
@@ -1026,12 +1023,12 @@ void lastRunROM()
 				} else {
 					if ((getFileSize(ms().dsiWarePubPath.c_str()) == 0) && (NDSHeader.pubSavSize > 0)) {
 						consoleDemoInit();
-						iprintf("Creating public save file...\n\n");
+						printf("Creating public save file...\n\n");
 						fadeType = true;
 
 						createDSiWareSave(ms().dsiWarePubPath.c_str(), NDSHeader.pubSavSize);
 
-						iprintf("Public save file created!\n");
+						printf("Public save file created!\n");
 
 						for (int i = 0; i < 30; i++) {
 							swiWaitForVBlank();
@@ -1044,12 +1041,12 @@ void lastRunROM()
 
 					if ((getFileSize(ms().dsiWarePrvPath.c_str()) == 0) && (NDSHeader.prvSavSize > 0)) {
 						consoleDemoInit();
-						iprintf("Creating private save file...\n\n");
+						printf("Creating private save file...\n\n");
 						fadeType = true;
 
 						createDSiWareSave(ms().dsiWarePrvPath.c_str(), NDSHeader.prvSavSize);
 
-						iprintf("Private save file created!\n");
+						printf("Private save file created!\n");
 
 						for (int i = 0; i < 30; i++) {
 							swiWaitForVBlank();
@@ -1063,7 +1060,7 @@ void lastRunROM()
 
 				if ((NDSHeader.dsi_flags & BIT(2)) && getFileSize(ms().dsiWareBnrPath.c_str()) == 0) {
 					consoleDemoInit();
-					iprintf("Creating banner save file...\n\n");
+					printf("Creating banner save file...\n\n");
 					fadeType = true;
 
 					FILE *pFile = fopen(ms().dsiWareBnrPath.c_str(), "wb");
@@ -1076,7 +1073,7 @@ void lastRunROM()
 						fclose(pFile);
 					}
 
-					iprintf("Banner save file created!\n");
+					printf("Banner save file created!\n");
 
 					for (int i = 0; i < 30; i++) {
 						swiWaitForVBlank();
@@ -1148,15 +1145,15 @@ void lastRunROM()
 						}
 						rename("sd:/_nds/TWiLightMenu/tempDSiWare.bnr.bak", "sd:/_nds/TWiLightMenu/tempDSiWare.bnr");
 					}
-					fatGetAliasPath("sd:/_nds/TWiLightMenu/tempDSiWare.dsi", sfnSrl);
-					fatGetAliasPath("sd:/_nds/TWiLightMenu/tempDSiWare.pub", sfnPub);
-					fatGetAliasPath("sd:/_nds/TWiLightMenu/tempDSiWare.prv", sfnPrv);
-					fatGetAliasPath("sd:/_nds/TWiLightMenu/tempDSiWare.bnr", sfnBnr);
+					fatGetAliasPath("sd:/_nds/TWiLightMenu/tempDSiWare.dsi", sfnSrl, sizeof(sfnSrl));
+					fatGetAliasPath("sd:/_nds/TWiLightMenu/tempDSiWare.pub", sfnPub, sizeof(sfnPub));
+					fatGetAliasPath("sd:/_nds/TWiLightMenu/tempDSiWare.prv", sfnPrv, sizeof(sfnPrv));
+					fatGetAliasPath("sd:/_nds/TWiLightMenu/tempDSiWare.bnr", sfnBnr, sizeof(sfnBnr));
 				} else {
-					fatGetAliasPath(ms().dsiWareSrlPath.c_str(), sfnSrl);
-					fatGetAliasPath(ms().dsiWarePubPath.c_str(), sfnPub);
-					fatGetAliasPath(ms().dsiWarePrvPath.c_str(), sfnPrv);
-					fatGetAliasPath(ms().dsiWareBnrPath.c_str(), sfnBnr);
+					fatGetAliasPath(ms().dsiWareSrlPath.c_str(), sfnSrl, sizeof(sfnSrl));
+					fatGetAliasPath(ms().dsiWarePubPath.c_str(), sfnPub, sizeof(sfnPub));
+					fatGetAliasPath(ms().dsiWarePrvPath.c_str(), sfnPrv, sizeof(sfnPrv));
+					fatGetAliasPath(ms().dsiWareBnrPath.c_str(), sfnBnr, sizeof(sfnBnr));
 				}
 
 				CIniFile bootstrapini((useTempDSiWare || sys().isRunFromSD()) ? BOOTSTRAP_INI : BOOTSTRAP_INI_FC);
@@ -1252,7 +1249,7 @@ void lastRunROM()
 	}
 	if (err > 0) {
 		consoleDemoInit();
-		iprintf("Start failed. Error %i\n", err);
+		printf("Start failed. Error %i\n", err);
 		fadeType = true;
 		for (int i = 0; i < 60*3; i++) {
 			swiWaitForVBlank();
@@ -1267,7 +1264,7 @@ void lastRunROM()
 void setDSiDonorRom(const bool is3DS) {
 	if (!nandMounted) {
 		logPrint("Mounting NAND in order to auto-set a donor ROM...\n");
-		nandMounted = fatMountSimple("nand", &io_dsi_nand);
+		nandMounted = twlmMountStorage("nand", &io_dsi_nand);
 		if (nandMounted) {
 			logPrint("NAND mounted!\n");
 		} else {
@@ -1390,7 +1387,7 @@ void setDSiDonorRom(const bool is3DS) {
 void setDSiDonorRomSCFGLocked(void) {
 	if (!nandMounted) {
 		logPrint("Mounting NAND in order to auto-set a donor ROM...\n");
-		nandMounted = fatMountSimple("nand", &io_dsi_nand);
+		nandMounted = twlmMountStorage("nand", &io_dsi_nand);
 		if (nandMounted) {
 			logPrint("NAND mounted!\n");
 		} else {
@@ -2306,7 +2303,7 @@ int titleMode(void)
 			bool hiyaFound = (access("sd:/hiya.dsi", F_OK) == 0 && access("sd:/shared1/TWLCFG0.dat", F_OK) == 0 && access("sd:/sys/HWINFO_N.dat", F_OK) == 0 && !sys().arm7SCFGLocked());
 			if (!hiyaFound) {
 				// Mount NAND, if not using hiyaCFW
-				nandMounted = fatMountSimple("nand", &io_dsi_nand);
+				nandMounted = twlmMountStorage("nand", &io_dsi_nand);
 			}
 
 			if (nandMounted || hiyaFound) {
@@ -2319,7 +2316,7 @@ int titleMode(void)
 
 				u32 srBackendId[2] = {*(u32*)0x02000428, *(u32*)0x0200042C};
 				if ((srBackendId[0] != 0x53524C41 || srBackendId[1] != 0x00030004) && isDSiMode() && !nandMounted) {
-					nandMounted = fatMountSimple("nand", &io_dsi_nand);
+					nandMounted = twlmMountStorage("nand", &io_dsi_nand);
 					if (nandMounted) {
 						twlCfgFile = fopen("nand:/shared1/TWLCFG0.dat", "rb");
 						fseek(twlCfgFile, 0x88, SEEK_SET);
@@ -2460,8 +2457,8 @@ int titleMode(void)
 						FILE* file = fopen("sd:/_nds/nds-bootstrap/srBackendId.bin", "wb");
 						if (file) {
 							fwrite(currentSrBackendId, sizeof(u32), 2, file);
+							fclose(file);
 						}
-						fclose(file);
 					} else if (access("sd:/_nds/nds-bootstrap/srBackendId.bin", F_OK) == 0) {
 						remove("sd:/_nds/nds-bootstrap/srBackendId.bin");
 					}
@@ -2474,7 +2471,7 @@ int titleMode(void)
 			} else {
 				if (tidPart != 0x0003) {
 					if (!nandMounted) {
-						nandMounted = fatMountSimple("nand", &io_dsi_nand);
+						nandMounted = twlmMountStorage("nand", &io_dsi_nand);
 					}
 					// Read correct title ID of launched System Menu title
 					FILE* twlCfgFile = fopen("nand:/shared1/TWLCFG0.dat", "rb");
@@ -2538,7 +2535,7 @@ int titleMode(void)
 			// hiyaCFW is not found
 			if (!nandMounted) {
 				logPrint("Mounting NAND...\n");
-				nandMounted = fatMountSimple("nand", &io_dsi_nand);
+				nandMounted = twlmMountStorage("nand", &io_dsi_nand);
 			}
 
 			if (nandMounted) {
@@ -2846,7 +2843,7 @@ int titleMode(void)
 			if (access(addonPath, F_OK) != 0) {
 				mkdir(addonFolder, 0777);
 				FILE* addon = fopen(addonPath, "wb");
-				fclose(addon);
+				if (addon) fclose(addon);
 			}
 		}
 		if (access("sd:/_nds/TWiLightMenu/emulators/gameyob.nds", F_OK) == 0) {
@@ -2854,7 +2851,7 @@ int titleMode(void)
 			if (access(addonPath, F_OK) != 0) {
 				mkdir(addonFolder, 0777);
 				FILE* addon = fopen(addonPath, "wb");
-				fclose(addon);
+				if (addon) fclose(addon);
 			}
 		}
 	}
@@ -2871,7 +2868,7 @@ int titleMode(void)
 			if (access(addonPath, F_OK) != 0) {
 				mkdir(addonFolder, 0777);
 				FILE* addon = fopen(addonPath, "wb");
-				fclose(addon);
+				if (addon) fclose(addon);
 			}
 		}
 		if (access("fat:/_nds/TWiLightMenu/emulators/gameyob.nds", F_OK) == 0) {
@@ -2879,7 +2876,7 @@ int titleMode(void)
 			if (access(addonPath, F_OK) != 0) {
 				mkdir(addonFolder, 0777);
 				FILE* addon = fopen(addonPath, "wb");
-				fclose(addon);
+				if (addon) fclose(addon);
 			}
 		}
 	}
@@ -2887,7 +2884,7 @@ int titleMode(void)
 	if (isDSiMode()) {
 		// Extend the MPU region that is mapped at address 0xC000000 up to
 		// 0xE000000 instead of potentially ending at 0xD000000.
-		CP15_ExtendRegion6();
+		CP15_ExtendUncachedRam();
 	}
 
 	if (REG_SCFG_EXT != 0) {
@@ -2915,10 +2912,10 @@ int titleMode(void)
 	u32 softResetParams = 0;
 	FILE* file = fopen(softResetParamsPath, "rb");
 	if (file) {
-		fread(&softResetParams, sizeof(u32), 1, file);
-		softResetParamsFound = (softResetParams != 0xFFFFFFFF);
+		softResetParamsFound = fread(&softResetParams, sizeof(u32), 1, file) == 1
+			&& softResetParams != 0xFFFFFFFF;
+		fclose(file);
 	}
-	fclose(file);
 
 	if (softResetParamsFound) {
 		logPrint("Soft-reset parameters found\n");
@@ -2926,12 +2923,15 @@ int titleMode(void)
 		if (keysHeld() & KEY_X) {
 			softResetParams = 0xFFFFFFFF;
 			file = fopen(softResetParamsPath, "wb");
-			fwrite(&softResetParams, sizeof(u32), 1, file);
-			fseek(file, 0x10 - 1, SEEK_SET);
-			fputc('\0', file);
-			fclose(file);
-			logPrint("Cleared soft-reset parameters\n");
-			softResetParamsFound = false;
+			if (file) {
+				bool cleared = fwrite(&softResetParams, sizeof(u32), 1, file) == 1
+					&& fseek(file, 0x10 - 1, SEEK_SET) == 0 && fputc('\0', file) != EOF;
+				if (fclose(file) != 0) cleared = false;
+				if (cleared) {
+					logPrint("Cleared soft-reset parameters\n");
+					softResetParamsFound = false;
+				}
+			}
 		}
 	}
 

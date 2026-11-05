@@ -3,11 +3,9 @@
 #---------------------------------------------------------------------------------
 .SECONDARY:
 
-ifeq ($(strip $(DEVKITARM)),)
-$(error "Please set DEVKITARM in your environment. export DEVKITARM=<path to>devkitARM)
-endif
 
-include $(DEVKITARM)/ds_rules
+TWLM_ROOT ?= $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/..)
+include $(TWLM_ROOT)/universal/blocksds.mk
 
 export TARGET		:=	slot1launch
 export TOPDIR		:=	$(CURDIR)
@@ -44,7 +42,7 @@ arm7/$(TARGET).elf:
 	$(MAKE) -C arm7
 	
 #---------------------------------------------------------------------------------
-arm9/$(TARGET).elf:
+arm9/$(TARGET).elf: bootloader bootloaderAlt
 	$(MAKE) -C arm9
 	
 #---------------------------------------------------------------------------------
@@ -72,5 +70,5 @@ data:
 bootloader: data
 	@$(MAKE) -C bootloader
 
-bootloaderAlt: data
+bootloaderAlt: data cardengine_arm7
 	@$(MAKE) -C bootloaderAlt

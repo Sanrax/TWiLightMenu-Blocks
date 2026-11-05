@@ -3,7 +3,7 @@
 #define __TWILIGHTMENU_TEXTURES_CLASS__
 
 #define BMP_ID(a,b)         ((u16)( (a) | (b)<<8 ))
-#define CHUNK_ID(a,b,c,d)   ((u32)( (a) | (b)<<8 | (c)<<16 | (d)<<24 ))
+#define CHUNK_ID(a,b,c,d)   (u32(u8(a)) | (u32(u8(b)) << 8) | (u32(u8(c)) << 16) | (u32(u8(d)) << 24))
 
 #include <memory>
 #include <string>
@@ -83,10 +83,10 @@ class Texture
 
 	private:
 		TextureType findType(FILE* file);
-		void loadBitmap(FILE* file) noexcept;
+		bool loadBitmap(FILE* file) noexcept;
 		void loadPaletted(FILE* file) noexcept;
 		void loadCompressed(FILE* file) noexcept;
-		void loadPNG(const std::string &path) noexcept;
+		bool loadPNG(FILE* file) noexcept;
 };
 
 

@@ -15,7 +15,7 @@
 
 int FontGraphic::load(glImage *_font_sprite,
 				  const unsigned int numframes,
-				  const unsigned int *texcoords,
+				  const unsigned short *texcoords,
 				  GL_TEXTURE_TYPE_ENUM type,
 				  int sizeX,
 				  int sizeY,

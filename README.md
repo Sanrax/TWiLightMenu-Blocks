@@ -25,11 +25,9 @@ Additional features can be added on to **TW**i**L**ight Menu++. See [this page](
 
 ## Setting up
 
-Compiling this app requires devkitPro's devkitARM, libnds, grit, and mmutil. These can be installed using [devkitPro pacman](https://devkitpro.org/wiki/devkitPro_pacman) with the following command:
-```
-sudo dkp-pacman -S nds-dev
-```
-(Note: Command will vary by OS, sudo may not be needed and it may be just `pacman` instead.)
+This fork builds with [BlocksDS 1.24.0](https://blocksds.skylyrac.net/docs/setup/) and its Wonderful Toolchain, plus Python 3, GNU Make, and a host C/C++ compiler. BlocksDS includes libnds, Maxmod, grit, mmutil, ndstool and DLDI tools. The filesystem adapter is pinned to the FatFS ABI in this SDK release.
+
+The default paths are `/opt/blocksds/core` and `/opt/wonderful`. Set `BLOCKSDS` and `WONDERFUL_TOOLCHAIN` if your installation uses other locations.
 
 ## Cloning
 The repository contains submodules, so you need to clone recursively:
@@ -44,13 +42,15 @@ git submodule update --init --recursive
 
 ## Building
 
-Once you have devkitPro's toolchains installed you can build the entirety of TWiLight Menu++ by simply running `make package` in the root of the repository. If you only want to build a specific part of TWiLight Menu++ you can `cd` to that folder and run `make dist`.
+Once you have BlocksDS installed you can build the entirety of TWiLight Menu++ by simply running `make package` in the root of the repository. If you only want to build a specific part of TWiLight Menu++ you can `cd` to that folder and run `make dist`.
+
+Use `make -j6 all` to compile every component, `make test` to run the host regression tests, and `make check-build` to validate the linked images. See [the port notes](docs/blocksds-port.md) for compatibility details and validation.
 
 Once it finishes building, the output files will be in the `7zfile` folder following the same directory structure as the official `TWiLightMenu.7z` builds.
 
 ## Using Docker
 
-Using the included [Docker](https://docker.com) image, you can easily compile TWiLight Menu++ without having to manually set up the required version of devkitARM using the provided PowerShell (`.ps1`) scripts.
+Using the included [Docker](https://docker.com) image, you can easily compile TWiLight Menu++ without having to manually set up the required version of BlocksDS using the provided PowerShell (`.ps1`) scripts.
 
 The script accepts `make` arguments as well. For example, `.\compile_docker.ps1 clean` will clean the directories of all the compiled code. If you would like to build all artifacts, run `.\compile_docker.ps1 package`.
 

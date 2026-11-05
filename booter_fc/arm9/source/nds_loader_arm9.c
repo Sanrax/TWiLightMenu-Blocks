@@ -327,7 +327,7 @@ int runNds (const void* loader, u32 loaderSize, u32 cluster, bool initDisc, bool
 
 void runNds9i (const char* filename) {
 	//consoleClear();
-	//iprintf ("Now loading...\n");
+	//printf ("Now loading...\n");
 	FILE* ndsFile = fopen(filename, "rb");
 	fseek(ndsFile, 0, SEEK_SET);
 	fread(__DSiHeader, 1, 0x1000, ndsFile);

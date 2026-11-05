@@ -1,3 +1,5 @@
+#include "common/filetypes.h"
+#include <limits.h>
 #include "perGameSettings.h"
 #include <vector>
 #include <algorithm>
@@ -119,7 +121,6 @@ bool blacklisted_boostCpu = false;
 bool blacklisted_cardReadDma = false;
 bool blacklisted_asyncCardRead = false;
 
-bool extension(const std::string_view filename, const std::vector<std::string_view> extensions);
 
 void loadPerGameSettings (std::string filename) {
 	snprintf(pergamefilepath, sizeof(pergamefilepath), "%s/_nds/TWiLightMenu/gamesettings/%s.ini", (ms().secondaryDevice ? "fat:" : "sd:"), filename.c_str());

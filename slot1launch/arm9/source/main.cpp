@@ -78,8 +78,8 @@ off_t getFileSize(const char *fileName)
 		fseek(fp, 0, SEEK_END);
 		fsize = ftell(fp);			// Get source file's size
 		fseek(fp, 0, SEEK_SET);
+		fclose(fp);
 	}
-	fclose(fp);
 
 	return fsize;
 }
@@ -196,7 +196,7 @@ int main() {
 		if (io_dldi_data->ioInterface.features & FEATURE_SLOT_NDS) {
 			consoleDemoInit();
 			consoleInited = true;
-			iprintf ("Please remove your flashcard.\n");
+			printf ("Please remove your flashcard.\n");
 			do {
 				swiWaitForVBlank();
 				cardReadHeader((uint8*)&ndsHeader);
@@ -216,10 +216,10 @@ int main() {
 				consoleClear();
 			}
 			if (io_dldi_data->ioInterface.features & FEATURE_SLOT_GBA) {
-				iprintf ("Please insert a DS game\n");
-				iprintf ("or flashcard.\n");
+				printf ("Please insert a DS game\n");
+				printf ("or flashcard.\n");
 			} else {
-				iprintf ("Please insert a DS game.\n");
+				printf ("Please insert a DS game.\n");
 			}
 			do {
 				swiWaitForVBlank();
@@ -233,8 +233,8 @@ int main() {
 			if (ndsHeader.header.headerCRC16 != swiCRC16(0xFFFF, (void*)&ndsHeader, 0x15E)) {
 				consoleDemoInit();
 				consoleInited = true;
-				iprintf ("Please reboot the console with\n");
-				iprintf ("Slot-1 empty, and try again.\n");
+				printf ("Please reboot the console with\n");
+				printf ("Slot-1 empty, and try again.\n");
 				while (1);
 			}
 		}

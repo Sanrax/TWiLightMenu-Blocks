@@ -1,3 +1,4 @@
+#include "common/storage.h"
 /*-----------------------------------------------------------------
  Copyright (C) 2005 - 2013
 	Michael "Chishm" Chisholm
@@ -202,7 +203,7 @@ int main(int argc, char **argv) {
 	extern const DISC_INTERFACE __my_io_dsisd;
 	bool fatInited = false;
 	for (int i = 0; i < 30; i++) { // Run 30 times in case ntrboot is used
-		fatInited = fatMountSimple("sd", &__my_io_dsisd);
+		fatInited = twlmMountStorage("sd", &__my_io_dsisd);
 		if (fatInited) {
 			break;
 		} else {

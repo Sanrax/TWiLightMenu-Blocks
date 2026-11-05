@@ -1,3 +1,4 @@
+#include "common/filetypes.h"
 /*-----------------------------------------------------------------
  Copyright (C) 2015
 	Matthew Scholefield
@@ -45,7 +46,6 @@
 #define CONSOLE_SCREEN_WIDTH 32
 #define CONSOLE_SCREEN_HEIGHT 24
 
-extern bool extension(const std::string_view filename, const std::vector<std::string_view> extensions);
 
 extern bool fadeType;
 extern bool controlTopBright;
@@ -967,6 +967,8 @@ ITCM_CODE void drawWeekday(void) {
 }
 
 static int loadedFreeSpaceDevice = -1;
+static struct statvfs freeSpace[2] = {};
+static bool freeSpaceLoaded[2] = {};
 static int loadedBattery = -1;
 
 void drawFreeSpace(void) {
@@ -979,10 +981,13 @@ void drawFreeSpace(void) {
 
 	loadedFreeSpaceDevice = device;
 
-	// Read once at startup in main.cpp; GB here is 1024^3, as Windows shows it
-	extern struct statvfs st[2];
-	const u64 total = (u64)st[device].f_blocks * st[device].f_bsize;
-	const u64 avail = (u64)st[device].f_bfree * st[device].f_bsize;
+	// Query only the displayed drive, and only if the free-space panel is enabled.
+	if (!freeSpaceLoaded[device]) {
+		if (statvfs(device ? "fat:/" : "sd:/", &freeSpace[device]) != 0) return;
+		freeSpaceLoaded[device] = true;
+	}
+	const u64 total = (u64)freeSpace[device].f_blocks * freeSpace[device].f_bsize;
+	const u64 avail = (u64)freeSpace[device].f_bfree * freeSpace[device].f_bsize;
 
 	char text[32] = {0};
 	if (total > 0) {
@@ -1007,9 +1012,8 @@ void drawFreeSpace(void) {
 void refreshFreeSpace(void) {
 	if (!showFreeSpace) return;
 
-	extern struct statvfs st[2];
 	const int device = ms().secondaryDevice ? 1 : 0;
-	statvfs(device ? "fat:/" : "sd:/", &st[device]);
+	freeSpaceLoaded[device] = false;
 	loadedFreeSpaceDevice = -1;
 }
 

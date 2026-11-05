@@ -29,6 +29,7 @@
 #include <gl2d.h>
 #include "common/stringtool.h"
 #include "common/dsiBanner.h"
+#include "common/ndsmetadata.h"
 #include "common/tonccpy.h"
 #include "fileBrowse.h"
 #include "graphics/fontHandler.h"
@@ -262,7 +263,7 @@ void clearTitle(int num) {
 	cachedTitle[num] = blankTitle;
 }
 
-void getGameInfo(bool isDir, const char *name, int num, bool fromArgv) {
+void getGameInfo(bool isDir, const char *name, int num, bool fromArgv, bool checkCustomIcons) {
 	if (num == -1)
 		num = MOVING_APP_SLOT;
 
@@ -292,7 +293,7 @@ void getGameInfo(bool isDir, const char *name, int num, bool fromArgv) {
 	const CustomLauncher *customLauncher = (!isDir && name) ? findCustomLauncher(name) : NULL;
 	const bool bannerFromLauncher = (customLauncher && !customLauncher->bannerPath.empty());
 
-	if ((ms().showCustomIcons || bannerFromLauncher) && customIcon[num] < 2 && (!fromArgv || customIcon[num] <= 0)) {
+	if (((ms().showCustomIcons && checkCustomIcons) || bannerFromLauncher) && customIcon[num] < 2 && (!fromArgv || customIcon[num] <= 0)) {
 		sNDSBannerExt &banner = bnriconTile[num];
 		bool argvHadPng = customIcon[num] == 1;
 		u8 iconCopy[512];
@@ -309,7 +310,7 @@ void getGameInfo(bool isDir, const char *name, int num, bool fromArgv) {
 		// The per-file lookups stay behind showCustomIcons; the ini banner does not.
 		bool customIconIsPng = false;
 		bool customIconFound = false;
-		if (ms().showCustomIcons) {
+		if (ms().showCustomIcons && checkCustomIcons) {
 			snprintf(customIconPath, sizeof(customIconPath), "%s:/_nds/TWiLightMenu/icons/%s.bin", sys().isRunFromSD() ? "sd" : "fat", name);
 			customIconFound = (access(customIconPath, F_OK) == 0);
 			if (!customIconFound) {
@@ -368,9 +369,9 @@ void getGameInfo(bool isDir, const char *name, int num, bool fromArgv) {
 			customIcon[num] = 1; // custom icon is a png
 			{
 				std::vector<unsigned char> image;
-				uint imageWidth, imageHeight;
-				lodepng::decode(image, imageWidth, imageHeight, customIconPath);
-				if (imageWidth <= 32 && imageHeight <= 32) {
+				uint imageWidth = 0, imageHeight = 0;
+				const unsigned error = lodepng::decode(image, imageWidth, imageHeight, customIconPath);
+				if (!error && imageWidth && imageHeight && imageWidth <= 32 && imageHeight <= 32) {
 					customIconGood = true;
 
 					// if smaller than 32x32, center it
@@ -416,8 +417,8 @@ void getGameInfo(bool isDir, const char *name, int num, bool fromArgv) {
 							}
 						}
 	
-						convertIconPalette(&banner);
 					}
+					convertIconPalette(&banner);
 				}
 			}
 		}
@@ -443,12 +444,11 @@ void getGameInfo(bool isDir, const char *name, int num, bool fromArgv) {
 			clearTitle(num);
 			if (customIcon[num] != 2)
 				clearBannerSequence(num);
-			fclose(fp);
 			return;
 		}
 
 		// read each line
-		while ((rc = __getline(&line, &size, fp)) > 0) {
+		while ((rc = getline(&line, &size, fp)) > 0) {
 			// remove comments
 			if ((p = strchr(line, '#')) != NULL)
 				*p = 0;
@@ -485,7 +485,7 @@ void getGameInfo(bool isDir, const char *name, int num, bool fromArgv) {
 					if (customIcon[num] != 2)
 						clearBannerSequence(num);
 				} else {
-					getGameInfo(false, p, num, true);
+					getGameInfo(false, p, num, true, checkCustomIcons);
 				}
 			} else {
 				// this is not an nds/app file!
@@ -507,7 +507,6 @@ void getGameInfo(bool isDir, const char *name, int num, bool fromArgv) {
 		// open file for reading info
 		fp = fopen(name, "rb");
 		if (!fp) {
-			fclose(fp);
 			return;
 		}
 
@@ -522,7 +521,6 @@ void getGameInfo(bool isDir, const char *name, int num, bool fromArgv) {
 		// open file for reading info
 		fp = fopen(name, "rb");
 		if (!fp) {
-			fclose(fp);
 			return;
 		}
 
@@ -540,22 +538,19 @@ void getGameInfo(bool isDir, const char *name, int num, bool fromArgv) {
 			clearTitle(num);
 			if (customIcon[num] != 2)
 				clearBannerSequence(num); // banner sequence
-			fclose(fp);
 			return;
 		}
 
-		sNDSHeaderExt ndsHeader;
+		sNDSHeaderExt ndsHeader{};
 
-		if (!fread(&ndsHeader, sizeof(ndsHeader), 1, fp)) {
-			// try again, but using regular header size
-			fseek(fp, 0, SEEK_SET);
-			if (!fread(&ndsHeader, 0x160, 1, fp)) {
-				clearTitle(num);
-				if (customIcon[num] != 2)
-					clearBannerSequence(num);
-				fclose(fp);
-				return;
-			}
+		// Browsing only uses fields in the first sector, including DSi flags,
+		// access control and ARM7i destinations. Save sizes are read at launch.
+		static_assert(offsetof(sNDSHeaderExt, arm7ibinarySize) + sizeof(u32) <= 0x200);
+		if (fread(&ndsHeader, 1, 0x200, fp) < 0x160) {
+			clearTitle(num);
+			if (customIcon[num] != 2) clearBannerSequence(num);
+			fclose(fp);
+			return;
 		}
 
 		isNdz[num] = (memcmp(ndsHeader.gameTitle, "NDZ1", 4) == 0);
@@ -726,22 +721,17 @@ void getGameInfo(bool isDir, const char *name, int num, bool fromArgv) {
 			return;
 		}
 		const u32 bannerOffset = isNdz[num] ? 0x10 : ndsHeader.bannerOffset;
-		fseek(fp, bannerOffset, SEEK_SET);
-		if (!fread(&ndsBanner, sizeof(ndsBanner), 1, fp)) {
-			// Only the NTR portion of the banner will be read, so clear the DSi
-			// animation data left behind by the previously loaded ROM.
-			toncset(ndsBanner.dsi_icon, 0, DSI_BANNER_ANIME_SIZE);
-			// try again, but using regular banner size
-			fseek(fp, bannerOffset, SEEK_SET);
-			if (!fread(&ndsBanner, NDS_BANNER_SIZE_ORIGINAL, 1, fp)) {
-				fclose(fp);
+		const size_t bannerBytes = ndsmetadata::readBanner(fp, bannerOffset, &ndsBanner,
+			sizeof(ndsBanner), ms().animateDsiIcons);
+		bool animationLoaded = bannerBytes == sizeof(ndsBanner);
+		if (bannerBytes < NDS_BANNER_SIZE_ORIGINAL) {
+			fclose(fp);
 
-				// If no custom icon, display as unknown
-				if (customIcon[num] == 0)
-					customIcon[num] = -1;
+			// If no custom icon, display as unknown
+			if (customIcon[num] == 0)
+				customIcon[num] = -1;
 
-				return;
-			}
+			return;
 		}
 
 		// close file!
@@ -814,13 +804,14 @@ void getGameInfo(bool isDir, const char *name, int num, bool fromArgv) {
 				// The banner now holds valid DSi animation data even when the ROM's
 				// own banner is NTR-only, so let the DSi code paths pick it up.
 				ndsBanner.version = NDS_BANNER_VER_DSi;
+				animationLoaded = true;
 			} else {
 				logPrint("No valid banner save.\n");
 			}
 		}
 
 		// banner sequence
-		if (ms().animateDsiIcons && ndsBanner.version == NDS_BANNER_VER_DSi) {
+		if (ms().animateDsiIcons && animationLoaded && ndsBanner.version == NDS_BANNER_VER_DSi) {
 			const u16 crc16 = swiCRC16(0xFFFF, ndsBanner.dsi_icon, 0x1180);
 			convertIconPalette(&ndsBanner);
 			if (ndsBanner.crc[3] == crc16) { // Check if CRC16 is valid
@@ -836,7 +827,6 @@ void getGameInfo(bool isDir, const char *name, int num, bool fromArgv) {
 void iconUpdate(bool isDir, const char *name, int num) {
 	logPrint("iconUpdate: ");
 
-	const int listIdx = num; // -1 for the moving app, else the 0..39 grid position
 	const int spriteIdx = (num == -1) ? ICON_MOVING_BANK : ICON_GRID_BANK(num);
 	if (num == -1)
 		num = 40;
@@ -859,68 +849,10 @@ void iconUpdate(bool isDir, const char *name, int num) {
 	} else if (isDir) {
 		logPrint("Folder found!");
 		clearIcon(spriteIdx);
-	} else if (extension(name, {".argv"})) {
-		// look through the argv file for the corresponding nds file
-		FILE *fp;
-		char *line = NULL, *p = NULL;
-		size_t size = 0;
-		ssize_t rc;
-
-		// open the argv file
-		fp = fopen(name, "rb");
-		if (fp == NULL) {
-			logPrint("Icon not found!\n");
-			clearIcon(spriteIdx);
-			fclose(fp);
-			return;
-		}
-
-		// read each line
-		while ((rc = __getline(&line, &size, fp)) > 0) {
-			// remove comments
-			if ((p = strchr(line, '#')) != NULL)
-				*p = 0;
-
-			// skip leading whitespace
-			for (p = line; *p && isspace((int)*p); ++p);
-
-			if (*p)
-				break;
-		}
-
-		// done with the file at this point
-		fclose(fp);
-
-		if (p && *p) {
-			// we found an argument
-			struct stat st;
-
-			// truncate everything after first argument
-			strtok(p, "\n\r\t ");
-
-			if (extension(p, {".nds", ".dsi", ".ids", ".srl", ".app"})) {
-				// let's see if this is a file or directory
-				rc = stat(p, &st);
-				if (rc != 0) {
-					// stat failed
-					logPrint("Icon not found!");
-					clearIcon(spriteIdx);
-				} else if (S_ISDIR(st.st_mode)) {
-					// this is a directory!
-					logPrint("Folder found!");
-					clearIcon(spriteIdx);
-				} else {
-					iconUpdate(false, p, listIdx);
-				}
-			} else {
-				// this is not an nds/app file!
-				clearIcon(spriteIdx);
-			}
-		} else {
-			clearIcon(spriteIdx);
-		}
-		// clean up the allocated line
-		free(line);
+	} else if (extension(name, {".argv"}) && !infoFound[num]) {
+		// getGameInfo() already resolved the target and cached its banner. An
+		// invalid argv has no cached title; valid targets use the NDS path below.
+		clearIcon(spriteIdx);
 	} else if (isNds) {
 		// this is an nds/app file!
 		logPrint("NDS icon found!");

@@ -3,9 +3,6 @@
 #---------------------------------------------------------------------------------
 .SECONDARY:
 
-ifeq ($(strip $(DEVKITARM)),)
-$(error "Please set DEVKITARM in your environment. export DEVKITARM=<path to>devkitARM")
-endif
 
 ifeq ($(strip $(PROJECT)),)
 export PROJECT	:=	$(CURDIR)/../
@@ -21,7 +18,8 @@ else
 $(error "Python not found in PATH, please install it.")
 endif
 
-include $(DEVKITARM)/ds_rules
+TWLM_ROOT ?= $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/..)
+include $(TWLM_ROOT)/universal/blocksds.mk
 
 export VERSION_MAJOR	:= 7
 export VERSION_MINOR	:= 4
@@ -59,12 +57,12 @@ CFLAGS	+=	$(INCLUDE) -DARM9
 CXXFLAGS	:= $(CFLAGS) -fno-rtti -fno-exceptions -std=gnu++17
 
 ASFLAGS	:=	-g $(ARCH)
-LDFLAGS	=	-specs=ds_arm9.specs -g -Wl,--gc-sections $(ARCH) -Wl,-Map,$(notdir $*.map)
+LDFLAGS	=	-specs=$(BLOCKSDS)/sys/crts/ds_arm9.specs -g -Wl,--gc-sections $(ARCH) -Wl,-Map,$(notdir $*.map)
 
 #---------------------------------------------------------------------------------
 # any extra libraries we wish to link with the project (order is important)
 #---------------------------------------------------------------------------------
-LIBS	:= 	-lfat -lnds9
+LIBS	:= 	-lnds9
  
  
 #---------------------------------------------------------------------------------
@@ -114,6 +112,8 @@ export OFILES	:=	$(addsuffix .o,$(BINFILES)) \
 					$(PNGFILES:.png=.o) \
 					$(CPPFILES:.cpp=.o) $(CFILES:.c=.o) $(SFILES:.s=.o)
  
+export ASSET_OBJECTS := $(addsuffix .o,$(BINFILES)) $(BMPFILES:.bmp=.o) $(PNGFILES:.png=.o)
+
 export INCLUDE	:=	$(foreach dir,$(INCLUDES),-iquote $(CURDIR)/$(dir)) \
 					$(foreach dir,$(LIBDIRS),-I$(dir)/include) \
 					-I$(CURDIR)/$(BUILD)
@@ -173,7 +173,7 @@ arm7/$(TARGET).elf:
 	@$(MAKE) -C arm7
 	
 #---------------------------------------------------------------------------------
-arm9/$(TARGET).elf:
+arm9/$(TARGET).elf: bootloader bootstub
 	@$(MAKE) -C arm9
 
 #---------------------------------------------------------------------------------

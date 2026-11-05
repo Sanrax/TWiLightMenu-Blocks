@@ -1,3 +1,4 @@
+#include "common/storage.h"
 /*-----------------------------------------------------------------
  Copyright (C) 2005 - 2013
 	Michael "Chishm" Chisholm
@@ -59,11 +60,11 @@ int main(int argc, char **argv) {
 	bool isRegularDS = fifoGetValue32(FIFO_USER_07);
 
 	//iprintf("Initing flashcard...\n");
-	bool flashcardFound = fatMountSimple("fat", dldiGetInternal());
+	bool flashcardFound = twlmMountStorage("fat", dldiGetInternal());
 	if (isDSiMode() || (!isRegularDS && REG_SCFG_EXT != 0)) {
 		extern const DISC_INTERFACE __my_io_dsisd;
 		//iprintf("Initing SD...\n");
-		fatMountSimple("sd", &__my_io_dsisd);
+		twlmMountStorage("sd", &__my_io_dsisd);
 	}
 	bool primaryIsSd = (access("sd:/_nds/primary", F_OK) == 0 || access("fat:/_nds/TWiLightMenu/main.srldr", F_OK) != 0);
 	/* if (REG_SCFG_EXT != 0) {
@@ -88,13 +89,13 @@ int main(int argc, char **argv) {
 		consoleDemoInit();
 
 		if (err == 1) {
-			iprintf ("fat:/_nds/TWiLightMenu/\nmain.srldr not found.\n");
+			printf ("fat:/_nds/TWiLightMenu/\nmain.srldr not found.\n");
 		} else {
-			iprintf ("Start failed. Error %i\n", err);
+			printf ("Start failed. Error %i\n", err);
 		}
 	}
 
-	iprintf(isRegularDS ? "\nPress B to power off." : "\nPress B to return to menu.");
+	printf(isRegularDS ? "\nPress B to power off." : "\nPress B to return to menu.");
 
 	while (1) {
 		scanKeys();

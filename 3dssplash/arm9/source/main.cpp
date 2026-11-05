@@ -35,7 +35,7 @@ int main(int argc, char **argv) {
 		SetBrightness(0, 0);
 		SetBrightness(1, 0);
 		consoleDemoInit();
-		iprintf("FAT init failed!");
+		printf("FAT init failed!");
 		while (1) {
 			swiWaitForVBlank();
 		}

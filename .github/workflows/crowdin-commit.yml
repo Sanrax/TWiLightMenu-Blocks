@@ -8,7 +8,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    container: devkitpro/devkitarm:20241104
+    container: skylyrac/blocksds:slim-v1.24.0
 
     steps:
       - uses: actions/checkout@v4
@@ -21,9 +21,8 @@ jobs:
 
       - name: Install tools
         run: |
-          sudo sed -i "/bullseye-security/d" /etc/apt/sources.list
-          sudo apt-get update
-          sudo apt-get install python -y
+          apt-get update
+          apt-get install python3 g++ -y
 
       - uses: actions/setup-node@v4
         with:

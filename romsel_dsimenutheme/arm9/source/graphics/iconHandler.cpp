@@ -1,228 +1,80 @@
 #include "iconHandler.h"
 #include "ThemeTextures.h"
-#include "common/twlmenusettings.h"
 #include "common/logging.h"
-#include <gl2d.h>
-#include <ctype.h>
-#include <nds.h>
-#include <stdio.h>
-#include <sys/stat.h>
+#include "common/tonccpy.h"
 
 bool initialized;
+static int iconTexID[NDS_ICON_BANK_COUNT];
+static void* iconPixels[NDS_ICON_BANK_COUNT];
+static void* iconPalettes[NDS_ICON_BANK_COUNT];
+alignas(4) static u16 paletteCache[NDS_ICON_BANK_COUNT][16];
+static glImage ndsIcon[NDS_ICON_BANK_COUNT][TWL_ICON_FRAMES];
+static const u8 clearTiles[32 * TWL_TEX_HEIGHT / 2] = {};
+static const u16 blackPalette[16] = {};
 
-static int _iconTexID[NDS_ICON_BANK_COUNT];
-static u16 _paletteCache[NDS_ICON_BANK_COUNT][16];
-
-glImage _ndsIcon[NDS_ICON_BANK_COUNT][TWL_ICON_FRAMES];
-
-static u8 clearTiles[(32 * 256) / 2] = {0};
-static u16 blackPalette[16 * 8] = {0};
-
-// Set if any bank's texture allocation ever failed; see glLoadTileSetIntoSlot.
-static bool iconBankAllocFailed = false;
-
-/**
- * Gets the current icon stored at the specified index.
- * If the index is out of bounds or the icon manager is not
- * initialized, returns null.
- */
-const glImage *getIcon(int num) {
-	if (BAD_ICON_IDX(num) || !initialized)
-		return NULL;
-	return _ndsIcon[num];
+const glImage* getIcon(int num) {
+    return BAD_ICON_IDX(num) || !initialized ? nullptr : ndsIcon[num];
 }
 
-/**
- * Copied glLoadTileSet directly from gl2d.c
- *
- * With the added feature of specifitying the preallocated textureID.
- * The texture ID is intended to have already been initialized, as well
- * as palette already set.
- *
- * Do not call this directly, instead, use only loadIcon.
- */
-void glLoadTileSetIntoSlot(int num, int tile_wid, int tile_hei, int bmp_wid, int bmp_hei, GL_TEXTURE_TYPE_ENUM type,
-			   int sizeX, int sizeY, int param, int pallette_width, const u16 *_palette,
-			   const uint8 *_texture, bool init) {
-	int textureID;
-	glImage *sprite;
-
-	switch (num) {
-	default:
-		if (BAD_ICON_IDX(num))
-			return;
-		textureID = _iconTexID[num];
-		sprite = _ndsIcon[num];
-		break;
-	}
-
-	glBindTexture(0, textureID);
-	// Icon banks are allocated after the theme's textures (main.cpp), so they are
-	// the first thing to fail if a heavy custom theme exhausts texture VRAM. On
-	// failure the UV coords below are still written against a stale textureID and
-	// the icon draws as garbage, so record it rather than fail silently.
-	// Only nocashMessage here, never logPrint: this runs inside the vblank IRQ via
-	// execDeferredIconUpdates(), and logPrint does fopen/fwrite on the SD card.
-	// iconManagerInit() reports the flag from the main thread instead.
-	if (!glTexImage2D(0, 0, type, sizeX, sizeY, 0, param, _texture)) {
-		iconBankAllocFailed = true;
-		nocashMessage("glTexImage2D failed for icon bank!");
-	}
-	glColorTableEXT(0, 0, pallette_width, 0, 0, _palette);
-
-	int i = 0;
-	int x, y;
-
-	// init sprites texture coords and texture ID
-	for (y = 0; y < (bmp_hei / tile_hei); y++) {
-		for (x = 0; x < (bmp_wid / tile_wid); x++) {
-			sprite[i].width = tile_wid;
-			sprite[i].height = tile_hei;
-			sprite[i].u_off = x * tile_wid;
-			sprite[i].v_off = y * tile_hei;
-			sprite[i].textureID = textureID;
-			i++;
-		}
-	}
-}
-
-static inline GL_TEXTURE_SIZE_ENUM tex_height(int texHeight) {
-	switch (texHeight) {
-	case 8:
-		return TEXTURE_SIZE_8;
-	case 16:
-		return TEXTURE_SIZE_16;
-	case 32:
-		return TEXTURE_SIZE_32;
-	case 64:
-		return TEXTURE_SIZE_64;
-	case 128:
-		return TEXTURE_SIZE_128;
-	case 256:
-		return TEXTURE_SIZE_256;
-	case 512:
-		return TEXTURE_SIZE_512;
-	case 1024:
-		return TEXTURE_SIZE_1024;
-	default:
-		return TEXTURE_SIZE_8;
-	}
-}
-
-/**
- * Initializes an icon into one of the NDS_ICON_BANK_COUNT existing banks,
- * overwritting the previous data.
- * num must be in the range [0, NDS_ICON_BANK_COUNT - 1], OR ONE OF
- * GBA_ICON, GBC_ICON, or NES_ICON
- *
- * If init is true, then the palettes will be copied into
- * texture memory before being bound with
- * glColorTableEXT.
- *
- * Otherwise, they will be replacing the existing palette
- * using glColorTableSubEXT at the same memory location.
- */
-void glLoadIcon(int num, const u16 *_palette, const u8 *_tiles, int texHeight, bool init) {
-	if (!BAD_ICON_IDX(num))
-		swiCopy(_palette, _paletteCache[num], 4 * sizeof(u16) | COPY_MODE_COPY | COPY_MODE_WORD);
-
-	glLoadTileSetIntoSlot(num,
-			      32,		     // sprite width
-			      32,		     // sprite height
-			      32,		     // bitmap image width
-			      texHeight,	     // bitmap image height
-			      GL_RGB16,		     // texture type for glTexImage2D() in videoGL.h
-			      TEXTURE_SIZE_32,       // sizeX for glTexImage2D() in videoGL.h
-			      tex_height(texHeight), // sizeY for glTexImage2D() in videoGL.h
-			      TEXGEN_OFF | GL_TEXTURE_COLOR0_TRANSPARENT,
-			      16,		 // Length of the palette to use (16 colors)
-			      (u16 *)_palette, // Image palette
-			      (u8 *)_tiles,      // Raw image data
-			      init);
-}
-
-void glLoadPalette(int num, const u16 *_palette) {
-	if (!BAD_ICON_IDX(num))
-		swiCopy(_palette, _paletteCache[num], 4 * sizeof(u16) | COPY_MODE_COPY | COPY_MODE_WORD);
-
-	glReloadIconPalette(num);
-}
-
-/**
- * Reloads the palette in the given slot from
- * the palette cache.
- */
 void glReloadIconPalette(int num) {
-
-	int textureID;
-	const u16 *cachedPalette;
-	switch (num) {
-	default:
-		if (BAD_ICON_IDX(num))
-			return;
-		textureID = _iconTexID[num];
-		cachedPalette = _paletteCache[num];
-		break;
-	}
-	
-	glBindTexture(0, textureID);
-	glColorTableEXT(0, 0, 16, 0, 0, cachedPalette);
+    if (BAD_ICON_IDX(num) || !iconPalettes[num]) return;
+    const u32 banks = vramSetBanks_EFG(VRAM_E_LCD, VRAM_F_LCD, VRAM_G_LCD);
+    tonccpy(iconPalettes[num], paletteCache[num], sizeof(paletteCache[num]));
+    vramRestoreBanks_EFG(banks);
 }
 
-/**
- * Reloads all the palettes in the palette cache if
- * they have been corrupted.
- */
+void glLoadPalette(int num, const u16* palette) {
+    if (BAD_ICON_IDX(num)) return;
+    tonccpy(paletteCache[num], palette, sizeof(paletteCache[num]));
+    glReloadIconPalette(num);
+}
+
 void reloadIconPalettes() {
-	for (int i = 0; i < NDS_ICON_BANK_COUNT; i++) {
-		glReloadIconPalette(i);
-	}
-}
-/**
- * Loads an icon into one of the NDS_ICON_BANK_COUNT existing banks,
- * overwritting the previous data.
- * num must be in the range [0, NDS_ICON_BANK_COUNT - 1], or else this
- * function does nothing.
- *
- * If init is true, then the palettes will be copied into
- * texture memory before being bound with
- * glColorTableEXT.
- *
- * Otherwise, they will be replacing the existing palette
- * using glColorTableSubEXT at the same memory location.
- */
-void glLoadIcon(int num, const u16 *palette, const u8 *tiles, int texHeight) {
-	glLoadIcon(num, palette, tiles, texHeight, false);
+    for (int i = 0; i < NDS_ICON_BANK_COUNT; ++i) glReloadIconPalette(i);
 }
 
-/**
- * Clears an icon from the bank.
- */
-void glClearIcon(int num) { glLoadIcon(num, blackPalette, clearTiles, 256, true); }
+void glLoadIcon(int num, const u16* palette, const u8* tiles, int texHeight) {
+    if (BAD_ICON_IDX(num) || !iconPixels[num]
+        || texHeight <= 0 || texHeight > TWL_TEX_HEIGHT) return;
 
-/**
- * Allocates and initializes the VRAM locations for
- * icons. Must be called before the icon manager is used.
- */
+    // Banks keep their full eight-frame allocation. Runtime updates run in
+    // VBlank and must not allocate/free GL textures or palettes: that can
+    // interrupt a main-thread allocation and corrupt the allocator's state.
+    const u32 banks = vramSetPrimaryBanks(VRAM_A_LCD, VRAM_B_LCD, VRAM_C_LCD, VRAM_D_LCD);
+    tonccpy(iconPixels[num], tiles, 32 * texHeight / 2);
+    vramRestorePrimaryBanks(banks);
+    glLoadPalette(num, palette);
+}
+
+void glClearIcon(int num) {
+    glLoadIcon(num, blackPalette, clearTiles, TWL_TEX_HEIGHT);
+}
+
 void iconManagerInit() {
-	logPrint("iconManagerInit()\n");
-
-	tex().loadIconUnknownTexture();
-
-	// Allocate texture memory for the icon banks.
-	glGenTextures(NDS_ICON_BANK_COUNT, _iconTexID);
-
-	// Initialize empty data for each bank.
-	for (int i = 0; i < NDS_ICON_BANK_COUNT; i++) {
-		glLoadIcon(i, tex().iconUnknownTexture()->palette(), tex().iconUnknownTexture()->bytes(),
-			   TWL_TEX_HEIGHT, true);
-	}
-
-	// Safe to log here: main thread, and this is where VRAM exhaustion would first
-	// show, since every bank is allocated at full TWL_TEX_HEIGHT above.
-	if (iconBankAllocFailed)
-		logPrint("Out of texture VRAM for icon banks!\n");
-
-	// set initialized.
-	initialized = true;
+    logPrint("iconManagerInit()\n");
+    tex().loadIconUnknownTexture();
+    glGenTextures(NDS_ICON_BANK_COUNT, iconTexID);
+    for (int i = 0; i < NDS_ICON_BANK_COUNT; ++i) {
+        glBindTexture(0, iconTexID[i]);
+        if (!glTexImage2D(0, 0, GL_RGB16, TEXTURE_SIZE_32, TEXTURE_SIZE_256, 0,
+                          TEXGEN_OFF | GL_TEXTURE_COLOR0_TRANSPARENT, nullptr)
+            || !glColorTableNtr(16, nullptr)) {
+            logPrint("Out of texture VRAM for icon bank %d!\n", i);
+            continue;
+        }
+        iconPixels[i] = glGetTexturePointer(iconTexID[i]);
+        iconPalettes[i] = glGetColorTablePointer(iconTexID[i]);
+        for (int frame = 0; frame < TWL_ICON_FRAMES; ++frame) {
+            ndsIcon[i][frame].width = 32;
+            ndsIcon[i][frame].height = 32;
+            ndsIcon[i][frame].u_off = 0;
+            ndsIcon[i][frame].v_off = frame * 32;
+            ndsIcon[i][frame].textureID = iconTexID[i];
+        }
+        glClearIcon(i);
+        // The unknown icon contains one frame, not the eight-frame capacity
+        // reserved above. Never read beyond its texture allocation.
+        glLoadIcon(i, tex().iconUnknownTexture()->palette(), tex().iconUnknownTexture()->bytes(), 32);
+    }
+    initialized = true;
 }

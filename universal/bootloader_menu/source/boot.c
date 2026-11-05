@@ -43,7 +43,9 @@ Helpful information:
 #undef ARM7
 #include <nds/memory.h>
 #include <nds/arm9/video.h>
+#ifndef __BLOCKSDS__
 #include <nds/arm9/input.h>
+#endif
 #undef ARM9
 #define ARM7
 #include <nds/arm7/audio.h>

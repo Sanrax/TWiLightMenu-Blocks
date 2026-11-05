@@ -1,3 +1,4 @@
+#ifndef __BLOCKSDS__
 /*---------------------------------------------------------------------------------
 
   Copyright (C) 2006 - 2016
@@ -98,3 +99,5 @@ dldi_data_end:
 dldi_end:
 	.end
 @---------------------------------------------------------------------------------
+
+#endif // BlocksDS supplies its own DLDI stub and cache boundaries.

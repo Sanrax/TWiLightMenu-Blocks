@@ -56,6 +56,7 @@ void logPrint(const char* format, ...) {
 	}
 
 	logFile = fopen(path, "r+");
+	if (!logFile) return;
 	fseek(logFile, position, SEEK_SET);
 	fwrite(logText, 1, i, logFile);
 	fclose(logFile);

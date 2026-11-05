@@ -10,6 +10,8 @@
 #include <string.h>
 #include <stddef.h>
 
+void twlmDldiFixDriverAddresses(DLDI_INTERFACE *io);
+
 #define ndmaSlot 0
 
 static struct mmcdevice deviceSD;
@@ -349,11 +351,11 @@ static void sdmmc_send_command_nonblocking_ndma(struct mmcdevice *ctx, u32 cmd, 
             //nocashMessage("cmd busy");
             break;
 		} 
-        else if (strncmp((const char*)0x04FFFA00, "no$gba", 6) == 0)
+        else
         {
-            // command is finished already without going busy : return
-            // not supposed to happen
-            // needed for no$gba only
+            // A fast command may finish before we observe CMD_BUSY. Accept
+            // its completion flags on every platform rather than waiting
+            // forever for a busy state which has already passed.
             u16 status0 = sdmmc_read16(REG_SDSTATUS0);
             //nocashMessage("already finished");
             if((status0 & flags) == flags)
@@ -458,6 +460,13 @@ void my_sdmmc_controller_init( bool force_init ) {
 //---------------------------------------------------------------------------------
 
 	if (!force_init && my_sdmmc_controller_initialised) return;
+
+	// BlocksDS enables these in its native TMIO driver rather than crt0.
+	// The custom IPC driver must enable them too, including legacy DMA:
+	// older melonDS versions gate SD access on that bit as well.
+	if (REG_SCFG_EXT & SCFG_EXT_SCFG_MBK_REG) {
+		REG_SCFG_EXT |= SCFG_EXT_SDMMC | SCFG_EXT_INTERRUPT | SCFG_EXT_AES | SCFG_EXT_DMA;
+	}
 
 	deviceSD.isSDHC = 0;
 	deviceSD.SDOPT = 0;
@@ -799,7 +808,7 @@ void my_sdmmcHandler() {
 		if (sdflag == 1 && result != 0 && *(u32*)(0x2FFFA04) == 0x49444C44) {
 			if (*(vu32*)(0x303C000) != 0x49444C44) {
 				memcpy((void*)io_dldi_data, (void*)*(u32*)0x2FFFA00, 0x4000);
-				dldiFixDriverAddresses((DLDI_INTERFACE*)io_dldi_data);
+				twlmDldiFixDriverAddresses((DLDI_INTERFACE*)io_dldi_data);
 				*(vu32*)(0x303C000) = 0x49444C44;
 			}
 			useDLDI = io_dldi_data->ioInterface.startup();

@@ -1,3 +1,5 @@
+#include "common/launchpath.h"
+#include <time.h>
 #include <nds.h>
 #include <nds/arm9/dldi.h>
 #include "io_m3_common.h"
@@ -232,7 +234,6 @@ bool applaunchprep = false;
 //char usernameRendered[10];
 //bool usernameRenderedDone = false;
 
-struct statvfs st[2];
 bool gbaBiosFound[2] = {false};
 
 touchPosition touch;
@@ -1050,7 +1051,6 @@ int akTheme(void) {
 	ms().gbaR3Test = (access(sys().isRunFromSD() ? "sd:/_nds/TWiLightMenu/emulators/GBARunner3.nds" : "fat:/_nds/TWiLightMenu/emulators/GBARunner3.nds", F_OK) == 0);
 
 	if (sdFound()) {
-		statvfs("sd:/", &st[0]);
 
 		gbaBiosFound[0] = (access("sd:/_gba/bios.bin", F_OK) == 0);
 		if (!ms().gbaR3Test) {
@@ -1060,7 +1060,6 @@ int akTheme(void) {
 		logPrint(gbaBiosFound[0] ? "GBA BIOS found on sd\n" : "GBA BIOS not found on sd\n");
 	}
 	if (flashcardFound()) {
-		statvfs("fat:/", &st[1]);
 
 		gbaBiosFound[1] = (access("fat:/_gba/bios.bin", F_OK) == 0);
 		if (!ms().gbaR3Test) {
@@ -1318,12 +1317,6 @@ int akTheme(void) {
 
 			// Construct a command line
 			getcwd (filePath, PATH_MAX);
-			int pathLen = strlen(filePath);
-			if (pathLen < PATH_MAX && filePath[pathLen - 1] != '/') { // Ensure the path ends in a slash
-				filePath[pathLen] = '/';
-				filePath[pathLen + 1] = '\0';
-				pathLen++;
-			}
 			vector<char*> argarray;
 
 			bool isArgv = false;
@@ -1374,7 +1367,8 @@ int akTheme(void) {
 				std::string typeToReplace = filename.substr(filename.rfind('.'));
 
 				char *name = argarray.at(0);
-				strcpy (filePath + pathLen, name);
+				const std::string resolvedPath = launchPath(filePath, name);
+				snprintf(filePath, sizeof(filePath), "%s", resolvedPath.c_str());
 				free(argarray.at(0));
 				argarray.at(0) = filePath;
 
@@ -1607,15 +1601,15 @@ int akTheme(void) {
 					char sfnPrv[62];
 					char sfnBnr[62];
 					if (ms().secondaryDevice && !bs().b4dsMode && ms().dsiWareToSD && !savFormat && sdFound()) {
-						fatGetAliasPath("sd:/_nds/TWiLightMenu/tempDSiWare.dsi", sfnSrl);
-						fatGetAliasPath("sd:/_nds/TWiLightMenu/tempDSiWare.pub", sfnPub);
-						fatGetAliasPath("sd:/_nds/TWiLightMenu/tempDSiWare.prv", sfnPrv);
-						fatGetAliasPath("sd:/_nds/TWiLightMenu/tempDSiWare.bnr", sfnBnr);
+						fatGetAliasPath("sd:/_nds/TWiLightMenu/tempDSiWare.dsi", sfnSrl, sizeof(sfnSrl));
+						fatGetAliasPath("sd:/_nds/TWiLightMenu/tempDSiWare.pub", sfnPub, sizeof(sfnPub));
+						fatGetAliasPath("sd:/_nds/TWiLightMenu/tempDSiWare.prv", sfnPrv, sizeof(sfnPrv));
+						fatGetAliasPath("sd:/_nds/TWiLightMenu/tempDSiWare.bnr", sfnBnr, sizeof(sfnBnr));
 					} else {
-						fatGetAliasPath(ms().dsiWareSrlPath.c_str(), sfnSrl);
-						fatGetAliasPath(ms().dsiWarePubPath.c_str(), sfnPub);
-						fatGetAliasPath(ms().dsiWarePrvPath.c_str(), sfnPrv);
-						fatGetAliasPath(ms().dsiWareBnrPath.c_str(), sfnBnr);
+						fatGetAliasPath(ms().dsiWareSrlPath.c_str(), sfnSrl, sizeof(sfnSrl));
+						fatGetAliasPath(ms().dsiWarePubPath.c_str(), sfnPub, sizeof(sfnPub));
+						fatGetAliasPath(ms().dsiWarePrvPath.c_str(), sfnPrv, sizeof(sfnPrv));
+						fatGetAliasPath(ms().dsiWareBnrPath.c_str(), sfnBnr, sizeof(sfnBnr));
 					}
 
 					const char *bootstrapinipath = sdFound() ? BOOTSTRAP_INI : BOOTSTRAP_INI_FC;
@@ -1765,7 +1759,8 @@ int akTheme(void) {
 				}
 
 				char *name = argarray.at(0);
-				strcpy (filePath + pathLen, name);
+				const std::string resolvedPath = launchPath(filePath, name);
+				snprintf(filePath, sizeof(filePath), "%s", resolvedPath.c_str());
 				free(argarray.at(0));
 				argarray.at(0) = filePath;
 				if (!isNdz[cursorPosOnScreen] && !ms().secondaryDevice && !sys().arm7SCFGLocked() && ms().consoleModel == TWLSettings::EDSiRetail && isHomebrew[cursorPosOnScreen] && !(perGameSettings_useBootstrap == -1 ? true : perGameSettings_useBootstrap)) {

@@ -38,7 +38,7 @@
 
 const DLDI_INTERFACE* io_dldi_data = (DLDI_INTERFACE*)0x03038000;
 
-void dldiFixDriverAddresses (DLDI_INTERFACE* io) {
+void twlmDldiFixDriverAddresses (DLDI_INTERFACE* io) {
 	u32 offset;
 	u8** address;
 	u8* oldStart;

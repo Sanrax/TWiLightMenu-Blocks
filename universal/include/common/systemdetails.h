@@ -30,6 +30,7 @@ public:
 	bool isDSPhat() { return (_isRegularDS && _isDSPhat); }
 	bool isDSLite() { return (_isRegularDS && !_isDSPhat); }
 	bool hasRegulableBacklight() { return _hasRegulableBacklight; }
+	bool backlightsInitiallyOff() { return _backlightsInitiallyOff; }
 	bool i2cBricked() { return _i2cBricked; }
 	bool dsDebugRam() { return _dsDebugRam; }
 	u32 commonCache() { return (isDSiMode() || _dsDebugRam) ? *_lastUsedCommonCache : 0; }
@@ -51,6 +52,7 @@ private:
 	bool _isRegularDS;
 	bool _isDSPhat;
 	bool _hasRegulableBacklight;
+	bool _backlightsInitiallyOff;
 	bool _i2cBricked;
 	bool _dsDebugRam;
 	bool _fatInitOk;

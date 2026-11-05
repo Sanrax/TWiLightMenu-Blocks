@@ -1,3 +1,5 @@
+#include "common/filetypes.h"
+#include "common/storage.h"
 #include <nds.h>
 #include <nds/arm9/dldi.h>
 #include <fat.h>
@@ -22,7 +24,7 @@ TWL_CODE bool UpdateCardInfo(char* gameid, char* gamename) {
 }
 
 /*TWL_CODE void ShowGameInfo(const char gameid[], const char gamename[]) {
-	iprintf("Game id: %s\nName:    %s", gameid, gamename);
+	printf("Game id: %s\nName:    %s", gameid, gamename);
 }*/
 
 typedef signed int addr_t;
@@ -156,7 +158,7 @@ TWL_CODE static void dldiRelocateBinary (data_t *binData, size_t dldiFileSize)
 }
 
 TWL_CODE void myDldiLoadFromFile (const char* filename) {
-	extern bool extension(const std::string_view filename, const std::vector<std::string_view> extensions);
+
 
 	u32* dldiAddr = new u32[0x8000/sizeof(u32)];
 
@@ -253,7 +255,7 @@ TWL_CODE void twl_flashcardInit(void) {
 	UpdateCardInfo(&gameid[0], &gamename[0]);
 
 	/*consoleDemoInit();
-	iprintf("REG_SCFG_MC: %x\n", REG_SCFG_MC);
+	printf("REG_SCFG_MC: %x\n", REG_SCFG_MC);
 	ShowGameInfo(gameid, gamename);
 
 	for (int i = 0; i < 60*5; i++) {
@@ -307,7 +309,7 @@ TWL_CODE void twl_flashcardInit(void) {
 		if (isDSPico) picoInit(false);
 	}
 
-	fatMountSimple("fat", dldiGet());
+	twlmMountStorage("fat", dldiGet());
 
 	flashcardFoundReset();
 	if (!flashcardFound()) {

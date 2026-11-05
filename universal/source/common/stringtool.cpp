@@ -35,11 +35,12 @@ std::string formatString(const char *fmt, ...)
 	va_list argList;
 	va_start(argList, fmt);
 	char *ptempStr = NULL;
-	size_t max_len = vasiprintf( &ptempStr, f, argList);
-	std::string str( ptempStr );
-	str.resize( max_len );
-	free( ptempStr );
+	const int length = vasprintf(&ptempStr, f, argList);
 	va_end(argList);
+	if (length < 0 || !ptempStr)
+		return {};
+	std::string str(ptempStr, length);
+	free(ptempStr);
 	return str;
 }
 
