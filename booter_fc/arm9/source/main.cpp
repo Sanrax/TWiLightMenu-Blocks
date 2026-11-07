@@ -34,12 +34,53 @@
 #include "common/tonccpy.h"
 #include "common/bootpath.h"
 
+#ifdef TWLM_BOOT_DIAGNOSTICS
+static const char* diagnosticLogPath = nullptr;
+
+static void beginBootLog(const char* path) {
+	diagnosticLogPath = path;
+	FILE* file = fopen(path, "wb");
+	if (!file) return;
+	fprintf(file, "TWiLight boot diagnostics (Power/navigation r4)\nARM9 mode: %s\nSCFG_EXT: %08lX\nDLDI: %.48s\n",
+		isDSiMode() ? "DSi" : "DS", (unsigned long)REG_SCFG_EXT, io_dldi_data->friendlyName);
+	fclose(file);
+}
+
+extern "C" void bootDisableDiskLog(void) { diagnosticLogPath = nullptr; }
+extern "C" void bootLogSdIo(void);
+extern "C" bool bootSdIpcTimedOut(void);
+
+extern "C" void bootStage(const char* stage) {
+	printf("%s\n", stage);
+	nocashMessage(stage);
+	if (diagnosticLogPath) {
+		FILE* file = fopen(diagnosticLogPath, "ab");
+		if (file) {
+			fprintf(file, "%s\n", stage);
+			fclose(file);
+		}
+	}
+}
+#else
+static inline void bootStage(const char* stage) {
+	(void)stage;
+}
+#endif
+
 //---------------------------------------------------------------------------------
 int main(int argc, char **argv) {
 //---------------------------------------------------------------------------------
 
 	//defaultExceptionHandler();
 	fifoSendValue32(FIFO_PM, PM_REQ_SLEEP_DISABLE);
+#ifdef TWLM_BOOT_DIAGNOSTICS
+	consoleDemoInit();
+	REG_MASTER_BRIGHT = 0;
+	REG_MASTER_BRIGHT_SUB = 0;
+	printf("TWiLight boot diagnostics\nARM9 mode: %s\nSCFG_EXT: %08lX\n",
+		isDSiMode() ? "DSi" : "DS", (unsigned long)REG_SCFG_EXT);
+#endif
+	bootStage("ARM9 main entered");
 
 	// overwrite reboot stub identifier
 	extern char *fake_heap_end;
@@ -56,15 +97,32 @@ int main(int argc, char **argv) {
 
 	//consoleDemoInit();
 
+	bootStage("Waiting for ARM7");
 	bool isRegularDS = fifoGetValue32(FIFO_USER_07);
+	bootStage("ARM7 ready");
 
 	//iprintf("Initing flashcard...\n");
+	bootStage("Mounting flashcard");
 	bool flashcardFound = twlmMountStorage("fat", dldiGetInternal());
+#ifdef TWLM_BOOT_DIAGNOSTICS
+	if (flashcardFound) beginBootLog("fat:/_nds/TWiLightMenu/boot-diagnostic.log");
+#endif
+	bootStage(flashcardFound ? "Flashcard mounted" : "Flashcard unavailable");
 	bool sdFound = false;
 	if (isDSiMode() || (!isRegularDS && REG_SCFG_EXT != 0)) {
 		extern const DISC_INTERFACE __my_io_dsisd;
 		//iprintf("Initing SD...\n");
+		bootStage("Mounting internal SD");
 		sdFound = twlmMountStorage("sd", &__my_io_dsisd);
+#ifdef TWLM_BOOT_DIAGNOSTICS
+		if (sdFound && !flashcardFound) beginBootLog("sd:/_nds/TWiLightMenu/boot-diagnostic.log");
+        bootLogSdIo();
+        if (bootSdIpcTimedOut()) {
+            printf("Restart console to retry.\n");
+            while (1) swiWaitForVBlank();
+        }
+#endif
+		bootStage(sdFound ? "Internal SD mounted" : "Internal SD unavailable");
 	}
 	const char* menuPath = bootpath::mainMenu(
 		flashcardFound && access(bootpath::flashcardMenu, F_OK) == 0,
@@ -83,6 +141,8 @@ int main(int argc, char **argv) {
 		u32* _lastUsedCommonCache = (u32*)0x02FF3FF4;
 
 		//iprintf(sdFound ? "Running from SD...\n" : "Running from flashcard...\n");
+		bootStage(menuPath);
+		bootStage("Loading main.srldr");
 		int err = runNdsFile(menuPath, 1, &menuPath,
 			(*commonCacheTag == 0x414C5253) ? *_lastUsedCommonCache : 0);
 

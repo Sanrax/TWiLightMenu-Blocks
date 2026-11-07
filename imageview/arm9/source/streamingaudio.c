@@ -34,6 +34,9 @@ volatile bool fade_out = false;
 
 volatile u32 sample_delay_count = 0;
 
+#ifdef SOUND_DEBUG
+char debug_buf[256] = {0};
+#endif
 
 /*
  * The maxmod stream request handler. 
@@ -79,6 +82,7 @@ mm_word on_stream_request(mm_word length, mm_addr dest, mm_stream_formats format
    
 	// Debug stuff
 	// if (fill_requested) {
+	//	 nocashMessage("missed fill");
 	// }
 
 	int len = length;
@@ -113,14 +117,23 @@ mm_word on_stream_request(mm_word length, mm_addr dest, mm_stream_formats format
 	}
 
 	/*if (!sample_delay_count && fade_out && (fade_counter > 0)) {
+		// sprintf(debug_buf, "Fade i: %i", fade_counter);
+		// nocashMessage(debug_buf);
 		fade_counter--;
 	}*/
 
 	
+	#ifdef SOUND_DEBUG
+	sprintf(debug_buf, "Stream filled, pointer at %li, samples filed %li", streaming_buf_ptr, filled_samples);
+	nocashMessage(debug_buf);
+	#endif
 	// Request a new fill from sound.cpp, refreshing the fill buffer.
 	// Ensure that fills are requested only if the streaming buf ptr is more than
 	// the filled samples.
 	if (!fill_requested && abs(streaming_buf_ptr - filled_samples) >= SAMPLES_PER_FILL) {
+		#ifdef SOUND_DEBUG
+		nocashMessage("Fill requested!");
+		#endif
 		fill_requested = true;
 	} 
 	return length;

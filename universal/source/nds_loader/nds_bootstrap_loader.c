@@ -106,6 +106,7 @@ int bootstrapHbRunNds (const void* loader, u32 loaderSize, u32 cluster, u32 ramD
 	int argSize;
 	const char* argChar;
 	
+	//nocashMessage("runNds");
 
 	irqDisable(IRQ_ALL);
 
@@ -180,6 +181,7 @@ int bootstrapHbRunNds (const void* loader, u32 loaderSize, u32 cluster, u32 ramD
 	writeAddr ((data_t*) LCDC_BANK_D, PRELOADED_OFFSET, ndsPreloaded);
 
 
+	//nocashMessage("irqDisable(IRQ_ALL);");
 
 	irqDisable(IRQ_ALL);
 
@@ -187,10 +189,12 @@ int bootstrapHbRunNds (const void* loader, u32 loaderSize, u32 cluster, u32 ramD
 		REG_SCFG_CLK = 0x80;
 	}
 
+	//nocashMessage("Give the VRAM to the ARM7");
 	// Give the VRAM to the ARM7
 	VRAM_C_CR = VRAM_ENABLE | VRAM_C_ARM7_0x06000000;
 	VRAM_D_CR = VRAM_ENABLE | VRAM_D_ARM7_0x06020000;
 
+	//nocashMessage("Reset into a passme loop");
 	// Reset into a passme loop
 	REG_EXMEMCNT |= ARM7_OWNS_ROM | ARM7_OWNS_CARD;
 
@@ -198,12 +202,14 @@ int bootstrapHbRunNds (const void* loader, u32 loaderSize, u32 cluster, u32 ramD
 	*((vu32*)0x02FFFE04) = (u32)0xE59FF018;
 	*((vu32*)0x02FFFE24) = (u32)0x02FFFE04;
 	
+	//nocashMessage("resetARM7");
 
 	// The SD IPC can leave sync value 1 asserted. Clear it before the SDK
 	// reset handshake, or ARM7 may acknowledge before ARM9 starts waiting.
 	REG_IPC_SYNC = 0;
 	resetARM7(0x06020000);
 
+	//nocashMessage("swiSoftReset");
 
 	swiSoftReset(); 
 	return true;
@@ -342,6 +348,7 @@ dsiSD:
 */
 /*bool installBootStub(bool havedsiSD) {
 #ifndef _NO_BOOTSTUB_
+	nocashMessage("installBootStub");
 	extern char *fake_heap_end;
 	struct __bootstub *bootcode = (struct __bootstub *)fake_heap_end;
 

@@ -67,7 +67,7 @@ The DSi-mode flashcard Quit Game black screen is reported upstream in
 [nds-bootstrap #1925](https://github.com/DS-Homebrew/nds-bootstrap/issues/1925).
 This fork applies no menu-side workaround and does not modify bootstrap.
 
-## Packaging
+## Packaging and diagnostics
 
 The release workflow builds the platform/add-on archives and rebuilt CIA when
 a GitHub release is created. The upload job explicitly grants release-asset
@@ -86,15 +86,17 @@ and records hashes/source provenance under `build/hardware-test/dist/`.
 It takes no user settings, games, saves, NAND or BIOS as inputs. Emulator add-ons
 remain separate. Preserve settings and saves when installing an overlay.
 
-Boot diagnostics, startup profiling and homebrew launch probes are maintained on
-the [`diagnostics` branch](https://github.com/Sanrax/TWiLightMenu-Blocks/blob/diagnostics/docs/diagnostics.md).
-Production `master` retains the port fixes and regression tests without runtime
-trace calls, SD snapshots or measurement targets.
+`make -C booter_fc diagnostic` creates an isolated `booter_fc-diagnostic.nds`.
+Launch as `BOOT_TEST.NDS`; it displays stages and writes
+`_nds/TWiLightMenu/boot-diagnostic.log` after a successful storage mount.
+SD traces stay in RAM until a disk callback has finished. Normal builds omit
+these diagnostics. [Profiling instructions](optimizations.md#measuring-and-verifying)
+cover separate instrumented menu binaries.
 
 Repository-only changes include host tests, the licensed vendored R4 encoder,
 build/provenance tooling and ignored generated files. The initial fork removed
 `AI-GUIDELINES.md`; that changes no runtime feature. The three existing upstream
 commits on the destination fork are retained, including homebrew-return and
 Mega Drive file-listing corrections. Loader padding after that merge uses
-a byte offset within VRAM bank D; the diagnostics branch retains an argv probe
-with B/exit support for testing return to the menu.
+a byte offset within VRAM bank D; the argv probe now supports B/exit to
+exercise return to the menu.

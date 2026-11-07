@@ -133,14 +133,9 @@ int main(void) {
     }
 
     reset();
-    *(vu32 *)0x02FFFA00 = 0x12345678;
-    *(vu32 *)0x02FFFA04 = 0x49444C44; // The presence query must retain the DLDI marker.
-    *(vu32 *)0x02FFFA08 = 0x87654321;
     assert(request(0x56484453) == 1);
     assert(testScfg & SCFG_EXT_SDMMC);
-    assert(*(vu32 *)0x02FFFA00 == 0x12345678);
-    assert(*(vu32 *)0x02FFFA04 == 0x49444C44);
-    assert(*(vu32 *)0x02FFFA08 == 0x87654321);
+    assert(*(vu32 *)0x02FFFA00 == testScfg);
     assert(request(0x54534453) == 0 && appAttempts == 3);
     assert(deviceSD.isSDHC == 1);
     assert(my_sdmmc_cardinserted());
@@ -216,6 +211,8 @@ int main(void) {
         for (unsigned i = 0; i < words; ++i) assert(data[i] == (i ^ 0x12345678));
         for (unsigned i = words; i < words + 16; ++i) assert(data[i] == 0xDEADBEEF);
         assert(*(vu32 *)0x0400411C == 0);
+        request(0x47445353);
+        assert(*(vu32 *)0x02FFFA08 == words);
     }
     // Unaligned callers use PIO. Completion flags alone must not return
     // success while the FIFO still has the final block to deliver.

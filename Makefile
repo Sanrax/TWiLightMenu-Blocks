@@ -19,6 +19,10 @@ test:
 check-build:
 	python3 tests/check_build.py
 
+.PHONY: profile-startup
+profile-startup: shared-loaders
+	@$(MAKE) -C romsel_dsimenutheme profile-startup
+
 all:	booter booter_fc 3dssplash gbapatcher quickmenu manual imageview resources romsel_aktheme romsel_dsimenutheme romsel_r4theme settings slot1launch title
 
 # Shared loaders must finish before parallel component builds copy their binaries.

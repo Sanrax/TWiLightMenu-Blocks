@@ -38,6 +38,7 @@
 #include "common/systemdetails.h"
 #include "common/my_rumble.h"
 #include "common/logging.h"
+#include "common/startupprofile.h"
 #include "common/indexedPhoto.h"
 #include "myDSiMode.h"
 #include "date.h"
@@ -1834,7 +1835,9 @@ static bool loadDefaultPhoto() {
 	if (!loaded) return false;
 	photoWidth = image.width;
 	photoHeight = image.height;
+	startupProfileMark("photo decode");
 	u16 *background = beginPhotoDraw();
+	startupProfileMark("photo clear");
 	const unsigned start = (24 + (156 - photoHeight) / 2) * 256 + 24 + (208 - photoWidth) / 2;
 	for (unsigned frame = 0; frame < unsigned(boxArtColorDeband) + 1; frame++) {
 		u16 *border = (frame ? tex().topBorderBuffer2() : tex().topBorderBuffer()) + start;
@@ -1843,6 +1846,7 @@ static bool loadDefaultPhoto() {
 		for (unsigned row = 0; row < photoHeight; row++)
 			tonccpy(bg + row * 256, border + row * 256, photoWidth * sizeof(u16));
 	}
+	startupProfileMark("photo pixels");
 	tex().commitBgSubModify();
 	return true;
 }
@@ -1865,12 +1869,14 @@ void loadPhoto(const std::string &path) {
 	}
 	if (error || !photoWidth || !photoHeight || photoWidth > 208 || photoHeight > 156
 		|| image.size() != photoWidth * photoHeight * 4) return;
+	startupProfileMark("photo decode");
 	u16 *bgSubBuffer = beginPhotoDraw();
 	u16 *bgSubBuffer2 = tex().bgSubBuffer2();
 	u16 *topBorderBuffer = tex().topBorderBuffer();
 	u16 *topBorderBuffer2 = tex().topBorderBuffer2();
 
 	// Start loading
+	startupProfileMark("photo clear");
 	uint startX = 24 + (208 - photoWidth) / 2;
 	for (int b = 0; b < boxArtColorDeband+1; b++) {
 		const uint startY = 24 + ((156 - photoHeight) / 2);
@@ -1933,6 +1939,7 @@ void loadPhoto(const std::string &path) {
 		alternatePixel = !alternatePixel;
 	}
 
+	startupProfileMark("photo pixels");
 	tex().commitBgSubModify();
 }
 
@@ -2132,11 +2139,13 @@ void graphicsInit() {
 	drawCurrentTime();
 
 	// printf("drawn bgload");
+	startupProfileMark("background/name/date");
 	// while (1) {}
 	if (!ms().macroMode && ms().showPhoto && tc().renderPhoto()) {
 		srand(time(NULL));
 		loadPhotoList();
 	}
+	startupProfileMark("photo");
 
 	if (ms().theme == TWLSettings::EThemeHBL) {
 		u16* newPalette = (u16*)bubblesPal;

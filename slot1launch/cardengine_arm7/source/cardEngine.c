@@ -108,6 +108,7 @@ void myIrqHandlerVBlank(void) {
 	}
 
 	#ifdef DEBUG
+	nocashMessage("cheat_engine_start\n");
 	#endif	
 	
 	cheat_engine_start();

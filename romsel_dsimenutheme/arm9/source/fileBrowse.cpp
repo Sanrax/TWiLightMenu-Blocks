@@ -1,4 +1,5 @@
 #include "common/filetypes.h"
+#include "common/startupprofile.h"
 #include <limits.h>
 #include <sys/stat.h>
 #include "common/storage.h"
@@ -3264,6 +3265,7 @@ std::string browseForFile(const std::vector<std::string_view> &extensionList) {
 	vector<vector<DirEntry>> dirContents(scrn.SIZE);
 
 	getDirectoryContents(dirContents[scrn], extensionList);
+	startupProfileMark("directory");
 	
 	if (CURPOS > last_used_box)
 	{
@@ -3277,6 +3279,7 @@ std::string browseForFile(const std::vector<std::string_view> &extensionList) {
 	while (1) {
 		updateDirectoryContents(dirContents[scrn]);
 		getFileInfo(scrn, dirContents, true);
+		startupProfileMark("ROM metadata");
 		if (!vramSafeToUnmap()) swiWaitForVBlank(); // unmaps VRAM E/F/G while it copies
 			reloadIconPalettes();
 		const bool revealStartup = !browserHasDisplayed;
@@ -3440,6 +3443,7 @@ std::string browseForFile(const std::vector<std::string_view> &extensionList) {
 				buttonArrowTouched[0] = ((keysHeld() & KEY_TOUCH) && touch.py > 171 && touch.px < 19);
 				buttonArrowTouched[1] = ((keysHeld() & KEY_TOUCH) && touch.py > 171 && touch.px > 236);
 				bgOperations(true);
+				startupProfileEnd();
 				/*if (REG_SCFG_MC != current_SCFG_MC) {
 					break;
 				}*/

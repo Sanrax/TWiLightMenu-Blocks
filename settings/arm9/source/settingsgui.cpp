@@ -4,6 +4,7 @@
 #include "graphics/graphics.h"
 #include "common/bootstrapsettings.h"
 #include "common/twlmenusettings.h"
+#include "common/startupprofile.h"
 #include <variant>
 #include <algorithm>
 #include <nds.h>
@@ -440,6 +441,7 @@ void SettingsGUI::rotateOption(int rotateAmount)
 
 void SettingsGUI::saveAndExit(int currentTheme)
 {
+	startupProfileBegin("settings-exit-profile.csv");
 	_isExited = true;
 	mmEffectEx(currentTheme == 4 ? &snd().snd_saturn_back : &snd().snd_back);
 
@@ -450,11 +452,15 @@ void SettingsGUI::saveAndExit(int currentTheme)
 	for (int i = 0; i < 25 || !screenFadedOut(); i++) {
 		swiWaitForVBlank();
 	}
+	startupProfileMark("fade");
 	ms().saveSettings();
 	gs().saveSettings();
 	bs().saveSettings();
+	startupProfileMark("save");
 	_isSaved = true;
 	snd().stopBgMusic(false);
+	startupProfileMark("music-stop");
+	startupProfileEnd();
 
 	if (_exitCallback != nullptr) {
 		_exitCallback();

@@ -1,3 +1,4 @@
+#include "common/startupprofile.h"
 /*-----------------------------------------------------------------
  Copyright (C) 2015
 	Matthew Scholefield
@@ -1356,6 +1357,7 @@ void graphicsInit()
 		}
 	};
 	
+	startupProfileMark("video setup");
 
 	dlp_icons.bitmap = dlp_iconsBitmap + 0x1000 * getDlpBitmapOffset();
 
@@ -1394,7 +1396,9 @@ void graphicsInit()
 		pictochat_images = &pictochat.images;
 	}
 
+	startupProfileMark("sprite setup");
 	loadConsoleIcons();
+	startupProfileMark("console icons");
 
 	updateCursorTargetPos();
 	cursorTL = cursorTargetTL;

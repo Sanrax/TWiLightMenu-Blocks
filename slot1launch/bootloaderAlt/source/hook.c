@@ -189,5 +189,6 @@ int hookNdsRetail (const tNDSHeader* ndsHeader, u32* cardEngineLocation) {
 
 	*vblankHandler = patches[0];
 
+	nocashMessage("ERR_NONE");
 	return ERR_NONE;
 }
