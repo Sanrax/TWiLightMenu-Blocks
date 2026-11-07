@@ -25,7 +25,7 @@ jobs:
       - name: Get manual pages
         run: |
           cd manual/nitrofiles
-          curl -LO https://github.com/DS-Homebrew/twilight-manual/releases/download/pages/pages.7z
+          curl -fLO https://github.com/DS-Homebrew/twilight-manual/releases/download/pages/pages.7z
           7z x pages.7z
           rm pages.7z
       - name: Build TWiLightMenu++
@@ -63,7 +63,7 @@ jobs:
           # nds-bootstrap
           mkdir -p nds-bootstrap
           cd nds-bootstrap
-          curl -LO https://github.com/DS-Homebrew/nds-bootstrap/releases/latest/download/nds-bootstrap.7z
+          curl -fLO https://github.com/DS-Homebrew/nds-bootstrap/releases/latest/download/nds-bootstrap.7z
           7z x nds-bootstrap.7z
           mv nds-bootstrap.* ..
           cd ..
@@ -153,36 +153,37 @@ jobs:
           rm -rf TWiLightMenu
           cp -r "7zfile/Virtual Console (DSi or Flashcard)/" TWiLightMenu
           cd TWiLightMenu/_nds/TWiLightMenu/emulators
-          curl -LO https://github.com/wavemotion-dave/A8DS/releases/latest/download/A8DS.nds
-          curl -LO https://github.com/wavemotion-dave/StellaDS/releases/latest/download/StellaDS.nds
-          curl -LO https://github.com/wavemotion-dave/A5200DS/releases/latest/download/A5200DS.nds
-          curl -LO https://github.com/wavemotion-dave/A5200DS/releases/latest/download/A5200DSi.nds
-          curl -LO https://github.com/wavemotion-dave/A7800DS/releases/latest/download/A7800DS.nds
-          curl -LO https://github.com/wavemotion-dave/NINTV-DS/releases/latest/download/NINTV-DS.nds
-          curl -LO https://github.com/wavemotion-dave/ColecoDS/releases/latest/download/ColecoDS.nds
-          curl -LO https://github.com/wavemotion-dave/SugarDS/releases/latest/download/SugarDS.nds
-          curl -LO https://github.com/DS-Homebrew/jEnesisDSPlus/releases/latest/download/jEnesisDSPlus.nds
-          curl -LO https://github.com/DS-Homebrew/jEnesisDSPlus/releases/latest/download/jEnesisDSPlus_macro.nds
-          curl -LO https://github.com/Sanrax/snemulds-shim/releases/latest/download/snemulds-shim.nds
-          curl -fL -o SNEmulDS.zip "https://sanrax.github.io/flashcart-guides/assets/SNEmulDS%200.6d%200.6a%20TWL-NTR.zip"
-          7z x SNEmulDS.zip SNEmulDS.nds SNEmulDS.srl
-          rm SNEmulDS.zip
-          curl -LO https://github.com/DS-Homebrew/NesDS/releases/latest/download/nesDS.nds
-          curl -LO https://github.com/FluBBaOfWard/S8DS/releases/latest/download/S8DS.zip
+          curl -fLO https://github.com/wavemotion-dave/A8DS/releases/latest/download/A8DS.nds
+          curl -fLO https://github.com/wavemotion-dave/StellaDS/releases/latest/download/StellaDS.nds
+          curl -fLO https://github.com/wavemotion-dave/A5200DS/releases/latest/download/A5200DS.nds
+          # 3.4a is the last release containing the separate DSi binary.
+          curl -fLO https://github.com/wavemotion-dave/A5200DS/releases/download/3.4a/A5200DSi.nds
+          curl -fLO https://github.com/wavemotion-dave/A7800DS/releases/latest/download/A7800DS.nds
+          curl -fLO https://github.com/wavemotion-dave/NINTV-DS/releases/latest/download/NINTV-DS.nds
+          curl -fLO https://github.com/wavemotion-dave/ColecoDS/releases/latest/download/ColecoDS.nds
+          curl -fLO https://github.com/wavemotion-dave/SugarDS/releases/latest/download/SugarDS.nds
+          curl -fLO https://github.com/DS-Homebrew/jEnesisDSPlus/releases/latest/download/jEnesisDSPlus.nds
+          curl -fLO https://github.com/DS-Homebrew/jEnesisDSPlus/releases/latest/download/jEnesisDSPlus_macro.nds
+          curl -fLO https://github.com/Sanrax/snemulds-shim/releases/latest/download/snemulds-shim.nds
+          curl -fL -o SNEmulDS_0.6d_TWL-NTR.zip "https://sanrax.github.io/flashcart-guides/assets/SNEmulDS%200.6d%200.6a%20TWL-NTR.zip"
+          7z x SNEmulDS_0.6d_TWL-NTR.zip SNEmulDS.nds SNEmulDS.srl
+          rm SNEmulDS_0.6d_TWL-NTR.zip
+          curl -fLO https://github.com/DS-Homebrew/NesDS/releases/latest/download/nesDS.nds
+          curl -fLO https://github.com/FluBBaOfWard/S8DS/releases/latest/download/S8DS.zip
           7z x S8DS.zip S8DS.nds
           rm S8DS.zip
-          curl -LO https://github.com/FluBBaOfWard/NGPDS/releases/latest/download/NGPDS.zip
+          curl -fLO https://github.com/FluBBaOfWard/NGPDS/releases/latest/download/NGPDS.zip
           7z x NGPDS.zip NGPDS.nds
           rm NGPDS.zip
-          curl -LO https://github.com/FluBBaOfWard/NitroGrafx/releases/latest/download/NitroGrafx0_9_0.zip
-          7z x NitroGrafx0_9_0.zip NitroGrafx.nds
-          rm NitroGrafx0_9_0.zip
-          curl -LO https://github.com/FluBBaOfWard/NitroSwan/releases/latest/download/NitroSwan.zip
+          curl -fL -o NitroGrafx.zip https://github.com/FluBBaOfWard/NitroGrafx/releases/download/v0.9.1/NitroGrafx0_9_1.zip
+          7z x NitroGrafx.zip NitroGrafx.nds
+          rm NitroGrafx.zip
+          curl -fLO https://github.com/FluBBaOfWard/NitroSwan/releases/latest/download/NitroSwan.zip
           7z x NitroSwan.zip NitroSwan.nds
           rm NitroSwan.zip
           # PicoDriveTWL is a prerelease, so get the latest URL from the GH api
-          curl -LO $(curl https://api.github.com/repos/DS-Homebrew/PicoDriveTWL/releases | jq --raw-output '.[0].assets[0].browser_download_url' -)
-          curl -LO https://github.com/DS-Homebrew/PokeMini/releases/latest/download/PokeMini.nds
+          curl -fLO "$(curl -fsSL https://api.github.com/repos/DS-Homebrew/PicoDriveTWL/releases | jq -er '.[0].assets[0].browser_download_url')"
+          curl -fLO https://github.com/DS-Homebrew/PokeMini/releases/latest/download/PokeMini.nds
           cd ../../..
           7z a -md=16m AddOn-VirtualConsole-DSi-or-Flashcard.7z
           mv AddOn-VirtualConsole-DSi-or-Flashcard.7z ~/artifacts
@@ -194,24 +195,25 @@ jobs:
           cd TWiLightMenu/_nds/TWiLightMenu
           mkdir -p emulators
           cd emulators
-          curl -LO https://github.com/wavemotion-dave/A8DS/releases/latest/download/A8DS.nds
-          curl -LO https://github.com/wavemotion-dave/StellaDS/releases/latest/download/StellaDS.nds
-          curl -LO https://github.com/wavemotion-dave/A5200DS/releases/latest/download/A5200DS.nds
-          curl -LO https://github.com/wavemotion-dave/A5200DS/releases/latest/download/A5200DSi.nds
-          curl -LO https://github.com/wavemotion-dave/A7800DS/releases/latest/download/A7800DS.nds
-          curl -LO https://github.com/wavemotion-dave/NINTV-DS/releases/latest/download/NINTV-DS.nds
-          curl -LO https://github.com/wavemotion-dave/ColecoDS/releases/latest/download/ColecoDS.nds
-          curl -LO https://github.com/wavemotion-dave/SugarDS/releases/latest/download/SugarDS.nds
-          curl -LO https://github.com/FluBBaOfWard/S8DS/releases/latest/download/S8DS.zip
+          curl -fLO https://github.com/wavemotion-dave/A8DS/releases/latest/download/A8DS.nds
+          curl -fLO https://github.com/wavemotion-dave/StellaDS/releases/latest/download/StellaDS.nds
+          curl -fLO https://github.com/wavemotion-dave/A5200DS/releases/latest/download/A5200DS.nds
+          # 3.4a is the last release containing the separate DSi binary.
+          curl -fLO https://github.com/wavemotion-dave/A5200DS/releases/download/3.4a/A5200DSi.nds
+          curl -fLO https://github.com/wavemotion-dave/A7800DS/releases/latest/download/A7800DS.nds
+          curl -fLO https://github.com/wavemotion-dave/NINTV-DS/releases/latest/download/NINTV-DS.nds
+          curl -fLO https://github.com/wavemotion-dave/ColecoDS/releases/latest/download/ColecoDS.nds
+          curl -fLO https://github.com/wavemotion-dave/SugarDS/releases/latest/download/SugarDS.nds
+          curl -fLO https://github.com/FluBBaOfWard/S8DS/releases/latest/download/S8DS.zip
           7z x S8DS.zip S8DS.nds
           rm S8DS.zip
-          curl -LO https://github.com/FluBBaOfWard/NGPDS/releases/latest/download/NGPDS.zip
+          curl -fLO https://github.com/FluBBaOfWard/NGPDS/releases/latest/download/NGPDS.zip
           7z x NGPDS.zip NGPDS.nds
           rm NGPDS.zip
-          curl -LO https://github.com/FluBBaOfWard/NitroSwan/releases/latest/download/NitroSwan.zip
+          curl -fLO https://github.com/FluBBaOfWard/NitroSwan/releases/latest/download/NitroSwan.zip
           7z x NitroSwan.zip NitroSwan.nds
           rm NitroSwan.zip
-          curl -LO https://github.com/DS-Homebrew/PokeMini/releases/latest/download/PokeMini.nds
+          curl -fLO https://github.com/DS-Homebrew/PokeMini/releases/latest/download/PokeMini.nds
           cd ../../..
           7z a -md=16m AddOn-VirtualConsole-3DS-Minimal.7z
           mv AddOn-VirtualConsole-3DS-Minimal.7z ~/artifacts
@@ -221,36 +223,37 @@ jobs:
           rm -rf TWiLightMenu
           cp -r "7zfile/Virtual Console (3DS, Full)/" TWiLightMenu
           cd TWiLightMenu/_nds/TWiLightMenu/emulators
-          curl -LO https://github.com/wavemotion-dave/A8DS/releases/latest/download/A8DS.nds
-          curl -LO https://github.com/wavemotion-dave/StellaDS/releases/latest/download/StellaDS.nds
-          curl -LO https://github.com/wavemotion-dave/A5200DS/releases/latest/download/A5200DS.nds
-          curl -LO https://github.com/wavemotion-dave/A5200DS/releases/latest/download/A5200DSi.nds
-          curl -LO https://github.com/wavemotion-dave/A7800DS/releases/latest/download/A7800DS.nds
-          curl -LO https://github.com/wavemotion-dave/NINTV-DS/releases/latest/download/NINTV-DS.nds
-          curl -LO https://github.com/wavemotion-dave/ColecoDS/releases/latest/download/ColecoDS.nds
-          curl -LO https://github.com/wavemotion-dave/SugarDS/releases/latest/download/SugarDS.nds
-          curl -LO https://github.com/DS-Homebrew/jEnesisDSPlus/releases/latest/download/jEnesisDSPlus.nds
-          curl -LO https://github.com/DS-Homebrew/jEnesisDSPlus/releases/latest/download/jEnesisDSPlus_macro.nds
-          curl -LO https://github.com/Sanrax/snemulds-shim/releases/latest/download/snemulds-shim.nds
-          curl -fL -o SNEmulDS.zip "https://sanrax.github.io/flashcart-guides/assets/SNEmulDS%200.6d%200.6a%20TWL-NTR.zip"
-          7z x SNEmulDS.zip SNEmulDS.nds SNEmulDS.srl
-          rm SNEmulDS.zip
-          curl -LO https://github.com/DS-Homebrew/NesDS/releases/latest/download/nesDS.nds
-          curl -LO https://github.com/FluBBaOfWard/S8DS/releases/latest/download/S8DS.zip
+          curl -fLO https://github.com/wavemotion-dave/A8DS/releases/latest/download/A8DS.nds
+          curl -fLO https://github.com/wavemotion-dave/StellaDS/releases/latest/download/StellaDS.nds
+          curl -fLO https://github.com/wavemotion-dave/A5200DS/releases/latest/download/A5200DS.nds
+          # 3.4a is the last release containing the separate DSi binary.
+          curl -fLO https://github.com/wavemotion-dave/A5200DS/releases/download/3.4a/A5200DSi.nds
+          curl -fLO https://github.com/wavemotion-dave/A7800DS/releases/latest/download/A7800DS.nds
+          curl -fLO https://github.com/wavemotion-dave/NINTV-DS/releases/latest/download/NINTV-DS.nds
+          curl -fLO https://github.com/wavemotion-dave/ColecoDS/releases/latest/download/ColecoDS.nds
+          curl -fLO https://github.com/wavemotion-dave/SugarDS/releases/latest/download/SugarDS.nds
+          curl -fLO https://github.com/DS-Homebrew/jEnesisDSPlus/releases/latest/download/jEnesisDSPlus.nds
+          curl -fLO https://github.com/DS-Homebrew/jEnesisDSPlus/releases/latest/download/jEnesisDSPlus_macro.nds
+          curl -fLO https://github.com/Sanrax/snemulds-shim/releases/latest/download/snemulds-shim.nds
+          curl -fL -o SNEmulDS_0.6d_TWL-NTR.zip "https://sanrax.github.io/flashcart-guides/assets/SNEmulDS%200.6d%200.6a%20TWL-NTR.zip"
+          7z x SNEmulDS_0.6d_TWL-NTR.zip SNEmulDS.nds SNEmulDS.srl
+          rm SNEmulDS_0.6d_TWL-NTR.zip
+          curl -fLO https://github.com/DS-Homebrew/NesDS/releases/latest/download/nesDS.nds
+          curl -fLO https://github.com/FluBBaOfWard/S8DS/releases/latest/download/S8DS.zip
           7z x S8DS.zip S8DS.nds
           rm S8DS.zip
-          curl -LO https://github.com/FluBBaOfWard/NGPDS/releases/latest/download/NGPDS.zip
+          curl -fLO https://github.com/FluBBaOfWard/NGPDS/releases/latest/download/NGPDS.zip
           7z x NGPDS.zip NGPDS.nds
           rm NGPDS.zip
-          curl -LO https://github.com/FluBBaOfWard/NitroGrafx/releases/latest/download/NitroGrafx0_9_0.zip
-          7z x NitroGrafx0_9_0.zip NitroGrafx.nds
-          rm NitroGrafx0_9_0.zip
-          curl -LO https://github.com/FluBBaOfWard/NitroSwan/releases/latest/download/NitroSwan.zip
+          curl -fL -o NitroGrafx.zip https://github.com/FluBBaOfWard/NitroGrafx/releases/download/v0.9.1/NitroGrafx0_9_1.zip
+          7z x NitroGrafx.zip NitroGrafx.nds
+          rm NitroGrafx.zip
+          curl -fLO https://github.com/FluBBaOfWard/NitroSwan/releases/latest/download/NitroSwan.zip
           7z x NitroSwan.zip NitroSwan.nds
           rm NitroSwan.zip
           # PicoDriveTWL is a prerelease, so get the latest URL from the GH api
-          curl -LO $(curl https://api.github.com/repos/DS-Homebrew/PicoDriveTWL/releases | jq --raw-output '.[0].assets[0].browser_download_url' -)
-          curl -LO https://github.com/DS-Homebrew/PokeMini/releases/latest/download/PokeMini.nds
+          curl -fLO "$(curl -fsSL https://api.github.com/repos/DS-Homebrew/PicoDriveTWL/releases | jq -er '.[0].assets[0].browser_download_url')"
+          curl -fLO https://github.com/DS-Homebrew/PokeMini/releases/latest/download/PokeMini.nds
           cd ../../..
           7z a -md=16m AddOn-VirtualConsole-3DS-Full.7z
           mv AddOn-VirtualConsole-3DS-Full.7z ~/artifacts
@@ -260,8 +263,8 @@ jobs:
           rm -rf TWiLightMenu
           cp -r 7zfile/Multimedia/ TWiLightMenu
           cd TWiLightMenu/_nds/TWiLightMenu/apps
-          curl -LO https://github.com/DS-Homebrew/tuna-vids/releases/latest/download/tuna-vids.nds
-          curl -LO https://github.com/RocketRobz/RocketVideoPlayer/releases/latest/download/RocketVideoPlayer.nds
+          curl -fLO https://github.com/DS-Homebrew/tuna-vids/releases/latest/download/tuna-vids.nds
+          curl -fLO https://github.com/RocketRobz/RocketVideoPlayer/releases/latest/download/RocketVideoPlayer.nds
           # curl -LO https://github.com/Gericom/FastVideoDSPlayer/releases/latest/download/FastVideoDS.nds
           cd ../../..
           7z a -md=16m AddOn-Multimedia.7z
