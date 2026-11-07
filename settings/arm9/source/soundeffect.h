@@ -125,13 +125,21 @@ class SoundEffect
 		}
     }
 
-    void stopBgMusic()
+    void beginBgMusicFadeOut()
+    {
+        if (mmActive())
+            *(int*)0x02003004 = 1;
+    }
+
+    void stopBgMusic(bool waitForFade = true)
     {
         if (!mmActive()) return;
 
-		*(int*)0x02003004 = 1; // Fade out sound
-		for (int i = 0; i < 25; i++)
-			swiWaitForVBlank();
+		if (waitForFade) {
+			beginBgMusicFadeOut();
+			for (int i = 0; i < 25; i++)
+				swiWaitForVBlank();
+		}
 		mmStop();
 		*(int*)0x02003004 = 0; // Cancel sound fade out
     }

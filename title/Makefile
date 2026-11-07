@@ -11,6 +11,7 @@ NITRODATA		:=	nitrofiles
 
 TWLM_ROOT ?= $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/..)
 include $(TWLM_ROOT)/universal/blocksds.mk
+include $(TWLM_ROOT)/universal/languagepacks.mk
 
 .PHONY: bootloader bootstub clean makearm7 makearm9
 

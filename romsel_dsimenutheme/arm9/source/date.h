@@ -1,20 +1,19 @@
 #ifndef DATE_H
 #define DATE_H
 
-// #include <nds.h>
 #include <string>
-// #include <stddef.h>
 
 /**
  * Get the current date formatted for the current language.
- * @return std::string containing the date
+ * The returned text stays valid until the next date update.
  */
-std::string getDate(void);
+const std::string &getDate(void);
 
 /**
  * Get the current time formatted for the top bar.
- * @return std::string containing the time.
+ * Includes the menu's leading zero and blinking colon. The returned text
+ * stays valid until the next time update.
  */
-std::string retTime(void);
+const std::string &retTime(bool colonVisible);
 
 #endif // DATE_H

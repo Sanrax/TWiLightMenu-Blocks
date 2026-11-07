@@ -1,5 +1,7 @@
 #pragma once
 
+#include "common/nftrGlyphPages.h"
+
 #include <array>
 #include <map>
 #include <nds.h>
@@ -36,7 +38,8 @@ private:
 	static char16_t arabicForm(char16_t current, char16_t prev, char16_t next);
 
 	FILE* file = nullptr;
-	bool fromCommonCache = false;
+	bool commonTiles = false, commonWidths = false, commonMap = false;
+	twlm::NftrGlyphPages glyphPages;
 	bool useTileCache = false;
 	u8 tileOffset = 0;
 	u8 tileWidth = 0, tileHeight = 0;

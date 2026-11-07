@@ -60,12 +60,52 @@ with tempfile.TemporaryDirectory(prefix='twlm-tests-') as temp:
         ('romsel_dsimenutheme', 'quickmenu', 'settings', 'title', 'manual', 'imageview')))
 
     run('c++', '-std=c++17', '-O2', '-Wall', '-Wextra', '-Werror',
+        '-Iuniversal/include', 'tests/clocktext.cpp', '-Wl,--wrap=localtime',
+        '-Wl,--wrap=strftime', '-o', str(output/'clocktext'))
+    run(str(output/'clocktext'))
+
+    run('c++', '-std=c++17', '-O2', '-Wall', '-Wextra', '-Werror', '-D__BLOCKSDS__',
+        '-Itests/include/nitrofs', '-Iuniversal/include', 'tests/nitrofile.cpp',
+        'universal/source/common/nitroFile.cpp', '-Wl,--wrap=fopen', '-Wl,--wrap=opendir',
+        '-Wl,--wrap=readdir', '-Wl,--wrap=closedir', '-Wl,--wrap=fdopen',
+        '-Wl,--wrap=close', '-o', str(output/'nitrofile'))
+    run(str(output/'nitrofile'))
+
+    run('c++', '-std=c++17', '-O2', '-Wall', '-Wextra', '-Werror',
+        '-Iuniversal/include', 'tests/languagepack.cpp',
+        'universal/source/common/languagePack.cpp', 'universal/source/common/inifile.cpp',
+        '-o', str(output/'languagepack'))
+    for app in ('romsel_dsimenutheme', 'quickmenu', 'settings', 'title', 'manual', 'imageview'):
+        converter = output/('language-pack-' + app)
+        run('c++', '-std=c++17', '-O2', '-Wall', '-Wextra', '-Werror',
+            '-Iuniversal/include', f'-DTWLM_LANGUAGE_INL="../{app}/arm9/source/language.inl"',
+            'tools/language_pack.cpp', 'universal/source/common/inifile.cpp', '-o', str(converter))
+        translations = sorted((ROOT/app/'nitrofiles/languages').glob('*/language.ini'))
+        custom = output/(app + '-custom.ini')
+        custom.write_bytes(b'\xef\xbb\xbf[LANGUAGE]\r\nBACK = first\\A&rlm\\du\r\n'
+                           b'BACK = ignored duplicate\r\nDONE =\r\nGUI_SETTINGS = \xe6\x97\xa5\xe6\x9c\xac\\n\\D\r\n'
+                           b'[LANGUAGE]\r\nBACK = ignored duplicate section\r\n')
+        translations.append(custom)
+        args = []
+        for number, ini in enumerate(translations):
+            packed = output/f'{app}-{number}.lng'
+            run(str(converter), str(ini), str(packed))
+            args.extend((str(ini), str(packed)))
+        run(str(output/'languagepack'), app, *args)
+
+    run('c++', '-std=c++17', '-O2', '-Wall', '-Wextra', '-Werror',
         '-Iuniversal/include', 'tests/fontmap.cpp', '-Wl,--wrap=fread', '-o', str(output/'fontmap'))
     fonts = [font for app in ('title', 'settings', 'quickmenu', 'romsel_dsimenutheme',
                              'romsel_aktheme', 'romsel_r4theme', 'manual', 'imageview')
              for font in (ROOT/app/'nitrofiles/graphics/font').glob('*.nftr')]
     fonts += list((ROOT/'7zfile/_nds/TWiLightMenu/extras/fonts').glob('*/*.nftr'))
     run(str(output/'fontmap'), *map(str, sorted(fonts)))
+    run('python3', 'tests/nftrcompact.py')
+
+    run('c++', '-std=c++17', '-O2', '-Wall', '-Wextra', '-Werror',
+        '-Iuniversal/include', 'tests/glyphpages.cpp', '-Wl,--wrap=fread',
+        '-Wl,--wrap=fseek', '-o', str(output/'glyphpages'))
+    run(str(output/'glyphpages'), *map(str, sorted(fonts)))
 
     run('c++', '-std=c++17', '-O2', '-Wall', '-Wextra', '-Werror',
         '-Itests/include', '-Iuniversal/include', 'tests/picolaunch.cpp',
@@ -85,6 +125,15 @@ with tempfile.TemporaryDirectory(prefix='twlm-tests-') as temp:
     run(str(output/'soundbank'), 'romsel_dsimenutheme/nitrofiles/sound/defaultfx.bin',
         'romsel_dsimenutheme/nitrofiles/sound/saturnfx.bin')
 
+    run('cc', '-std=c11', '-O2', '-Wall', '-Wextra', '-Werror',
+        '-Itests/include/audio', '-Iuniversal/include',
+        '-c', 'romsel_dsimenutheme/arm9/source/streamingaudio.c', '-o', str(output/'streamingaudio.o'))
+    run('c++', '-std=c++17', '-O2', '-Wall', '-Wextra', '-Werror',
+        '-Itests/include/audio', '-Iuniversal/include', '-Iromsel_dsimenutheme/arm9/source',
+        'tests/audiostream.cpp', str(output/'streamingaudio.o'), '-Wl,--wrap=malloc',
+        '-o', str(output/'audiostream'))
+    run(str(output/'audiostream'))
+
     run('c++', '-std=c++17', '-O2', '-Wall', '-Wextra', '-Werror',
         '-Iuniversal/include', 'tools/photo_index.cpp', 'universal/source/lodepng/lodepng.cpp',
         '-o', str(output/'photo-index'))
@@ -97,6 +146,7 @@ with tempfile.TemporaryDirectory(prefix='twlm-tests-') as temp:
     run('c++', '-std=c++17', '-O2', '-Wall', '-Wextra', '-Werror', '-fno-exceptions',
         '-Itests/include', '-Iuniversal/include', '-Iromsel_dsimenutheme/arm9/source/graphics',
         'tests/texture.cpp', 'romsel_dsimenutheme/arm9/source/graphics/Texture.cpp',
+        'universal/source/common/nitroFile.cpp',
         'universal/source/lodepng/lodepng.cpp', '-o', str(output/'texture'))
     run(str(output/'texture'), str(output), 'romsel_dsimenutheme/nitrofiles')
     for name in ('unsupported-large', 'unsupported-colors'):

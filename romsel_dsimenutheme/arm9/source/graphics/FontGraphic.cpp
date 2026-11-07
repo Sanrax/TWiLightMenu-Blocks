@@ -125,25 +125,32 @@ FontGraphic::FontGraphic(const char* path, const bool large, const bool useCommo
 	tileHeight = fgetc(file);
 	fread(&tileSize, 2, 1, file);
 
-	// Load character glyphs
+	// Load character glyphs. Keep the old fully populated tag readable during
+	// a handoff from an older module; new caches use a distinct paged layout.
 	tileAmount = (chunkSize - 0x10) / tileSize;
 	fseek(file, 4, SEEK_CUR);
 	if (useTileCache) {
 		fontTiles = new u8[tileSize * (tileAmount>tileCacheCount ? tileCacheCount : tileAmount)];
 	} else if (useCommonCache) {
 		fontTiles = (u8*)sys().getDataFromCommonCache(fnttTag);
-		if (fontTiles == NULL) {
-			fontTiles = (u8*)sys().allocCommonCache(fnttTag, tileSize * tileAmount);
-			if (fontTiles == NULL) {
-				fontTiles = new u8[tileSize * tileAmount];
-			} else {
-				logPrint("Loading font to common cache: %s\n", large ? "large" : "small");
-				fromCommonCache = true;
-			}
-			fread(fontTiles, tileSize, tileAmount, file);
+		if (fontTiles) {
+			commonTiles = true;
 		} else {
-			logPrint("Using font from common cache: %s\n", large ? "large" : "small");
-			fromCommonCache = true;
+			const u32 pageTag = large ? 0x47504E46 : 0x67706E66; // FNPG / fnpg
+			void* pages = sys().getDataFromCommonCache(pageTag);
+			const bool initialize = pages == nullptr;
+			const u32 bytes = tileSize * tileAmount;
+			if (!pages) {
+				const u32 capacity = twlm::NftrGlyphPages::storageSize(tileOffset, bytes, tileSize);
+				if (capacity) pages = sys().allocCommonCache(pageTag, capacity);
+			}
+			if (glyphPages.attach(pages, tileOffset, bytes, tileSize, initialize)) {
+				fontTiles = glyphPages.data();
+				commonTiles = true;
+			} else {
+				fontTiles = new u8[bytes];
+				fread(fontTiles, tileSize, tileAmount, file);
+			}
 		}
 	} else {
 		fontTiles = new u8[tileSize * tileAmount];
@@ -162,8 +169,10 @@ FontGraphic::FontGraphic(const char* path, const bool large, const bool useCommo
 		fread(fontWidths, 3, tileAmount, file);
 	} else {
 		fontWidths = (u8*)sys().getDataFromCommonCache(fntwTag);
+		commonWidths = fontWidths != nullptr;
 		if (fontWidths == NULL) {
 			fontWidths = (u8*)sys().allocCommonCache(fntwTag, 3 * tileAmount);
+			commonWidths = fontWidths != nullptr;
 			if (fontWidths == NULL) {
 				fontWidths = new u8[3 * tileAmount];
 			}
@@ -176,8 +185,10 @@ FontGraphic::FontGraphic(const char* path, const bool large, const bool useCommo
 		fontMap = new u16[tileAmount];
 	} else {
 		fontMap = (u16*)sys().getDataFromCommonCache(fntmTag);
+		commonMap = fontMap != nullptr;
 		if (fontMap == NULL) {
 			fontMap = (u16*)sys().allocCommonCache(fntmTag, tileAmount * sizeof(u16));
+			commonMap = fontMap != nullptr;
 			if (fontMap == NULL) {
 				fontMap = new u16[tileAmount];
 			}
@@ -194,15 +205,10 @@ setQuestionMark:
 }
 
 FontGraphic::~FontGraphic(void) {
-	fclose(file);
-	if (fromCommonCache)
-		return;
-	if (fontTiles)
-		delete[] fontTiles;
-	if (fontWidths)
-		delete[] fontWidths;
-	if (fontMap)
-		delete[] fontMap;
+	if (file) fclose(file);
+	if (!commonTiles) delete[] fontTiles;
+	if (!commonWidths) delete[] fontWidths;
+	if (!commonMap) delete[] fontMap;
 }
 
 u16 FontGraphic::getCharIndex(char16_t c) {
@@ -442,7 +448,7 @@ ITCM_CODE void FontGraphic::print(int x, int y, bool top, std::u16string_view te
 					}
 				}
 			}
-		} else {
+		} else if (!glyphPages.active() || glyphPages.load(file, index)) {
 			// Don't draw off screen chars
 			if (x >= 0 && x + fontWidths[(index * 3) + 2] < 256 && y >= 0 && y + tileHeight < 192) {
 				u8 *dst = textBuf[top] + x + fontWidths[(index * 3)];

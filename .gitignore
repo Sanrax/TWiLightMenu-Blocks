@@ -99,6 +99,8 @@ romsel_aktheme/nitrofiles/language/lang_ic
 romsel_dsimenutheme/arm9/build-profile/
 title/arm9/build-profile/
 quickmenu/arm9/build-profile/
+settings/arm9/build-profile/
+*/nitrofiles/languages/*/language.lng
 quickmenu/nitrofiles/graphics/*.pht
 quickmenu/nitrofiles/graphics/*/*.pht
 booter_fc/arm9/build-diagnostic/

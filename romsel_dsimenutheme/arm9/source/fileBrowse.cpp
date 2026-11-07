@@ -742,8 +742,9 @@ void launchSettings(void) {
 	controlTopBright = true;
 
 	fadeType = false;		  // Fade to white
-	snd().fadeOutStream();
-	for (int i = 0; i < 60; i++) {
+	fadeSpeed = true;
+	snd().fadeOutStream(true);
+	for (int i = 0; i < 16 || !screenFadedOut(); i++) {
 		bgOperations(true);
 	}
 	snd().stopStream();

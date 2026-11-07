@@ -1,4 +1,5 @@
 #include "common/storage.h"
+#include "common/nitroFile.h"
 #include "common/systemdetails.h"
 #include "common/flashcard.h"
 #include "common/arm7status.h"
@@ -146,6 +147,7 @@ void SystemDetails::initFilesystem(const char *runningPath)
 	chdir(_isRunFromSD ? "sd:/" : "fat:/");
 
 	if (!_nitroFsInitOk && runningPath != NULL) {
+		twlm::clearNitroFileCache();
 		_nitroFsInitOk = nitroFSInit(runningPath) == 1;
 	}
 	// Native NitroFS selects nitro:/ as the default device. Menu paths rooted

@@ -1965,7 +1965,9 @@ ITCM_CODE void ThemeTextures::drawDateTime(const char *str, int posX, int posY, 
 	const int lastX = std::min(posX + width, (int)SCREEN_WIDTH);
 	if (lastY > firstY && lastX > firstX) {
 		const size_t rowBytes = (lastX - firstX) * sizeof(u16);
-		while (REG_VCOUNT < 192); // Fix screen tearing; see commitBgMainModify on the bound
+		if (!backgroundDisplayHidden(true)) {
+			while (REG_VCOUNT < 192); // Visible clock rows still need a safe scanline.
+		}
 		for (int y = firstY; y < lastY; y++) {
 			const u16 *src = &_bgSubBuffer[y * 256 + firstX];
 			const bool rowInVideoBand = videoPlaying && y >= rocketVideo_videoYpos

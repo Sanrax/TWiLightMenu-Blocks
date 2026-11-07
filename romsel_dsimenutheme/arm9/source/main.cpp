@@ -1122,6 +1122,7 @@ void bgOperations(bool waitFrame) {
 		customSleep();
 	}
 	checkSdEject();
+	refreshMacroModeBackground();
 	tex().drawVolumeImageCached();
 	tex().drawBatteryImageCached();
 	drawCurrentTime();

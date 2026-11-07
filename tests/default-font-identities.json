@@ -1,0 +1,16 @@
+{
+  "large.nftr": {
+    "glyphs": 20313,
+    "glyph_chunk_sha256": "ab917d95a10839625f3d81e188abc0182c2005bf178ccdfb801c28eb5629e437",
+    "width_chunk_sha256": "00fec3c1f4564547fd43842a4f8274e24e4c07afe1046731a0f6f49ca9c8d65a",
+    "map_sha256": "d09b6527d163e03cf70a8a48b0e04e45888520cb72e8145b5b68decde4a1257a",
+    "settings_sha256": "b58269cebdbd394fb677c637dc046d87b50c5844432dffdd7edb984e00c64118"
+  },
+  "small.nftr": {
+    "glyphs": 20314,
+    "glyph_chunk_sha256": "a36652eb1e09db14932912e5ea2c936c920343416e58e446b60a12ef59a59a38",
+    "width_chunk_sha256": "32487701c34faec895e7d01ec349480a84c961704216a54bc6fa814b32125596",
+    "map_sha256": "9e64f67e69f17e27963975c64479d52fea1f23f1d9736a4cc3381ad2b690a22e",
+    "settings_sha256": "8ea6a0ee24f6125e5c29d93c07e0728613daa0096221bdd6f7f12915062621d0"
+  }
+}

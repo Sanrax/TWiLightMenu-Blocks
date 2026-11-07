@@ -4,6 +4,7 @@
 #include "common/twlmenusettings.h"
 #include "common/lodepng.h"
 #include "common/indexedImage.h"
+#include "common/nitroFile.h"
 // #include "common/ColorLut.h"
 #include <algorithm>
 #include <cstdint>
@@ -24,7 +25,7 @@ Texture::Texture(const std::string &filePath, const std::string &fallback1, cons
                 _type = TextureType::Png;
                 return;
             }
-            FILE *file = fopen((*path + extension).c_str(), "rb");
+            FILE *file = twlm::openNitroFile((*path + extension).c_str());
             if (!file) continue;
             u32 header[12];
             _type = findType(file, header);
@@ -162,7 +163,7 @@ bool Texture::loadBitmap(FILE *file) noexcept {
 }
 
 bool Texture::loadIndexedPNG(const std::string &basePath) noexcept {
-    FILE *file = fopen((basePath + ".pht").c_str(), "rb");
+    FILE *file = twlm::openNitroFile((basePath + ".pht").c_str());
     if (!file) return false;
     indexedImage::Image image;
     const bool loaded = image.load(file);
@@ -270,7 +271,7 @@ void Texture::applyBitmapEffect(Texture::BitmapEffect effect) {
 
 void Texture::applyUserPaletteFile(const std::string &filePath, Texture::PaletteEffect fallbackEffect) {
 	if (_type & TextureType::Paletted) {
-		FILE *file = fopen(filePath.c_str(), "rb");
+		FILE *file = twlm::openNitroFile(filePath.c_str());
 		if (file) {
 			u16 *pal = _palette.get();
 			int offset = ((useTwlCfg ? *(u8*)0x02000444 : PersonalData->theme) * _paletteLength);

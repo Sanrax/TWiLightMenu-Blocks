@@ -177,7 +177,7 @@ float dbox_Ypos = -192;
 int bottomScreenBrightness = 255;
 
 int bottomBgState = 0; // 0 = Uninitialized, 1 = No Bubble, 2 = bubble, 3 = moving.
-int prevBottomBgState = 1;
+static volatile bool macroBackgroundChanged = false;
 
 int vblankRefreshCounter = 0;
 
@@ -311,22 +311,26 @@ void bottomBgLoad(int drawBubble, bool init = false) {
 		leaveCriticalSection(oldIE);
 	}
 
-	if (ms().macroMode && prevBottomBgState != bottomBgState) {
-		reloadDate = true;
-		reloadTime = true;
-		tex().resetCachedVolumeLevel();
-		tex().resetCachedBatteryLevel();
-		tex().resetProfileName();
-		drawCurrentDate();
-		drawCurrentTime();
-		tex().drawVolumeImageCached();
-		tex().drawBatteryImageCached();
-		tex().drawProfileName();
-		prevBottomBgState = bottomBgState;
-	}
+	if (ms().macroMode && bottomBgStateBefore != bottomBgState)
+		macroBackgroundChanged = true;
 }
 
 void bottomBgRefresh() { bottomBgLoad(currentBg, false); }
+
+void refreshMacroModeBackground() {
+	// bottomBgLoad() also runs in VBlank. Clock formatting, font reads and
+	// profile rendering must stay in the main thread, outside IRQ context.
+	if (!macroBackgroundChanged) return;
+	const int oldIE = enterCriticalSection();
+	macroBackgroundChanged = false;
+	leaveCriticalSection(oldIE);
+	reloadDate = true;
+	reloadTime = true;
+	tex().resetCachedVolumeLevel();
+	tex().resetCachedBatteryLevel();
+	tex().resetProfileName();
+	tex().drawProfileName();
+}
 
 void drawBubble(const glImage *images) { glSprite(bubbleXpos, bubbleYpos, GL_FLIP_NONE, &images[0]); }
 
@@ -2002,7 +2006,7 @@ static std::string loadedDate;
 
 ITCM_CODE void drawCurrentDate() {
 	// Load date
-	std::string currentDate = getDate();
+	const std::string &currentDate = getDate();
 	if (currentDate == loadedDate && !reloadDate)
 		return;
 
@@ -2017,10 +2021,7 @@ static std::string loadedTime;
 
 ITCM_CODE void drawCurrentTime() {
 	// Load time
-	std::string currentTime = retTime();
-	if (currentTime[0] == ' ')
-		currentTime[0] = '0';
-	currentTime[2] = showColon ? ':' : ' ';
+	const std::string &currentTime = retTime(showColon);
 
 	if (currentTime == loadedTime && !reloadTime)
 		return;

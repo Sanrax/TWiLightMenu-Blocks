@@ -4,6 +4,7 @@
 #include "graphics/graphics.h"
 #include "common/bootstrapsettings.h"
 #include "common/twlmenusettings.h"
+#include "common/startupprofile.h"
 #include <variant>
 #include <algorithm>
 #include <nds.h>
@@ -147,7 +148,7 @@ void SettingsGUI::draw()
 
 		std::string str;
 		for (int i = _topCursor; i < _bottomCursor; i++) {
-			auto option = _pages[_selectedPage].options()[i];
+			auto &option = _pages[_selectedPage].options()[i];
 			int selected = option.selected();
 
 			if (i == _selectedOption) {
@@ -173,7 +174,7 @@ void SettingsGUI::draw()
 
 		std::string str;
 		for (int i = _topCursor; i < _bottomCursor; i++) {
-			auto option = _pages[_selectedPage].options()[i];
+			auto &option = _pages[_selectedPage].options()[i];
 			int selected = option.selected();
 
 			if (i == _selectedOption) {
@@ -440,23 +441,26 @@ void SettingsGUI::rotateOption(int rotateAmount)
 
 void SettingsGUI::saveAndExit(int currentTheme)
 {
+	startupProfileBegin("settings-exit-profile.csv");
 	_isExited = true;
 	mmEffectEx(currentTheme == 4 ? &snd().snd_saturn_back : &snd().snd_back);
-	// Draw in between here.
-	draw();
 
 	fadeType = false;
-	for (int i = 0; i < 25; i++) {
+	snd().beginBgMusicFadeOut();
+	// Fade music alongside the picture. The minimum keeps the existing audio
+	// fade even when B is pressed before Settings has finished fading in.
+	for (int i = 0; i < 25 || !screenFadedOut(); i++) {
 		swiWaitForVBlank();
 	}
+	startupProfileMark("fade");
 	ms().saveSettings();
 	gs().saveSettings();
 	bs().saveSettings();
+	startupProfileMark("save");
 	_isSaved = true;
-	draw();
-	for (int i = 0; i < 30; i++)
-		swiWaitForVBlank();
-	snd().stopBgMusic();
+	snd().stopBgMusic(false);
+	startupProfileMark("music-stop");
+	startupProfileEnd();
 
 	if (_exitCallback != nullptr) {
 		_exitCallback();

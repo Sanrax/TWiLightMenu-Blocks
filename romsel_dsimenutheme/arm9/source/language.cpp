@@ -1,51 +1,23 @@
-#include <nds.h>
-#include <stdio.h>
-#include <fat.h>
-#include <sys/stat.h>
-#include <string.h>
-#include <unistd.h>
-#include <string>
-
+#include "common/languagePack.h"
 #include "common/twlmenusettings.h"
-#include "common/inifile.h"
-#include "common/languageEscape.h"
-#include <utility>
+#include "language.h"
 #include "common/logging.h"
 
-#define STRING(what,def) std::string STR_##what;
+#define STRING(key, fallback) std::string STR_##key;
 #include "language.inl"
 #undef STRING
 
-/**
- * Get strings from the ini with special processing
- */
-std::string getString(CIniFile &ini, const std::string &item, const std::string &defaultValue) {
-	std::string out = ini.GetString("LANGUAGE", item, defaultValue);
-	// logPrint("%s: %s\n", item.c_str(), out.c_str());
-	if (out == "") {
-		// Fallback to default string if translated string is blank
-		out = defaultValue;
-	}
+static constexpr twlm::language::Entry languageEntries[] = {
+#define STRING(key, fallback) {#key, fallback, &STR_##key},
+#include "language.inl"
+#undef STRING
+};
+static constexpr size_t languageEntryCount = sizeof(languageEntries) / sizeof(languageEntries[0]);
+static constexpr uint32_t languageSchema = twlm::language::schemaHash(languageEntries, languageEntryCount);
 
-	return decodeLanguageEscapes(std::move(out));
-}
-
-/**
- * Initialize translations.
- * Uses the language ID specified in settings.ui.language.
- */
 void langInit(void)
 {
 	logPrint("langInit() ");
-
-	char languageIniPath[64];
-	snprintf(languageIniPath, sizeof(languageIniPath), "nitro:/languages/%s/language.ini", ms().getGuiLanguageString().c_str());
-
-	CIniFile languageini(languageIniPath);
-
-#define STRING(what,def) STR_##what = getString(languageini, ""#what, def);
-#include "language.inl"
-#undef STRING
-
+	twlm::language::loadTranslations(ms().getGuiLanguageString().c_str(), languageEntries, languageEntryCount, languageSchema);
 	logPrint("Language inited\n");
 }

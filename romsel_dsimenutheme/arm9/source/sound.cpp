@@ -34,28 +34,6 @@
 
 extern bool controlTopBright;
 
-extern volatile s16 fade_counter;
-extern volatile bool fade_out;
-
-extern volatile s16* play_stream_buf;
-extern volatile s16* fill_stream_buf;
-
-// Number of samples filled into the fill buffer so far.
-extern volatile s32 filled_samples;
-
-extern volatile bool fill_requested;
-extern volatile s32 samples_left_until_next_fill;
-extern volatile s32 streaming_buf_ptr;
-
-#define SAMPLES_USED (STREAMING_BUF_LENGTH - samples_left)
-#define REFILL_THRESHOLD STREAMING_BUF_LENGTH >> 2
-
-#ifdef SOUND_DEBUG
-extern char debug_buf[256];
-#endif
-
-extern volatile u32 sample_delay_count;
-
 volatile char* SFX_DATA = (char*)NULL;
 mm_word SOUNDBANK[MSL_BANKSIZE] = {0};
 
@@ -197,15 +175,15 @@ SoundControl::SoundControl()
 }
 
 void SoundControl::loadStream(const bool prepMsg) {
+	unloadStream();
 	if (ms().dsiMusic == 0 || ms().theme == TWLSettings::EThemeSaturn) {
 		return;
 	}
 
-	alloc_streaming_buf();
+	if (!alloc_streaming_buf()) return;
 	resetStreamSettings();
 
 	bool loopableMusic = false;
-	loopingPoint = false;
 
 	mkdir(sys().isRunFromSD() ? "sd:/_nds/TWiLightMenu/cache" : "fat:/_nds/TWiLightMenu/cache", 0777);
 	mkdir(sys().isRunFromSD() ? "sd:/_nds/TWiLightMenu/cache/music" : "fat:/_nds/TWiLightMenu/cache/music", 0777);
@@ -224,6 +202,7 @@ void SoundControl::loadStream(const bool prepMsg) {
 				if (access(loopPath.c_str(), F_OK) == 0) {
 					stream_start_source = fopen(std::string(ms().dsiMusic == 5 ? TFN_HBL_START_SOUND_BG : TFN_SHOP_START_SOUND_BG).c_str(), "rb");
 					stream_source = fopen(loopPath.c_str(), "rb");
+					if (!stream_source) { unloadStream(); return; }
 					logPrint(ms().dsiMusic == 5 ? "Using HBL music\n" : "Using DSi Shop music\n");
 
 					// Read properties from WAV header
@@ -273,6 +252,7 @@ void SoundControl::loadStream(const bool prepMsg) {
 						u8 wavFormat = 0;
 						u8 numChannels = 1;
 						stream_source = fopen(musicPath.c_str(), "rb");
+						if (!stream_source) { unloadStream(); return; }
 						fseek(stream_source, 0x14, SEEK_SET);
 						fread(&wavFormat, sizeof(u8), 1, stream_source);
 						fseek(stream_source, 0x16, SEEK_SET);
@@ -350,6 +330,7 @@ void SoundControl::loadStream(const bool prepMsg) {
 					}
 				}
 				stream_source = fopen(std::string(useHBLMusic ? TFN_HBL_LOOP_SOUND_BG : (use3DSMusic ? TFN_DEFAULT_SOUND_BG_3D : (useBetterDSiMusic ? TFN_BETTER_DEFAULT_SOUND_BG : TFN_DEFAULT_SOUND_BG))).c_str(), "rb");
+				if (!stream_source) { unloadStream(); return; }
 
 				// Read properties from WAV header
 				u8 numChannels = 1;
@@ -366,54 +347,24 @@ void SoundControl::loadStream(const bool prepMsg) {
 
 	logPrint("\n");
 
-	fseek(stream_source, seekPos, SEEK_SET);
+	if (!pcmStream.reset(stream_source, loopableMusic ? stream_start_source : nullptr, seekPos)) {
+		unloadStream();
+		return;
+	}
 
-	stream.buffer_length = 0x1000;	  			// should be adequate
-	stream.callback = on_stream_request;    
-	stream.timer = MM_TIMER0;	    	   // use timer0
-	stream.manual = false;	      		   // auto filling
+	stream.buffer_length = 0x1000;
+	stream.callback = on_stream_request;
+	stream.timer = MM_TIMER0;
+	stream.manual = false;
 
-	if (loopableMusic) {
-		fseek(stream_start_source, 0, SEEK_END);
-		size_t fileSize = ftell(stream_start_source);
-		fileSize -= seekPos;
-		fseek(stream_start_source, seekPos, SEEK_SET);
-
-		// Prep the first section of the stream
-		fread((void*)play_stream_buf, sizeof(s16), STREAMING_BUF_LENGTH, stream_start_source);
-		if (fileSize < STREAMING_BUF_LENGTH*sizeof(s16)) {
-			size_t fillerSize = 0;
-			while (fileSize+fillerSize < STREAMING_BUF_LENGTH*sizeof(s16)) {
-				fillerSize++;
-			}
-			fread((void*)(play_stream_buf+fileSize), 1, fillerSize, stream_source);
-
-			// Fill the next section premptively
-			fread((void*)fill_stream_buf, sizeof(s16), STREAMING_BUF_LENGTH, stream_source);
-
-			loopingPoint = true;
-		} else {
-			// Fill the next section premptively
-			fread((void*)fill_stream_buf, sizeof(s16), STREAMING_BUF_LENGTH, stream_start_source);
-			fileSize -= STREAMING_BUF_LENGTH*sizeof(s16);
-			if (fileSize < STREAMING_BUF_LENGTH*sizeof(s16)) {
-				size_t fillerSize = 0;
-				while (fileSize+fillerSize < STREAMING_BUF_LENGTH*sizeof(s16)) {
-					fillerSize++;
-				}
-				fread((void*)(fill_stream_buf+fileSize), 1, fillerSize, stream_source);
-
-				loopingPoint = true;
-			}
-		}
-	} else {
-		// Prep the first section of the stream
-		fread((void*)play_stream_buf, sizeof(s16), STREAMING_BUF_LENGTH, stream_source);
-
-		// Fill the next section premptively
-		fread((void*)fill_stream_buf, sizeof(s16), STREAMING_BUF_LENGTH, stream_source);
-
-		loopingPoint = true;
+	// Start with at least two seconds (three at the default 16 kHz), retaining
+	// the complete former capacity for refills during normal menu operations.
+	const unsigned initial = std::min<unsigned>(STREAMING_BUF_LENGTH,
+		std::max<unsigned>(48000, stream.sampling_rate * 2));
+	while (streaming_ring.queued < initial) {
+		const unsigned before = streaming_ring.queued;
+		fillStream(initial - before);
+		if (streaming_ring.queued == before) break;
 	}
 }
 
@@ -484,23 +435,20 @@ void SoundControl::stopStream() {
 }
 
 void SoundControl::unloadStream() {
-	if (!stream_source || !stream_is_playing) return;
-
+	if (stream_is_playing) mmStreamClose();
 	stream_is_playing = false;
-	mmStreamClose();
-	stream_source = NULL;
+	if (stream_start_source) fclose(stream_start_source);
+	if (stream_source) fclose(stream_source);
+	stream_start_source = stream_source = nullptr;
 	free_streaming_buf();
 }
 
 void SoundControl::fadeOutStream(bool fast) {
-	//fade_out = true; // Bugged
 	fifoSendValue32(FIFO_USER_01, fast ? 2 : 1); // Fade out on ARM7 side
 }
 
 void SoundControl::cancelFadeOutStream() {
 	fifoSendValue32(FIFO_USER_01, 0);
-	//fade_out = false;
-	//fade_counter = FADE_STEPS;
 }
 
 void SoundControl::setStreamDelay(u32 delay) {
@@ -508,28 +456,22 @@ void SoundControl::setStreamDelay(u32 delay) {
 }
 
 
-// Samples remaining in the fill buffer.
-#define SAMPLES_LEFT_TO_FILL (abs(STREAMING_BUF_LENGTH - filled_samples))
-
-// Samples that were already streamed and need to be refilled into the buffer.
-#define SAMPLES_TO_FILL (abs(streaming_buf_ptr - filled_samples))
-
-// Updates the background music fill buffer
-// Fill the amount of samples that were used up between the
-// last fill request and this.
-
-// Precondition Invariants:
-// filled_samples <= STREAMING_BUF_LENGTH
-// filled_samples <= streaming_buf_ptr
-
-// Postcondition Invariants:
-// filled_samples <= STREAMING_BUF_LENGTH
-// filled_samples <= streaming_buf_ptr
-// fill_requested == false
 static volatile bool stopSoundPending = false;
 
 void queueStopSound() {
 	stopSoundPending = true;
+}
+
+void SoundControl::fillStream(unsigned frames) {
+	const unsigned space = twlmAudioRingWriteSpace(&streaming_ring);
+	frames = std::min(frames, space);
+	if (!frames) return;
+	const unsigned got = pcmStream.read(twlmAudioRingWriteData(&streaming_ring), frames);
+	// IRQ playback may have consumed older frames during the read. Publish only
+	// the completed write, with interrupts masked for the pointer/count update.
+	const int irqState = enterCriticalSection();
+	twlmAudioRingCommit(&streaming_ring, got);
+	leaveCriticalSection(irqState);
 }
 
 void SoundControl::updateStream() {
@@ -538,40 +480,5 @@ void SoundControl::updateStream() {
 	stopSoundPending = false;
 	leaveCriticalSection(irqState);
 	if (playQueuedStop) playStop();
-	
-	if (!stream_is_playing) return;
-	if (fill_requested && filled_samples < STREAMING_BUF_LENGTH) {
-			
-		// Reset the fill request
-		fill_requested = false;
-		int instance_filled = 0;
-
-		// Either fill the max amount, or fill up the buffer as much as possible.
-		int instance_to_fill = std::min(SAMPLES_LEFT_TO_FILL, SAMPLES_TO_FILL);
-
-		// If we don't read enough samples, loop from the beginning of the file.
-		instance_filled = fread((s16*)fill_stream_buf + filled_samples, sizeof(s16), instance_to_fill, loopingPoint ? stream_source : stream_start_source);		
-		if (instance_filled < instance_to_fill) {
-			fseek(stream_source, seekPos, SEEK_SET);
-			instance_filled += fread((s16*)fill_stream_buf + filled_samples + instance_filled,
-				 sizeof(s16), (instance_to_fill - instance_filled), stream_source);
-			loopingPoint = true;
-		}
-
-		#ifdef SOUND_DEBUG
-		sprintf(debug_buf, "FC: SAMPLES_LEFT_TO_FILL: %li, SAMPLES_TO_FILL: %li, instance_filled: %i, filled_samples %li, to_fill: %i", SAMPLES_LEFT_TO_FILL, SAMPLES_TO_FILL, instance_filled, filled_samples, instance_to_fill);
-    	nocashMessage(debug_buf);
-		#endif
-
-		// maintain invariant 0 < filled_samples <= STREAMING_BUF_LENGTH
-		filled_samples = std::min<s32>(filled_samples + instance_filled, STREAMING_BUF_LENGTH);
-
-	
-	} else if (fill_requested && filled_samples >= STREAMING_BUF_LENGTH) {
-		// filled_samples == STREAMING_BUF_LENGTH is the only possible case
-		// but we'll keep it at gte to be safe.
-		filled_samples = 0;
-		// fill_count = 0;
-	}
-
+	if (stream_is_playing) fillStream(STREAMING_REFILL_FRAMES);
 }

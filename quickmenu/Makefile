@@ -12,6 +12,7 @@ NITRODATA	:=	nitrofiles
 
 TWLM_ROOT ?= $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/..)
 include $(TWLM_ROOT)/universal/blocksds.mk
+include $(TWLM_ROOT)/universal/languagepacks.mk
 
 # Favorite-color topbar/marker PNGs contain appended palette variants and
 # retain their runtime palette selection. Only ordinary built-in PNGs use PHT.

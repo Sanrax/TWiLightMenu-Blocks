@@ -12,6 +12,7 @@ NITRODATA		:=	nitrofiles
 
 TWLM_ROOT ?= $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/..)
 include $(TWLM_ROOT)/universal/blocksds.mk
+include $(TWLM_ROOT)/universal/languagepacks.mk
 
 INDEXED_PNG_INPUTS := $(wildcard nitrofiles/languages/*/photo_default.png nitrofiles/themes/*/*/*/*.png)
 INDEXED_PNG_OUTPUTS := $(INDEXED_PNG_INPUTS:.png=.pht)

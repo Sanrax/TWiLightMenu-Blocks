@@ -13,7 +13,8 @@ extern "C" size_t __wrap_fread(void *out, size_t size, size_t count, FILE *file)
     return __real_fread(out, size, count, file);
 }
 
-// Frozen small-read implementation: compare every bundled font's map bytes.
+// Small-read reference: compare every bundled font's map bytes. The indexed
+// form also skips NFTR's unmapped marker, used by the compact bundled maps.
 static void legacyMap(FILE *file, uint16_t *fontMap, uint32_t fileSize) {
 	fseek(file, 0x28, SEEK_SET);
 	uint32_t locPAMC, mapType;
@@ -39,7 +40,7 @@ static void legacyMap(FILE *file, uint16_t *fontMap, uint32_t fileSize) {
 				for (int i=firstChar;i<=lastChar;i++) {
 					uint16_t tile;
 					fread(&tile, 2, 1, file);
-					fontMap[tile] = i;
+					if (tile != 0xFFFF) fontMap[tile] = i;
 				}
 				break;
 			} case 2: {

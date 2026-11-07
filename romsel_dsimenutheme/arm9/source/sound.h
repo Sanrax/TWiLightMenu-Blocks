@@ -6,6 +6,7 @@
 #include <maxmod9.h>
 #include "common/singleton.h"
 #include <cstdio>
+#include "common/pcmStream.h"
 
 // Called by VBlank; playback happens on the main thread in updateStream().
 void queueStopSound();
@@ -74,10 +75,11 @@ class SoundControl {
         u16 loadedEffects;
         const char* sfxFilePath;
         bool stream_is_playing;
-        bool loopingPoint;
+        twlm::PcmStream pcmStream;
+        void fillStream(unsigned frames);
         //mm_sound_effect snd_loading;
         mm_sound_effect mus_startup;
-        FILE* stream_start_source;
+        FILE* stream_start_source = nullptr;
         FILE* stream_source;
         u32 startup_sample_length;
         u32 seekPos;
