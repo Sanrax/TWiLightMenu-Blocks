@@ -17,6 +17,46 @@
 **TW**i**L**ight Menu++ is an open-source DSi Menu upgrade/replacement for the Nintendo DSi, the Nintendo 3DS, and Nintendo DS flashcards.
 It can launch games for the Nintendo DS, Nintendo DSi, and GameBoy Advance, as well as DSTWO plugins (if you use a DSTWO).
 
+# Changes in this fork
+
+[TWiLightMenu-Blocks](https://github.com/Sanrax/TWiLightMenu-Blocks) ports TWiLight
+Menu++ to BlocksDS and reduces startup, folder-browsing and menu-switching work.
+All live themes, nds-bootstrap, pico-loader and argv/configured-emulator launching
+are retained. The fork diverged at upstream
+[`e3afe19ca`](https://github.com/DS-Homebrew/TWiLightMenu/commit/e3afe19ca).
+
+## BlocksDS port
+
+- Builds with **BlocksDS 1.24.0** and Wonderful Toolchain, including custom ARM7
+  cores, memory layouts, loaders, Docker/CI and flashcard autoboot variants.
+- Uses native NitroFS and FatFS, with the existing DLDI/SD/NAND drivers and a
+  separate bootstrap filesystem. Fixes DSi SD transfers/reset synchronization,
+  IRQ/FIFO work, palettes, Settings sleep recovery and power-button reboot.
+- Preserves device selection and launch arguments; fixes absolute argv paths,
+  bootstrap-version detection and missing soft-reset-state handling.
+- Adds host regression tests, linked-image checks and reproducible test packaging.
+
+Follow the [BlocksDS build and compatibility notes](docs/blocksds-port.md)
+for this fork. The upstream README and devkitPro instructions below are retained
+unchanged for reference.
+
+## Optimizations
+
+| Area | Changes and observed improvement | Code map |
+| --- | --- | --- |
+| Browsing | Visible-entry banners/selected box art, reusable icons, cheaper directory enumeration and cached clock/date text. First-page metadata 358 → 88 ms; 500-entry directory phase 185 → 99 ms. | [Browsing/common work](docs/optimizations.md#browsing-and-common-work) |
+| Loaders and graphics | FAT-sector caches/batched reads, indexed built-in images, sequential GRF reads, cached NitroFS file IDs and background reuse. Loader read phase 1.15 → 0.40 s; latest DSi graphics phase 173 → 69 ms. | [Startup/assets](docs/optimizations.md#startup-assets-and-transitions) |
+| Menu transitions | Remove loading overlays/redundant waits, retain icon-row fades, compress DS Classic art and overlap Settings fades. Classic startup 1.13 → 0.56 s; Settings exit phase 1.44 → 0.45 s. | [Transitions](docs/optimizations.md#startup-assets-and-transitions) |
+| Language and fonts | Build prepared translations, batch/compact NFTR maps and page persistent DSi glyph caches. Browser language 54 → 8 ms; DSi font setup 569 → 78 ms. | [Language/fonts](docs/optimizations.md#language-fonts-and-audio) |
+| Audio | Defer large SFX and refill a circular PCM queue on the main thread. Initial SFX data 435,500 → 183,424 bytes; DSi music setup 88 → 24 ms at unchanged queue capacity. | [Audio](docs/optimizations.md#language-fonts-and-audio) |
+
+Figures are paired **melonDS 1.1 phase measurements**, using different baselines;
+they cannot be summed and are not hardware cold-boot claims. The
+[optimization map](docs/optimizations.md) lists each change, affected behavior,
+implementation files, test coverage and measurement scope for upstream developers.
+[Phase data](docs/benchmarks/startup.json) is included. Broader hardware coverage
+and the unchanged upstream DSi-mode Quit Game issue are documented in the port notes.
+
 # Add-ons
 
 Additional features can be added on to **TW**i**L**ight Menu++. See [this page](https://wiki.ds-homebrew.com/twilightmenu/installing-addons) for more information.
@@ -25,9 +65,11 @@ Additional features can be added on to **TW**i**L**ight Menu++. See [this page](
 
 ## Setting up
 
-This fork builds with [BlocksDS 1.24.0](https://blocksds.skylyrac.net/docs/setup/) and its Wonderful Toolchain, plus Python 3, GNU Make, and a host C/C++ compiler. BlocksDS includes libnds, Maxmod, grit, mmutil, ndstool and DLDI tools. The filesystem adapter is pinned to the FatFS ABI in this SDK release.
-
-The default paths are `/opt/blocksds/core` and `/opt/wonderful`. Set `BLOCKSDS` and `WONDERFUL_TOOLCHAIN` if your installation uses other locations.
+Compiling this app requires devkitPro's devkitARM, libnds, grit, and mmutil. These can be installed using [devkitPro pacman](https://devkitpro.org/wiki/devkitPro_pacman) with the following command:
+```
+sudo dkp-pacman -S nds-dev
+```
+(Note: Command will vary by OS, sudo may not be needed and it may be just `pacman` instead.)
 
 ## Cloning
 The repository contains submodules, so you need to clone recursively:
@@ -42,15 +84,13 @@ git submodule update --init --recursive
 
 ## Building
 
-Once you have BlocksDS installed you can build the entirety of TWiLight Menu++ by simply running `make package` in the root of the repository. If you only want to build a specific part of TWiLight Menu++ you can `cd` to that folder and run `make dist`.
-
-Use `make -j6 all` to compile every component, `make test` to run the host regression tests, and `make check-build` to validate the linked images. See [the port notes](docs/blocksds-port.md) for compatibility details and validation.
+Once you have devkitPro's toolchains installed you can build the entirety of TWiLight Menu++ by simply running `make package` in the root of the repository. If you only want to build a specific part of TWiLight Menu++ you can `cd` to that folder and run `make dist`.
 
 Once it finishes building, the output files will be in the `7zfile` folder following the same directory structure as the official `TWiLightMenu.7z` builds.
 
 ## Using Docker
 
-Using the included [Docker](https://docker.com) image, you can easily compile TWiLight Menu++ without having to manually set up the required version of BlocksDS using the provided PowerShell (`.ps1`) scripts.
+Using the included [Docker](https://docker.com) image, you can easily compile TWiLight Menu++ without having to manually set up the required version of devkitARM using the provided PowerShell (`.ps1`) scripts.
 
 The script accepts `make` arguments as well. For example, `.\compile_docker.ps1 clean` will clean the directories of all the compiled code. If you would like to build all artifacts, run `.\compile_docker.ps1 package`.
 

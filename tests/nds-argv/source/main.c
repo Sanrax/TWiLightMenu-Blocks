@@ -65,5 +65,10 @@ int main(int argc, char **argv) {
     }
     if (out) fclose(out);
     if (mounted) checkStorage(device);
-    while (1) swiWaitForVBlank();
+    printf("Press B to return to the menu.\n");
+    while (1) {
+        swiWaitForVBlank();
+        scanKeys();
+        if (keysDown() & KEY_B) return 0;
+    }
 }

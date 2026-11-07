@@ -214,7 +214,7 @@ int runNds (
 	VRAM_D_CR = VRAM_ENABLE | VRAM_D_LCD;
 	// Load the loader/patcher into the correct address
 	tonccpy (LCDC_BANK_D, loader, loaderSize);
-	toncset (LCDC_BANK_D+loaderSize, 0, 0x18000-loaderSize);
+	toncset ((u8*)LCDC_BANK_D + loaderSize, 0, 0x18000 - loaderSize);
 
 	// Set the parameters for the loader
 	// STORED_FILE_CLUSTER = cluster;

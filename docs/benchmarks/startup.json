@@ -1,0 +1,370 @@
+{
+  "measured_with": "melonDS 1.1; BlocksDS 1.24.0; collected 2026-11-05 through 2026-11-07",
+  "scope": "Paired emulator phases, not hardware cold boots; different comparisons use different baselines/fixtures and must not be summed",
+  "fixtures": "DS or DSi DLDI as indicated; English defaults, matching card image, music and fonts unless case label says otherwise; clock large case contains 500 NDS entries",
+  "units": "microseconds except explicitly named byte/block/read counts",
+  "clock_directory": {
+    "small-baseline": {
+      "total_us": 715633,
+      "directory_us": 17843,
+      "background_name_date_us": 54388
+    },
+    "small-clock": {
+      "total_us": 698032,
+      "directory_us": 8863,
+      "background_name_date_us": 49319
+    },
+    "small-hidden": {
+      "total_us": 698034,
+      "directory_us": 8768,
+      "background_name_date_us": 48516
+    },
+    "large-baseline": {
+      "total_us": 917045,
+      "directory_us": 185460,
+      "background_name_date_us": 53396
+    },
+    "large-clock": {
+      "total_us": 817316,
+      "directory_us": 100462,
+      "background_name_date_us": 48749
+    },
+    "large-hidden": {
+      "total_us": 817317,
+      "directory_us": 99313,
+      "background_name_date_us": 48495
+    },
+    "3ds-large-baseline": {
+      "total_us": 832960,
+      "directory_us": 185517,
+      "background_name_date_us": 48556
+    },
+    "3ds-large-clock": {
+      "total_us": 766474,
+      "directory_us": 100386,
+      "background_name_date_us": 58342
+    },
+    "3ds-large-hidden": {
+      "total_us": 750832,
+      "directory_us": 99244,
+      "background_name_date_us": 48525
+    }
+  },
+  "font_compaction": {
+    "blocks_before": 62,
+    "blocks_after": 29,
+    "map_reads_before": 266,
+    "map_reads_after": 165,
+    "bytes_saved_per_font": 19536,
+    "glyph_width_settings_maps": "original golden identities preserved"
+  },
+  "font_paging": {
+    "dsi-menu-1-eager": {
+      "total_us": 1042167,
+      "font_us": 569200
+    },
+    "dsi-menu-1-pages": {
+      "total_us": 557210,
+      "font_us": 78154
+    },
+    "dsi-menu-0-eager": {
+      "total_us": 1042169,
+      "font_us": 569200
+    },
+    "dsi-menu-0-pages": {
+      "total_us": 557209,
+      "font_us": 78154
+    },
+    "dsi-menu-16-eager": {
+      "total_us": 1042170,
+      "font_us": 569198
+    },
+    "dsi-menu-16-pages": {
+      "total_us": 557210,
+      "font_us": 78154
+    },
+    "dsi-settings-1-eager": {
+      "total_us": 640109,
+      "font_us": 561731
+    },
+    "dsi-settings-1-pages": {
+      "total_us": 150305,
+      "font_us": 69447
+    },
+    "dsi-settings-0-eager": {
+      "total_us": 637229,
+      "font_us": 561731
+    },
+    "dsi-settings-0-pages": {
+      "total_us": 153306,
+      "font_us": 69447
+    },
+    "dsi-settings-16-eager": {
+      "total_us": 643232,
+      "font_us": 561731
+    },
+    "dsi-settings-16-pages": {
+      "total_us": 153969,
+      "font_us": 69447
+    },
+    "ds-menu-1-eager": {
+      "total_us": 682392,
+      "font_us": 95081
+    },
+    "ds-menu-1-pages": {
+      "total_us": 682390,
+      "font_us": 95940
+    },
+    "ds-settings-1-eager": {
+      "total_us": 239244,
+      "font_us": 86785
+    },
+    "ds-settings-1-pages": {
+      "total_us": 235330,
+      "font_us": 85801
+    },
+    "dsi-menu-24-eager": {
+      "total_us": 1042168,
+      "font_us": 569198
+    },
+    "dsi-menu-24-pages": {
+      "total_us": 557224,
+      "font_us": 78154
+    },
+    "dsi-settings-24-eager": {
+      "total_us": 646380,
+      "font_us": 561731
+    },
+    "dsi-settings-24-pages": {
+      "total_us": 159519,
+      "font_us": 69447
+    }
+  },
+  "audio_queue": {
+    "dsi-theme0-music1-eager": {
+      "total_us": 557210,
+      "sound_us": 88358
+    },
+    "dsi-theme0-music1-ring": {
+      "total_us": 488770,
+      "sound_us": 23666
+    },
+    "ds-theme0-music1-eager": {
+      "total_us": 682390,
+      "sound_us": 92029
+    },
+    "ds-theme0-music1-ring": {
+      "total_us": 613951,
+      "sound_us": 25235
+    }
+  },
+  "nitro_graphics": {
+    "dsi-baseline": {
+      "total_us": 488770,
+      "graphics_load_us": 173089,
+      "phases": {
+        "background textures": 29070,
+        "UI textures": 24086,
+        "volume textures": 21777,
+        "battery textures": 30206,
+        "sprite textures": 55245,
+        "sprite palettes": 11101,
+        "sprite uploads": 1604
+      }
+    },
+    "dsi-cache": {
+      "total_us": 389041,
+      "graphics_load_us": 69094,
+      "phases": {
+        "background textures": 23465,
+        "UI textures": 10802,
+        "volume textures": 4204,
+        "battery textures": 5314,
+        "sprite textures": 21885,
+        "sprite palettes": 1791,
+        "sprite uploads": 1633
+      }
+    },
+    "dsi-3ds-baseline": {
+      "total_us": 439880,
+      "graphics_load_us": 146517,
+      "phases": {
+        "background textures": 24942,
+        "UI textures": 24148,
+        "volume textures": 21412,
+        "battery textures": 30176,
+        "sprite textures": 43101,
+        "sprite palettes": 1583,
+        "sprite uploads": 1155
+      }
+    },
+    "dsi-3ds-cache": {
+      "total_us": 355798,
+      "graphics_load_us": 64012,
+      "phases": {
+        "background textures": 21152,
+        "UI textures": 10495,
+        "volume textures": 4191,
+        "battery textures": 5317,
+        "sprite textures": 20071,
+        "sprite palettes": 1608,
+        "sprite uploads": 1178
+      }
+    },
+    "ds-baseline": {
+      "total_us": 613951,
+      "graphics_load_us": 182648,
+      "phases": {
+        "background textures": 49044,
+        "UI textures": 28747,
+        "volume textures": 2,
+        "battery textures": 25328,
+        "sprite textures": 63746,
+        "sprite palettes": 12817,
+        "sprite uploads": 2964
+      }
+    },
+    "ds-cache": {
+      "total_us": 514223,
+      "graphics_load_us": 93933,
+      "phases": {
+        "background textures": 42837,
+        "UI textures": 13886,
+        "volume textures": 2,
+        "battery textures": 6226,
+        "sprite textures": 25717,
+        "sprite palettes": 2194,
+        "sprite uploads": 3071
+      }
+    },
+    "ds-3ds-baseline": {
+      "total_us": 531822,
+      "graphics_load_us": 154984,
+      "phases": {
+        "background textures": 44534,
+        "UI textures": 28977,
+        "volume textures": 2,
+        "battery textures": 25307,
+        "sprite textures": 52203,
+        "sprite palettes": 1830,
+        "sprite uploads": 2131
+      }
+    },
+    "ds-3ds-cache": {
+      "total_us": 463378,
+      "graphics_load_us": 90277,
+      "phases": {
+        "background textures": 40332,
+        "UI textures": 13371,
+        "volume textures": 2,
+        "battery textures": 6236,
+        "sprite textures": 26269,
+        "sprite palettes": 1896,
+        "sprite uploads": 2171
+      }
+    },
+    "dsi-macro-baseline": {
+      "total_us": 506369,
+      "graphics_load_us": 188749,
+      "phases": {
+        "background textures": 44708,
+        "UI textures": 24087,
+        "volume textures": 21782,
+        "battery textures": 30220,
+        "sprite textures": 55246,
+        "sprite palettes": 11101,
+        "sprite uploads": 1605
+      }
+    },
+    "dsi-macro-cache": {
+      "total_us": 373395,
+      "graphics_load_us": 69325,
+      "phases": {
+        "background textures": 23680,
+        "UI textures": 10801,
+        "volume textures": 4205,
+        "battery textures": 5310,
+        "sprite textures": 21932,
+        "sprite palettes": 1762,
+        "sprite uploads": 1635
+      }
+    },
+    "custom-png-baseline": {
+      "total_us": 707783,
+      "graphics_load_us": 401180,
+      "phases": {
+        "background textures": 216438,
+        "UI textures": 31219,
+        "volume textures": 28447,
+        "battery textures": 40092,
+        "sprite textures": 80055,
+        "sprite palettes": 3335,
+        "sprite uploads": 1594
+      }
+    },
+    "custom-png-cache": {
+      "total_us": 623697,
+      "graphics_load_us": 306554,
+      "phases": {
+        "background textures": 208007,
+        "UI textures": 19127,
+        "volume textures": 11098,
+        "battery textures": 15424,
+        "sprite textures": 47796,
+        "sprite palettes": 3477,
+        "sprite uploads": 1625
+      }
+    },
+    "custom-grf-font-baseline": {
+      "total_us": 707783,
+      "graphics_load_us": 207290,
+      "phases": {
+        "background textures": 35111,
+        "UI textures": 30441,
+        "volume textures": 27673,
+        "battery textures": 38961,
+        "sprite textures": 71281,
+        "sprite palettes": 2219,
+        "sprite uploads": 1604
+      }
+    },
+    "custom-grf-font-cache": {
+      "total_us": 623697,
+      "graphics_load_us": 125071,
+      "phases": {
+        "background textures": 29885,
+        "UI textures": 25161,
+        "volume textures": 10345,
+        "battery textures": 13633,
+        "sprite textures": 42166,
+        "sprite palettes": 2248,
+        "sprite uploads": 1633
+      }
+    }
+  },
+  "graphics_bottom_screen_comparisons": {
+    "dsi": {
+      "changed_pixels": 0
+    },
+    "dsi-3ds": {
+      "changed_pixels": 0,
+      "changed_outside_animated_focus": 0
+    },
+    "ds": {
+      "changed_pixels": 0
+    },
+    "ds-3ds": {
+      "changed_pixels": 0,
+      "changed_outside_animated_focus": 0
+    },
+    "dsi-macro": {
+      "changed_pixels": 0
+    },
+    "custom-png": {
+      "changed_pixels": 0
+    },
+    "custom-grf-font": {
+      "changed_pixels": 0
+    }
+  }
+}

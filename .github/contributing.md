@@ -20,4 +20,4 @@ Before you submit a pull request from your forked repo, check that it meets thes
 
 ## Setting up your environment
 
-This fork uses BlocksDS 1.24.0 and Wonderful Toolchain. See the [build instructions](../README.md#compiling) and [port notes](../docs/blocksds-port.md). Run `make test`, `make -j6 all`, and `make check-build` before submitting changes.
+This fork uses BlocksDS 1.24.0 and Wonderful Toolchain. See the [build instructions](../docs/blocksds-port.md#build-this-fork) and [port notes](../docs/blocksds-port.md). Run `make test`, `make -j6 all`, and `make check-build` before submitting changes.
