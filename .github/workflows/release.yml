@@ -164,10 +164,9 @@ jobs:
           curl -LO https://github.com/DS-Homebrew/jEnesisDSPlus/releases/latest/download/jEnesisDSPlus.nds
           curl -LO https://github.com/DS-Homebrew/jEnesisDSPlus/releases/latest/download/jEnesisDSPlus_macro.nds
           curl -LO https://github.com/Sanrax/snemulds-shim/releases/latest/download/snemulds-shim.nds
-          curl -LO https://sanrax.github.io/flashcart-guides/assets/SNEmulDS%200.6d%200.6a%20TWL-NTR.zip
-          7z x "SNEmulDS 0.6d 0.6a TWL-NTR.zip" SNEmulDS.nds
-          7z x "SNEmulDS 0.6d 0.6a TWL-NTR.zip" SNEmulDS.srl
-          rm "SNEmulDS 0.6d 0.6a TWL-NTR.zip"
+          curl -fL -o SNEmulDS_0.6d_TWL-NTR.zip "https://sanrax.github.io/flashcart-guides/assets/SNEmulDS%200.6d%200.6a%20TWL-NTR.zip"
+          7z x SNEmulDS_0.6d_TWL-NTR.zip SNEmulDS.nds SNEmulDS.srl
+          rm SNEmulDS_0.6d_TWL-NTR.zip
           curl -LO https://github.com/DS-Homebrew/NesDS/releases/latest/download/nesDS.nds
           curl -LO https://github.com/FluBBaOfWard/S8DS/releases/latest/download/S8DS.zip
           7z x S8DS.zip S8DS.nds
@@ -233,10 +232,9 @@ jobs:
           curl -LO https://github.com/DS-Homebrew/jEnesisDSPlus/releases/latest/download/jEnesisDSPlus.nds
           curl -LO https://github.com/DS-Homebrew/jEnesisDSPlus/releases/latest/download/jEnesisDSPlus_macro.nds
           curl -LO https://github.com/Sanrax/snemulds-shim/releases/latest/download/snemulds-shim.nds
-          curl -LO https://sanrax.github.io/flashcart-guides/assets/SNEmulDS%200.6d%200.6a%20TWL-NTR.zip
-          7z x "SNEmulDS 0.6d 0.6a TWL-NTR.zip" SNEmulDS.nds
-          7z x "SNEmulDS 0.6d 0.6a TWL-NTR.zip" SNEmulDS.srl
-          rm "SNEmulDS 0.6d 0.6a TWL-NTR.zip"
+          curl -fL -o SNEmulDS.zip "https://sanrax.github.io/flashcart-guides/assets/SNEmulDS%200.6d%200.6a%20TWL-NTR.zip"
+          7z x SNEmulDS.zip SNEmulDS.nds SNEmulDS.srl
+          rm SNEmulDS.zip
           curl -LO https://github.com/DS-Homebrew/NesDS/releases/latest/download/nesDS.nds
           curl -LO https://github.com/FluBBaOfWard/S8DS/releases/latest/download/S8DS.zip
           7z x S8DS.zip S8DS.nds
