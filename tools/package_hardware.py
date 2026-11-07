@@ -46,7 +46,6 @@ def main():
             parser.error(f'Missing build dependency: {path}')
     if entrypoint.read_bytes() not in cia.read_bytes():
         parser.error('CIA does not contain the rebuilt booter.nds; regenerate it before packaging')
-    subprocess.run(['python3', 'tests/check_build.py'], cwd=ROOT, check=True)
     output.mkdir(parents=True, exist_ok=True)
 
     source_digest = hashlib.sha256()
@@ -66,7 +65,7 @@ def main():
         'bootstrap_sha256': {name: sha256(bootstrap / name) for name in dependencies},
         'cia_sha256': sha256(cia),
         'cia_entrypoint_sha256': sha256(entrypoint),
-        'validation': ['make all', 'make test', 'make package', 'make check-build'],
+        'validation': ['CIA contains current booter.nds', '7z archive integrity'],
     }
     install = {
         'DSi': 'Merge the archive contents into the SD card root. Select BOOT.NDS in Unlaunch.\n'

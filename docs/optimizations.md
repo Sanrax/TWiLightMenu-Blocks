@@ -10,7 +10,8 @@ Startup means ARM9 `main()` to the first interactive frame unless a narrower
 phase is named; it excludes preceding loaders/title/SDK startup. Rows use
 different baselines and must not be added into an overall speedup. Hardware
 cold-boot gains have not been quantified. [Phase data](https://github.com/Sanrax/TWiLightMenu-Blocks/blob/diagnostics/docs/benchmarks/startup.json)
-and the host tests preserve the comparison evidence without BIOS, NAND or ROMs.
+and the diagnostics branch's host tests preserve the comparison evidence without
+BIOS, NAND or ROMs.
 
 ## Browsing and common work
 
@@ -48,20 +49,17 @@ and the host tests preserve the comparison evidence without BIOS, NAND or ROMs.
 
 ## Verifying and measuring
 
-Production regression checks remain on `master`:
-
-```sh
-make test
-make check-build
-```
-
-Profiling targets, timing markers, boot/SD traces, the argv homebrew probe and
+Agent regression tests, linked-image checks, profiling targets, timing markers,
+boot/SD traces, the argv homebrew probe and
 measurement records live on the [`diagnostics` branch](https://github.com/Sanrax/TWiLightMenu-Blocks/blob/diagnostics/docs/diagnostics.md).
-Use its instructions when measuring; `master` contains no runtime instrumentation.
+Use its instructions to run checks or measurements manually. `master` contains
+no test files or runtime instrumentation, and builds and GitHub Actions do not
+run these checks.
 
 Host coverage maps directly to changes: `loaderfat`, `ndsmetadata`, `inifile`,
 `clocktext`, `photo`/`menuimage`/`texture`/`nitrofile`, `language`/`languagepack`,
-`fontmap`/`nftrcompact`/`glyphpages`, and `soundbank`/`audiostream` in [tests](../tests/).
+`fontmap`/`nftrcompact`/`glyphpages`, and `soundbank`/`audiostream` in
+[diagnostics tests](https://github.com/Sanrax/TWiLightMenu-Blocks/tree/diagnostics/tests).
 The final graphics pass has seven pixel-identical paired bottom-screen captures,
 including DS/DSi modes, both UIs, macro mode and external PNG/GRF/font skins.
 Hardware results and remaining coverage are listed in the port notes.

@@ -31,7 +31,7 @@ jobs:
           apt-get update
           apt-get install python3 g++ -y
 
-      - name: Build test
+      - name: Build TWiLightMenu++
         run: |
           make package
 

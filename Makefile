@@ -11,14 +11,6 @@ export PROJECT	:=	$(CURDIR)
 #---------------------------------------------------------------------------------
 .PHONY: all package booter booter_fc 3dssplash gbapatcher quickmenu manual imageview resources romsel_aktheme romsel_dsimenutheme romsel_r4theme settings slot1launch title
 
-.PHONY: test
-test:
-	python3 tests/run.py
-
-.PHONY: check-build
-check-build:
-	python3 tests/check_build.py
-
 all:	booter booter_fc 3dssplash gbapatcher quickmenu manual imageview resources romsel_aktheme romsel_dsimenutheme romsel_r4theme settings slot1launch title
 
 # Shared loaders must finish before parallel component builds copy their binaries.

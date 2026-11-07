@@ -18,8 +18,6 @@ because the storage adapter uses its internal FatFS ABI.
 git clone --recursive https://github.com/Sanrax/TWiLightMenu-Blocks.git
 cd TWiLightMenu-Blocks
 make -j6 all
-make test
-make check-build
 make package
 ```
 
@@ -51,10 +49,6 @@ Legacy autoboot wrappers retain their card-specific formats and addresses.
 
 ## Validation and boundaries
 
-- `make test`: host checks for storage/IPC, I2C/power, FAT loaders, launch
-  arguments, INIs/translations, fonts, textures/photos, music queues and encoding.
-- `make check-build`: 18 NDS headers, DLDI allocations, palette sizes, MPU setup,
-  IRQ sound dispatch and ARM-state functions in seven ARM9 loader images.
 - melonDS 1.1: normal/ALT chains, DSi/3DS/Wood/R4 UIs, Settings/DS Classic
   round trips, lid recovery, argv/configured emulators, internal SD/NAND discovery,
   Unlaunch SD boot and retail bootstrap in DS flashcard mode.
@@ -81,17 +75,19 @@ from the current `booter.nds` using `booter/make_cia`, extract official bootstra
 python3 tools/package_hardware.py --bootstrap path/to/nds-bootstrap --cia booter/booter.cia
 ```
 
-The tool checks linked images and CIA contents, bundles exact bootstrap binaries,
+The tool checks CIA contents and archive integrity, bundles exact bootstrap binaries,
 and records hashes/source provenance under `build/hardware-test/dist/`.
 It takes no user settings, games, saves, NAND or BIOS as inputs. Emulator add-ons
 remain separate. Preserve settings and saves when installing an overlay.
 
-Boot diagnostics, startup profiling and homebrew launch probes are maintained on
+Agent regression tests, linked-image checks, boot diagnostics, startup profiling
+and homebrew launch probes are maintained on
 the [`diagnostics` branch](https://github.com/Sanrax/TWiLightMenu-Blocks/blob/diagnostics/docs/diagnostics.md).
-Production `master` retains the port fixes and regression tests without runtime
-trace calls, SD snapshots or measurement targets.
+They run manually there; production builds, packaging and GitHub Actions do not
+invoke them. Production `master` retains the port fixes without test files,
+runtime trace calls, SD snapshots or measurement targets.
 
-Repository-only changes include host tests, the licensed vendored R4 encoder,
+Repository-only changes include the licensed vendored R4 encoder,
 build/provenance tooling and ignored generated files. The initial fork removed
 `AI-GUIDELINES.md`; that changes no runtime feature. The three existing upstream
 commits on the destination fork are retained, including homebrew-return and

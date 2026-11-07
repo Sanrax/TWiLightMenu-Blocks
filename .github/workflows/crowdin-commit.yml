@@ -43,7 +43,7 @@ jobs:
         run: git pull origin master --ff-only # Pull origin in case a commit has been done while updating
 
       # This makes sure that the app actually builds before pushing to master
-      - name: Build test
+      - name: Build TWiLightMenu++
         run: |
           make package
 
