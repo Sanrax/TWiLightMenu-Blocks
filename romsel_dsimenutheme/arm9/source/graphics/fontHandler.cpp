@@ -1,4 +1,5 @@
 #include "fontHandler.h"
+#include "graphics.h"
 
 #include <nds/arm9/dldi.h>
 #include <list>
@@ -210,8 +211,13 @@ void updateText(bool top) {
 	}
 	text.clear();
 
-	// Copy buffer to the screen
-	tonccpy(bgGetGfxPtr(top ? 6 : 2), FontGraphic::textBuf[top], 256 * 192);
+	// Navigation prepares the next title in RAM and publishes it with the icons.
+	if (!menuContentUpdating())
+		copyTextToScreen();
+}
+
+void copyTextToScreen() {
+	tonccpy(bgGetGfxPtr(2), FontGraphic::textBuf[false], 256 * 192);
 }
 
 void updateTextImg(u16* img, bool top) {

@@ -308,8 +308,7 @@ void SoundControl::loadStream(const bool prepMsg) {
 							}
 							if (prepMsg && doClearText) {
 								clearText(false);
-								extern void displayNowLoading(void);
-								displayNowLoading();
+								updateText(false);
 							}
 							if (loopableMusic) {
 								fclose(stream_start_source);

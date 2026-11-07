@@ -259,7 +259,7 @@ unique_ptr<glImage[]> ThemeTextures::loadTexture(int *textureId, const Texture &
 
 	u32 texW = texture.texWidth();
 	u32 texH = texture.texHeight();
-	u8 paletteLength = texture.paletteLength();
+	u16 paletteLength = texture.paletteUploadLength();
 
 	if (*textureId != 0) {
 		nocashMessage("Existing texture found!?");
@@ -289,7 +289,7 @@ unique_ptr<glImage[]> ThemeTextures::loadTexture(int *textureId, const Texture &
 void ThemeTextures::reloadPalDialogBox() {
 	if (ms().theme == TWLSettings::EThemeSaturn || ms().theme == TWLSettings::EThemeHBL) return;
 	glBindTexture(0, dialogboxTexID);
-	glColorSubTableEXT(0, 0, _dialogBoxTexture->paletteLength(), 0, 0, _dialogBoxTexture->palette());
+	glColorSubTableEXT(0, 0, _dialogBoxTexture->paletteUploadLength(), 0, 0, _dialogBoxTexture->palette());
 	if (ms().theme != TWLSettings::ETheme3DS) {
 		glBindTexture(0, cornerButtonTexID);
 		glColorSubTableEXT(0, 0, 16, 0, 0, _cornerButtonTexture->palette());
@@ -433,6 +433,7 @@ void ThemeTextures::load3DSTheme() {
 
 	loadVolumeTextures();
 	loadBatteryTextures();
+	startupProfileMark("battery textures");
 
 	_bubbleTexture = std::make_unique<Texture>(TFN_GRF_BUBBLE, TFN_FALLBACK_GRF_BUBBLE);
 	_settingsIconTexture = std::make_unique<Texture>(TFN_GRF_ICON_SETTINGS, TFN_FALLBACK_GRF_ICON_SETTINGS);
@@ -447,7 +448,9 @@ void ThemeTextures::load3DSTheme() {
 	_startBorderTexture = std::make_unique<Texture>(TFN_GRF_CURSOR, TFN_FALLBACK_GRF_CURSOR);
 	_dialogBoxTexture = std::make_unique<Texture>(TFN_GRF_DIALOGBOX, TFN_FALLBACK_GRF_DIALOGBOX);
 
+	startupProfileMark("sprite textures");
 	applyUserPaletteToAllGrfTextures();
+	startupProfileMark("sprite palettes");
 
 	loadBubbleImage(*_bubbleTexture, tc().bubbleTipSpriteW(), tc().bubbleTipSpriteH());
 	loadSettingsImage(*_settingsIconTexture);
@@ -461,6 +464,7 @@ void ThemeTextures::load3DSTheme() {
 	loadDialogboxImage(*_dialogBoxTexture);
 	loadProgressImage(*_progressTexture);
 	loadWirelessIcons(*_wirelessIconsTexture);
+	startupProfileMark("sprite uploads");
 }
 
 void ThemeTextures::loadDSiTheme() {
@@ -475,6 +479,7 @@ void ThemeTextures::loadDSiTheme() {
 	loadVolumeTextures();
 	//iprintf("loadBatteryTextures()\n");
 	loadBatteryTextures();
+	startupProfileMark("battery textures");
 
 	_bipsTexture = std::make_unique<Texture>(TFN_GRF_BIPS, TFN_FALLBACK_GRF_BIPS);
 	_boxTexture = std::make_unique<Texture>(TFN_GRF_BOX, TFN_FALLBACK_GRF_BOX);
@@ -499,7 +504,9 @@ void ThemeTextures::loadDSiTheme() {
 	_manualIconTexture = std::make_unique<Texture>(TFN_GRF_ICON_MANUAL, TFN_FALLBACK_GRF_ICON_MANUAL);
 
 	// Apply the DSi palette shifts
+	startupProfileMark("sprite textures");
 	applyUserPaletteToAllGrfTextures();
+	startupProfileMark("sprite palettes");
 
 	//iprintf("loadBipsImage(*_bipsTexture)\n");
 	loadBipsImage(*_bipsTexture);
@@ -544,6 +551,7 @@ void ThemeTextures::loadDSiTheme() {
 	loadProgressImage(*_progressTexture);
 	//iprintf("loadWirelessIcons(*_wirelessIconsTexture)\n");
 	loadWirelessIcons(*_wirelessIconsTexture);
+	startupProfileMark("sprite uploads");
 }
 
 void ThemeTextures::loadVolumeTextures() {
@@ -1007,6 +1015,12 @@ u16 *ThemeTextures::beginBgSubModify() {
 	return _bgSubBuffer;
 }
 
+static bool backgroundDisplayHidden(bool subScreen) {
+	const u16 brightness = subScreen ? REG_MASTER_BRIGHT_SUB : REG_MASTER_BRIGHT;
+	const unsigned mode = brightness >> 14;
+	return (mode == 1 || mode == 2) && (brightness & 31) >= 16;
+}
+
 void ThemeTextures::commitBgSubModify() {
 	if (ms().macroMode)
 		return;
@@ -1019,7 +1033,11 @@ void ThemeTextures::commitBgSubModify() {
 	if (boxArtColorDeband) {
 		DC_FlushRange(_bgSubBuffer2, sizeof(u16) * BG_BUFFER_PIXELCOUNT);
 	}
-	while (REG_VCOUNT != 191); // Fix screen tearing
+	// No scanout synchronization is needed while master brightness hides every
+	// pixel. Startup draws several layers before revealing either screen.
+	if (!backgroundDisplayHidden(true)) {
+		while (REG_VCOUNT != 191); // Fix screen tearing
+	}
 	if (videoOwnsTopBand()) {
 		commitAroundBand(_bgSubBuffer, bgLoc, rocketVideo_videoYpos, false);
 	} else {
@@ -1043,7 +1061,9 @@ void ThemeTextures::commitBgSubModifyAsync() {
 	if (boxArtColorDeband && ndmaEnabled()) {
 		DC_FlushRange(_bgSubBuffer2, sizeof(u16) * BG_BUFFER_PIXELCOUNT);
 	}
-	while (REG_VCOUNT != 191); // Fix screen tearing
+	if (!backgroundDisplayHidden(true)) {
+		while (REG_VCOUNT != 191); // Fix screen tearing
+	}
 	if (videoOwnsTopBand()) {
 		commitAroundBand(_bgSubBuffer, bgLoc, rocketVideo_videoYpos, true);
 	} else {
@@ -1085,7 +1105,9 @@ void ThemeTextures::commitBgMainModify() {
 	// waits while the beam is still scanning out, because drawBottomBg() reaches
 	// here from inside the vblank IRQ -- where REG_VCOUNT is already >= 192 and a
 	// wait-for-191 would spin for very nearly a whole frame with interrupts held.
-	while (REG_VCOUNT < 192);
+	if (!backgroundDisplayHidden(false)) {
+		while (REG_VCOUNT < 192);
+	}
 	if (videoOwnsBottomBand()) {
 		commitAroundBand(_bgMainBuffer, bgLoc, rocketVideo_videoYposBottom, false);
 		invalidateVideoAlphaRows(1, 0, SCREEN_HEIGHT);
@@ -1114,10 +1136,12 @@ void ThemeTextures::commitBgMainModifyAsync() {
 	}*/
 }
 
-void ThemeTextures::drawTopBg() {
+void ThemeTextures::drawInitialTopBg() {
 	beginBgSubModify();
 
-	_backgroundTextures[0].copy(_bgSubBuffer, false);
+	// loadBackgrounds() already decoded this background for GUI restoration.
+	// Startup calls here before the photo or any GUI has modified that copy.
+	tonccpy(_bgSubBuffer, _topBorderBuffer, sizeof(_topBorderBuffer));
 	toncset(_topGuiMask, 0, sizeof(_topGuiMask));
 
 	if (boxArtColorDeband) {

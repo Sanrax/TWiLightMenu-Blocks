@@ -26,6 +26,7 @@
 
 #include <nds/arm7/i2c.h>
 #include <nds/bios.h>
+#include <nds/interrupts.h>
 
 static u32 i2cCurrentDelay = 0;
 
@@ -92,6 +93,10 @@ u8 my_i2cSelectRegister(u8 reg) {
 //---------------------------------------------------------------------------------
 u8 my_i2cWriteRegister(u8 device, u8 reg, u8 data) {
 //---------------------------------------------------------------------------------
+	// The SDK's power-button IRQ also uses I2C. It must not interrupt a
+	// transaction between selecting its device/register and transferring data.
+	const int oldIME = enterCriticalSection();
+	u8 result = 0;
 	my_i2cSetDelay(device);
 	int i;
 
@@ -100,17 +105,23 @@ u8 my_i2cWriteRegister(u8 device, u8 reg, u8 data) {
 			my_i2cDelay();
 			REG_I2CDATA = data;
 			my_i2cStop(0);
-			if (my_i2cGetResult() != 0) return 1;
+			if (my_i2cGetResult() != 0) {
+				result = 1;
+				break;
+			}
 		}
 		REG_I2CCNT = 0xC5;
 	}
 
-	return 0;
+	leaveCriticalSection(oldIME);
+	return result;
 }
 
 //---------------------------------------------------------------------------------
 u8 my_i2cReadRegister(u8 device, u8 reg) {
 //---------------------------------------------------------------------------------
+	const int oldIME = enterCriticalSection();
+	u8 result = 0xff;
 	my_i2cSetDelay(device);
 	int i;
 
@@ -121,12 +132,14 @@ u8 my_i2cReadRegister(u8 device, u8 reg) {
 			if (my_i2cSelectDevice(device | 1)) {
 				my_i2cDelay();
 				my_i2cStop(1);
-				return my_i2cGetData();
+				result = my_i2cGetData();
+				break;
 			}
 		}
 
 		REG_I2CCNT = 0xC5;
 	}
 
-	return 0xff;
+	leaveCriticalSection(oldIME);
+	return result;
 }

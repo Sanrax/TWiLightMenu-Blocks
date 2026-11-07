@@ -74,6 +74,10 @@ class Texture
 		u32 texWidth() const { return _texWidth; };
 		u32 pixelCount() const { return _texHeight * _texWidth; };
 		u8 paletteLength() const { return _type & TextureType::Paletted ? _paletteLength : 0;};
+		u16 paletteUploadLength() const {
+			if (!(_type & TextureType::Paletted)) return 0;
+			return _paletteLength < 16 ? 16 : (_paletteLength + 1) & ~1;
+		}
 		u32 texLength() const { return _texLength; };
 		u32 texCmpLength() const { return _texCmpLength; };
 
@@ -82,11 +86,11 @@ class Texture
 		void copy(u16 *dst, bool vram) const;
 
 	private:
-		TextureType findType(FILE* file);
+		TextureType findType(FILE* file, u32 (&header)[12]);
 		bool loadBitmap(FILE* file) noexcept;
-		void loadPaletted(FILE* file) noexcept;
-		void loadCompressed(FILE* file) noexcept;
+		bool loadGrf(FILE* file, const u32 (&header)[12]) noexcept;
 		bool loadPNG(FILE* file) noexcept;
+		bool loadIndexedPNG(const std::string &basePath) noexcept;
 };
 
 

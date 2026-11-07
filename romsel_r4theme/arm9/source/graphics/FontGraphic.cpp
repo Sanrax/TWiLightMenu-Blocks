@@ -1,4 +1,5 @@
 #include "FontGraphic.h"
+#include "common/nftrFontMap.h"
 
 #include "common/tonccpy.h"
 
@@ -131,47 +132,8 @@ FontGraphic::FontGraphic(const std::vector<std::string> &paths) {
 		// Load character maps
 		fontMap = new u16[tileAmount];
 
-		fseek(file, 0x28, SEEK_SET);
-		u32 locPAMC, mapType;
-		fread(&locPAMC, 4, 1, file);
+		loadNftrCharacterMap(file, fontMap, tileAmount, fileSize);
 
-		while (locPAMC < fileSize) {
-			u16 firstChar, lastChar;
-			fseek(file, locPAMC, SEEK_SET);
-			fread(&firstChar, 2, 1, file);
-			fread(&lastChar, 2, 1, file);
-			fread(&mapType, 4, 1, file);
-			fread(&locPAMC, 4, 1, file);
-
-			switch(mapType) {
-				case 0: {
-					u16 firstTile;
-					fread(&firstTile, 2, 1, file);
-					for (unsigned i=firstChar;i<=lastChar;i++) {
-						fontMap[firstTile+(i-firstChar)] = i;
-					}
-					break;
-				} case 1: {
-					for (int i=firstChar;i<=lastChar;i++) {
-						u16 tile;
-						fread(&tile, 2, 1, file);
-						fontMap[tile] = i;
-					}
-					break;
-				} case 2: {
-					u16 groupAmount;
-					fread(&groupAmount, 2, 1, file);
-					for (int i=0;i<groupAmount;i++) {
-						u16 charNo, tileNo;
-						fread(&charNo, 2, 1, file);
-						fread(&tileNo, 2, 1, file);
-						fontMap[tileNo] = charNo;
-					}
-					break;
-				}
-			}
-		}
-		fclose(file);
 		questionMark = getCharIndex(0xFFFD);
 		if (questionMark == 0)
 			questionMark = getCharIndex('?');
@@ -188,24 +150,7 @@ FontGraphic::~FontGraphic(void) {
 }
 
 u16 FontGraphic::getCharIndex(char16_t c) {
-	// Try a binary search
-	int left = 0;
-	int right = tileAmount;
-
-	while (left <= right) {
-		int mid = left + ((right - left) / 2);
-		if (fontMap[mid] == c) {
-			return mid;
-		}
-
-		if (fontMap[mid] < c) {
-			left = mid + 1;
-		} else {
-			right = mid - 1;
-		}
-	}
-
-	return questionMark;
+	return findNftrGlyph(fontMap, tileAmount, c, questionMark);
 }
 
 std::u16string FontGraphic::utf8to16(std::string_view text) {

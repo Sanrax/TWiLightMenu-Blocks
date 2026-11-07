@@ -13,7 +13,7 @@ include $(TWLM_ROOT)/universal/blocksds.mk
 TARGET		:=	load
 BUILD		?=	build
 SOURCES		:=	source source/patches 
-INCLUDES	:=	build
+INCLUDES	:=	build ../../universal/include
 SPECS		:=  specs
  
 #---------------------------------------------------------------------------------

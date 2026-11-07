@@ -22,6 +22,21 @@ encoder is built from the vendored, licensed source under `tools/r4denc/`;
 devkitPro binaries are no longer required to produce the autoboot packages.
 Archived subprojects under `archived/` are outside this build.
 
+`make -C booter_fc diagnostic` builds an isolated hybrid entry point at
+`booter_fc/booter_fc-diagnostic.nds`. Copy it beside the working entry as
+`BOOT_TEST.NDS` and launch it through Pico-Launcher to investigate the DSi
+flashcard boot failure. It displays startup stages and, after a filesystem
+mount succeeds, writes `_nds/TWiLightMenu/boot-diagnostic.log` on the
+flashcard (or on internal SD when no flashcard mount succeeds). Each run
+replaces this diagnostic log. The normal build contains no stage logging;
+diagnostic objects use a separate directory.
+The `Power/navigation r4` diagnostic records the IPC mailbox, ARM7 SD access,
+card presence and initialization result, followed by sector-read results,
+continuation counts and the last controller/NDMA snapshot. Read traces stay
+in RAM until the filesystem mount returns: writing a log from inside a disk
+callback would reenter the shared FatFS sector cache. An unacknowledged IPC
+request stops disk logging and leaves the diagnostic on screen for a restart.
+
 For hardware-test archives, generate the CIA from the rebuilt `booter.nds`
 using `booter/make_cia`, as in the release workflow. Extract the official
 nds-bootstrap release (the tested version is 2.17.0), then run:
@@ -80,6 +95,33 @@ without closing a null stream.
 
 ## Startup changes
 
+The user confirmed that the r3 ALT and diagnostic entries boot and function
+on DSpico through Pico-Launcher on a DSi LL with console SD inserted. Their
+new log records successful SD initialization, sector reads, filesystem mount
+and staged menu handoff. The remaining reported power-button failure was
+reproduced in melonDS using a fixture that enables software power IRQs:
+the old callback exits ARM7 `main()` into the SDK return-to-loader path and
+produces the same red horizontal lines. Power requests now remain in ARM7's
+main loop and invoke the existing firmware reboot routine. Under the same
+fixture, the emulator records `ARM7 ReturnToDSiMenu` and `BPTWL: soft-reset`.
+The callback only queues the request; the reboot and I2C status transactions
+are protected against interruption by another I2C operation. Local I2C code
+is retained for DS-mode callers that cannot execute SDK TWL-only functions.
+This correction still needs a hardware power-button retest before entry
+files can be consolidated.
+
+Folder, page and storage-device navigation in the DSi/3DS selector now fades
+only the game/folder icon row while keeping the surrounding interface at
+normal brightness. The old icons fade out before their banks are replaced;
+the new row fades in after its metadata and title are ready. These paths no
+longer display the loading label/progress screen. The animation uses nine
+frames (about 150 ms, excluding file I/O) and continues servicing audio.
+VBlank keeps servicing background work while the page is prepared. Moving
+an app across pages uses the same publication step. Startup also skips the
+loading label, spinner and progress bar: the first page and title are
+prepared before fading directly into the menu. Launch effects and operation
+dialogs retain their existing behavior.
+
 The November 4 hardware-feedback revision also fixes these port regressions:
 
 * The DSi menu queues its scroll-stop sound for the main thread. The debugger
@@ -109,6 +151,115 @@ insert one full frame of waiting per icon. DS Classic transitions use a
 out, including splash-disabled cold boots. These are removed waits and I/O
 counts, not measured hardware speedup claims.
 
+The following optimization pass lets the loading-screen fade run in VBlank
+while files are read, instead of waiting for the fade before starting that
+work. The DSi menu also starts its icon drop immediately and uses the normal
+fast fade to reveal the menu. In a melonDS DS/DLDI fixture with 48 homebrew
+entries, the measured ARM9 `main()` to first interactive frame interval fell
+from 2.03 s to 1.47 s. The drop animation continues after that frame. This
+excludes the booter, title program and SDK startup, and is not a hardware
+cold-boot measurement.
+
+Browsing checks the custom-icon directory once per page and skips per-file
+lookups when it is absent. It reads only the first 512 bytes of each NDS
+header, retaining all fields used for browsing, and reuses the resolved
+banner for `.argv` icons. The same fixture's first-page metadata phase fell
+from about 405 ms to 355–358 ms. PNG custom-icon palettes are transformed
+once after construction. Failed ARM9 signature reads now leave zeroes
+instead of reusing the previous game's signature.
+
+The next browsing pass initializes the page's inexpensive directory/type
+flags, then loads banners only for the current seven-icon draw window
+(fewer at either end). Cursor and touch navigation load each newly exposed
+entry once, before its title, settings or launch flags are used. Directory
+changes, page changes and app reordering invalidate these slot caches;
+the carried app retains its separate cache. In-memory box art loads on
+selection instead of preloading all 40 files. Reset slots also clear old
+classification and animation state, and malformed NDS headers display an
+unknown icon rather than a stale banner.
+
+In the same 48-entry DS/DLDI fixture, the initial metadata phase fell from
+about 358 ms to 88 ms, and the ARM9-main-to-first-interactive-frame interval
+fell from 1.47 s to 1.24 s. Normal DS scrolling and DSi-mode 3DS-theme tests
+cover unique per-entry titles/colors, an offscreen PNG custom icon, missing
+argv targets, malformed headers, page round trips, app reordering, animated
+icons, per-game settings and a successful argv handoff. Adjacent red/blue
+box-art fixtures verify that the DSi in-memory cache follows selection.
+These remain emulator results, not hardware cold-boot measurements.
+
+Bundled translated "No photo" PNGs now also have a build-generated indexed
+RGBA representation. The menu reads its palette/indices directly and computes
+dithered and color-filtered colors per palette entry, while user photos keep
+the PNG path. Missing, malformed or unsupported indexed data falls back to PNG.
+The generated assets retain all 34 translations, alpha blending, odd-sized
+photo centering, both deband frames and color LUTs; host tests compare every
+output pixel with the original renderer. Their temporary pixel buffer is
+about 32 KiB instead of the PNG renderer's 127 KiB RGBA buffer. The indexed
+assets add about 1.1 MiB to NitroFS and remain generated/ignored build outputs.
+A PNG with over 256 colors keeps the ordinary PNG path.
+
+The same indexed RGBA format now covers all 84 bundled theme PNGs. Their
+cache payload totals about 42 KiB. Small UI images convert colors once per
+palette entry, retaining the PNG texture loader's opacity, magenta key and
+color-LUT behavior. Only bundled NitroFS PNGs use this cache; custom skin
+PNGs retain their existing loader, and GRF files keep their priority. Missing,
+malformed or unsupported caches fall back to PNG. Pixel comparisons cover
+all 84 images with and without a LUT, plus alpha thresholds, truncated data,
+unavailable-cache markers and custom PNGs beside conflicting indexed files.
+In a paired DS/DLDI fixture, the UI texture phase falls from about 67 to
+29 ms and battery textures from 40 to 25 ms. Sprite uploads remain about
+3 ms. These are emulator phase measurements, not hardware cold-boot times.
+
+DS Classic now uses indexed RGBA for 13 ordinary bundled backgrounds,
+calendar/clock images and status icons. Flat screen art uses bounded
+run-length encoding when smaller than raw indices, reducing the additional
+image data from 138,551 to 27,768 bytes. RGB555 conversion runs once per
+palette color. Custom FAT PNGs retain PNG decoding, while the favorite-color
+top bar and calendar marker keep their appended palette variants. Missing,
+unsupported or corrupt caches fall back to PNG. Comparisons cover every
+converted pixel and alpha value with and without a color LUT, both indexed
+formats, malformed run lengths/indices, missing files, dimension limits and
+custom PNGs beside conflicting caches. Fast Classic fades advance at the
+DSi menu's existing rate; slow launch-effect timing is retained.
+
+In one paired DS/DLDI direct-entry fixture, Classic ARM9 `main()` through
+its first interactive frame falls from 1,132,792 to 564,432 microseconds.
+Image changes alone reduce that interval to 815,166 microseconds; the faster
+fade reduces its final wait from about 510 to 259 ms. These figures exclude
+the preceding program handoff and are not hardware cold-boot measurements.
+
+GRF files are now read sequentially through the existing stream, using
+cached file-size metadata instead of seeking to the end and back. Malformed
+or truncated GRFs fall back to the next supported skin format. GPU source
+buffers include zeroed padding for the power-of-two dimensions uploaded by
+gl2d, while logical image sizes remain unchanged. Short palettes are padded
+to at least 16 entries for VRAM uploads, independently of the palette length
+used to read favorite-color files. Tests compare all 150 bundled GRFs and
+exercise malformed assets, upload padding and custom three-color palettes.
+Custom folder/dialog GRFs also render in flashcard emulation; the DSi and
+3DS interfaces and per-game dialog render from internal SD. These changes
+do not have a new hardware startup-time measurement.
+
+The same fixture's photo phase fell from roughly 166–182 ms to 82 ms, and
+the first interactive frame reached about 1.14 s. Normal page loading now
+continues its existing fade instead of fading back to white before revealing
+the ready menu. Together these changes bring that interval to about 0.92 s,
+compared with the preceding browsing update's 1.24 s. DS-mode folder entry and
+page changes pass; DSi-mode testing covers a corrupt user photo falling back
+to the default with debanding, touchscreen scrollbar navigation to an
+initially unloaded entry, and subsequent lid reopening and navigation. A valid
+180×120 user PNG with partial transparency also renders centered in DSi mode.
+These figures still exclude the preceding booter, title and SDK startup.
+
+Built-in sound banks load their launch sound and startup jingle on first
+use. Navigation and lid sounds remain preloaded; custom banks retain the
+memory interface to support skin paths longer than Maxmod's file loader
+allows. The default bank initially needs 183,424 sample bytes instead of
+the entire 435,500-byte bank, saving about 246 KiB before those deferred
+effects are used. The timing probes show that sound initialization's earlier
+roughly 265 ms phase included about 200 ms spent waiting for the loading
+screen fade; the file-based bank alone did not shorten startup in this test.
+
 * DSi/3DS and R4 startup no longer call `statvfs` on both devices just to
   determine cluster size. The warning reads the mounted filesystem's
   cluster size directly, avoiding a scan of the allocation table.
@@ -137,6 +288,32 @@ counts, not measured hardware speedup claims.
   history delimiters and GBARunner's compact LF output. Read/write failures
   are reported, and missing empty defaults can be saved.
 
+Seven programs now share a linear translation-escape decoder instead of
+rebuilding a string's prefix and suffix for every newline or button icon.
+The decoder preserves UTF-8, upper/lowercase button escapes and direction
+marks, and safely handles an empty input. Compatibility checks compare all
+198 bundled translation INIs and all seven programs' default strings with
+the original decoder, alongside generated malformed and mixed UTF-8 inputs.
+In a paired DS/DLDI direct-entry fixture, the menu's language setup phase
+fell from about 63 to 54 ms. This is that phase only; the direct-entry test
+builds a cold font cache and is not comparable to the preceding full-chain
+0.92 s menu interval or to a hardware cold boot.
+
+All eight font implementations now share their NFTR character-map reader
+and bounded glyph lookup. The reader batches explicit and indexed mappings
+with one 512-byte scratch buffer, retaining all three map formats and the
+existing glyph cache. The two large default fonts each need 266 map `fread`
+calls instead of roughly 36,200. All 19 bundled fonts produce the same maps
+as the original reader. Checks also cover missing characters, unmapped
+entries, buffer boundaries, linked blocks, truncated reads and invalid map
+indices; a missing glyph no longer reads one element beyond the map.
+
+In the same DS/DLDI direct-entry fixture as the translation comparison,
+cold font initialization falls from about 651 to 112 ms, and menu ARM9
+`main()` to the first interactive frame falls from 1.416 to 0.882 s. The
+fixture uses the full external default fonts. These paired figures exclude
+the booter, title and SDK startup and remain emulator measurements.
+
 These remove identifiable I/O and allocation work. There is no claimed
 percentage speedup or hardware boot-time measurement yet. SD speed, FAT
 size, directory contents, custom skins, and splash settings all affect the
@@ -144,6 +321,61 @@ observed boot time. Measure cold boots on the same card and settings when
 comparing against the original version.
 
 ## Measuring menu startup
+
+The small ARM7 loaders now share a dedicated 512-byte FAT-sector cache,
+separate from their file/directory buffer. It is invalidated on every mount
+and on a failed FAT read. This avoids reading the same FAT sector again
+for each cluster link while loading the next menu. All six implementations
+are exercised by host tests with FAT12/16/32, contiguous and fragmented
+chains, partial sectors, remounts, EOF and injected I/O failures. A contiguous
+100 KiB fixture needs one FAT sector read on FAT12/16 and two on FAT32,
+compared with 398 on FAT12 and 199 on FAT16/32 before the change. The
+reader also normalizes FAT12 end markers and stops on broken chains and
+failed data reads.
+
+Those six loaders now also use one shared file reader. It follows actual
+FAT links to combine adjacent clusters into transfers of at most 128 sectors
+(64 KiB), the largest transfer previously used for one cluster. Fragmented
+chains end each run. Drivers that reject a batch are retried one sector at
+a time, and unaligned destinations use an aligned sector buffer. Tests cover
+512-byte through 64 KiB clusters, mixed contiguous/fragmented runs, transfer
+boundaries, unaligned reads, single-sector-only drivers and partial failures.
+For the contiguous 100 KiB fixture with 512-byte clusters, file-data commands
+fall from 200 to two; FAT metadata counts above are unchanged.
+
+DS Classic can be profiled with `make -C quickmenu profile-startup`. Install
+`quickmenu/mainmenu-profile.nds` as `_nds/TWiLightMenu/mainmenu.srldr`.
+Its `_nds/TWiLightMenu/classic-startup-profile.csv` covers ARM9 `main()`
+through the first interactive frame, with phase markers for graphics,
+fonts, language, backgrounds, calendar, clock and fade. It uses timers 0/1;
+normal builds contain neither the measurement code nor CSV writes.
+
+The title can be profiled separately with `make -C title profile-startup`.
+Install `title/title-profile.nds` as `_nds/TWiLightMenu/main.srldr` in an
+existing installation. Its `_nds/TWiLightMenu/title-startup-profile.csv`
+covers title ARM9 `main()` through its menu handoff decision/fade, ending
+before the loader runs. It uses ARM9 timers 2/3 so a GIF splash can continue
+using timer 0. Normal title builds contain no profiling code. With both
+splashes disabled, the configured DS/DLDI fixture takes about 121 ms in this
+interval. The original title loader's subsequent binary-read phase takes
+about 1.15 s in a separate instrumented run. With the dedicated FAT cache,
+the same binary-read phase takes about 0.40 s (1,146,944 → 399,183 µs) for
+the same target image in DS/DLDI emulation with 512-byte clusters. The shared
+batched reader brings this phase to about 393 ms. In DSi internal-SD emulation,
+the cached and batched readers take 244 and 214 ms with 512-byte clusters,
+and 145 and 143 ms with 32 KiB clusters. Thus batching adds little in the
+larger-cluster fixture; these results do not predict the gain on a particular
+flashcard. This excludes storage mounting,
+memory reset, SDK startup and menu initialization, and is not a hardware
+cold-boot measurement. The normal flashcard boot chain, DS Classic round
+trip, Settings handoff/return and Settings lid reopening also pass. Internal-SD
+tests also reach both retained UIs through the hybrid and normal SD entry
+points, change themes through Settings, and complete the DS Classic round
+trip in DSi mode. The argv probe still receives all three expected arguments
+after the app-loader handoff, with a PNG custom icon and color LUT enabled.
+The batched reader also passes the normal flashcard boot and DS Classic
+round trip. Its 32 KiB-cluster internal-SD test covers hybrid entry, both
+retained UIs, DS Classic, Settings return, lid reopening and subsequent input.
 
 `make profile-startup` builds a separate
 `romsel_dsimenutheme/romsel_dsimenutheme-profile.nds`. It uses a separate
@@ -172,6 +404,99 @@ has been omitted.
 
 ## Validation
 
+Subsequent hardware feedback confirms that the normal flashcard `BOOT.NDS`
+works without the previously reported menu regressions. `BOOT_ALT.NDS` still
+needs a hardware retest through Pico-Launcher after the SD startup changes
+below.
+Do not treat its earlier internal-SD-backed emulator run as proof that the
+DSpico flashcard-only boot works.
+
+The supplied DSpico `BOOT_TEST` log from a DSi LL with internal SD inserted
+confirms ARM9 entered DSi mode and
+mounted the DSpico DLDI filesystem. Its last stage is `Mounting internal SD`,
+before `main.srldr` is loaded. This narrows the failure to the SD mount; it
+does not identify the individual IPC or controller wait within that mount.
+Pico-Loader can disable ARM7 SD access according to the target header. The
+legacy driver checked card presence before enabling that access, although
+it enabled access later during controller initialization. The driver now
+enables accessible SD hardware before probing it, returns unavailable for
+locked access, and checks the actual card-presence signal. Controller busy
+and synchronous command polls, SD/NAND power-up retries, and ARM9 startup
+reply waits are bounded. The iEvolution DLDI fallback is retained. ARM9 now
+selects an uncached mailbox from the active RAM mapping and SDK aliases
+instead of probing an address by writing to it. This also covers unlocked
+DS-mode launchers that enable extended RAM after SDK startup.
+The revised diagnostic distinguishes presence and initialization
+failures and logs the ARM7 access/status registers. These changes require
+a new DSpico hardware run before the white screen can be called fixed.
+
+A separate DSi-mode DLDI emulator test with internal SD absent exposed a
+reset race after that mount: the SD presence request left IPC sync value 1
+asserted. The SDK reset receiver could acknowledge this stale value and
+reset ARM7 before ARM9 observed the reply. ARM9 then waited in `resetSync`
+while the ARM7 loader waited for ARM9. All five ARM9 reset callers now clear
+the application IPC sync value immediately before calling `resetARM7`.
+The previously stalled probe now receives `DSi=1`, a mounted flashcard and
+`fat:/_nds/TWiLightMenu/main.srldr` as its argument. This verifies the reset
+correction in emulation, separately from the pending DSpico hardware retest.
+The rebuilt full title/menu chain also boots in DSi-mode DLDI emulation
+with internal SD absent, including scrolling, per-game settings, DS Classic,
+Settings return and Settings lid reopening. With both storage devices
+present, the r2 log records a successful internal-SD mount, selects the
+flashcard menu program, and the menu opens the game folder. Internal-SD-only
+testing covers both retained interfaces and the same Settings/DS Classic
+round trips. These fixtures use melonDS's DLDI driver and do not emulate
+the DSpico cartridge protocol.
+
+The DSpico / DSi LL hardware retest of r2 still white-screened. Its log
+confirms that card presence and SD initialization succeed, then stops before
+the filesystem mount returns. The r3 revision corrects the subsequent read
+path: NDMA's total transfer length counts words, while the old code supplied
+bytes, requesting four times the destination size. Completion now requires
+both SD status and an inactive DMA channel. A PIO read likewise waits until
+all requested bytes have been drained, even if DATAEND arrives earlier.
+Read submission returns immediately instead of spinning for a busy flag
+inside the ARM7 interrupt handler; continuation polls have a two-second
+scanline deadline and an independent polling bound, and failures stop DMA.
+
+BlocksDS `irqInit()` also installs a native TMIO interrupt handler which
+clears response/data flags. The custom polling driver now disables that
+SDMMC interrupt when it installs its IPC handler, retaining WiFi SDIO and
+power-button interrupts. With r3 DMA configuration but before this interrupt
+correction, melonDS read the MBR successfully then timed out on partition
+sector 2048, with DMA inactive and the completion flags cleared. After the
+correction, reads of sectors 0, 2048 and 2049 succeed and both storage devices
+mount. The later DSpico hardware log confirms that both reads succeed, the
+internal SD mounts, and the menu handoff completes. ALT and TEST boot/function
+are now hardware-confirmed; the subsequent power-button correction above
+still needs a hardware retest.
+
+Both flashcard entry files contain the same ARM9 program. The normal entry
+uses a DS-only 0x200-byte header and an ARM7 image loaded into IWRAM. ALT
+uses a hybrid DS/DSi header, a relocating ARM7 startup image in main RAM,
+and TWL segments. Pico-Loader selects DS compatibility mode when a target
+header does not advertise DSi support. Thus successful normal entry from a
+DSi-mode launcher does not prove that the menu retains DSi mode. A single
+main entry requires a working hybrid startup as well as runtime storage
+selection. Legacy flashcard autoboot wrappers may still need their existing
+format and address variants; internal-SD and installed-title entry behavior
+also needs to be retained. The entry files have not yet been consolidated.
+
+The shared flashcard booter now accepts an internal-SD-only installation
+instead of rejecting it because the flashcard mount failed. It keeps the
+SD primary marker, then honors an explicitly supplied SD launch path, and
+falls back to an available installation. A DSi handoff now reuses the four
+already staged CPU binaries rather than reading the image again after
+resetting storage. The same hybrid code passes a DS/DLDI launch probe
+(`DSi=0`, `fat:/` argument) and an internal-SD-only DSi probe (`DSi=1`,
+`sd:/` argument) in melonDS. The complete hybrid entry → title → DSi menu
+chain also boots and scrolls from internal SD. These tests do not emulate
+the DSpico cartridge protocol or establish that its hardware white screen
+is fixed; the separate diagnostic entry is for that remaining case.
+
+See the [BlocksDS hybrid-ROM compatibility notes](https://blocksds.skylyrac.net/docs/guides/legacy_support/#23-nds-dsi-hybrid-roms)
+and [filesystem/device selection guide](https://blocksds.skylyrac.net/docs/guides/filesystem/).
+
 `make test` runs host regression checks for the bootstrap filesystem,
 malformed filesystem bounds, independent file handles, read-only behavior,
 extension views, launch plans, argument ordering, explicit devices,
@@ -182,6 +507,14 @@ and failed writes. Texture tests check BMP/PNG pixels and fallbacks, plus
 all 150 built-in GRF assets. `make check-build` requires a completed SDK
 build and checks all 13 applications, five flashcard variants, and seven
 ARM9 loader images.
+ARM7 storage tests run the actual driver against scripted controller
+registers: disabled/locked access, card absence/removal, SDHC and legacy SDSC
+initialization, controller stalls, missing replies, failed power-up
+commands, bounded SD/NAND retries and the iEvolution fallback. Sanitizer
+checks also cover unsigned assembly of high-bit SD response words. Transfer
+tests cover exact DMA word counts and destination guards, early DATAEND,
+delayed PIO readiness, CRC failures, stalled DMA cancellation, and retaining
+unrelated interrupts while taking ownership of SD completion flags.
 
 The port has been built from clean sources with `make -j6 all`. In melonDS
 1.1, using an isolated FAT image and the supplied DS BIOS/firmware, both the
@@ -268,7 +601,8 @@ images, NAND images or BIOS files are included in the tests or repository.
 The user has now confirmed retail nds-bootstrap and pico-loader gameplay
 input on DSpico hardware. The first hardware archive exposed ALT boot white
 screens through Pico-Launcher in DSi mode, DSi folder-scrolling freezes,
-missing palette colors and the Settings issues described above. DSi-mode
-ALT boot and browsing still need a hardware retest of this revision; an
-emulator pass is not a substitute for that retest. The previously reported
+missing palette colors and the Settings issues described above. The user subsequently confirmed
+ALT boot and menu operation with r3; the r4 power-button correction and
+new navigation behavior still need a hardware retest. An emulator pass is
+not a substitute for that retest. The previously reported
 emulator menu with a missing title panel was frozen, not a complete pass.

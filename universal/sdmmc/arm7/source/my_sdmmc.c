@@ -19,6 +19,33 @@ static struct mmcdevice deviceNAND;
 
 static bool useDLDI = false;
 
+// Do this before even probing card presence. Pico-Loader can leave the
+// controller disabled when the ROM header doesn't request SD access.
+static bool enableSdmmc(void) {
+	const u32 required = SCFG_EXT_SDMMC | SCFG_EXT_INTERRUPT | SCFG_EXT_AES | SCFG_EXT_DMA;
+	const u32 scfg = REG_SCFG_EXT;
+	if ((scfg & SCFG_EXT_SCFG_MBK_REG) && (scfg & required) != required) {
+		REG_SCFG_EXT = scfg | required;
+	}
+	return (REG_SCFG_EXT & SCFG_EXT_SDMMC) != 0;
+}
+
+// No timers are borrowed from the RTC or sound system. Bound stalled MMIO
+// polls as well as the card's power-up retries; hardware error flags alone
+// cannot terminate a wait when the controller is inaccessible.
+#define SDMMC_POLL_LIMIT (1u << 22)
+
+static bool waitNotBusy(struct mmcdevice *ctx) {
+	unsigned polls = SDMMC_POLL_LIMIT;
+	while (sdmmc_read16(REG_SDSTATUS1) & TMIO_STAT1_CMD_BUSY) {
+		if (--polls == 0) {
+			ctx->error = 4;
+			return false;
+		}
+	}
+	return true;
+}
+
 /*mmcdevice *getMMCDevice(int drive) {
 	if (drive==0) return &deviceNAND;
 	return &deviceSD;
@@ -61,7 +88,7 @@ void my_sdmmc_send_command(struct mmcdevice *ctx, uint32_t cmd, uint32_t args) {
 	}
 
 	ctx->error = 0;
-	while ((sdmmc_read16(REG_SDSTATUS1) & TMIO_STAT1_CMD_BUSY)); //mmc working?
+	if (!waitNotBusy(ctx)) return;
 	sdmmc_write16(REG_SDIRMASK0,0);
 	sdmmc_write16(REG_SDIRMASK1,0);
 	sdmmc_write16(REG_SDSTATUS0,0);
@@ -82,7 +109,12 @@ void my_sdmmc_send_command(struct mmcdevice *ctx, uint32_t cmd, uint32_t args) {
 	bool tUseBuf = ( NULL != tDataPtr32 );
 
 	u16 status0 = 0;
+	unsigned polls = SDMMC_POLL_LIMIT;
 	while (1) {
+		if (--polls == 0) {
+			ctx->error |= 4;
+			break;
+		}
 		volatile u16 status1 = sdmmc_read16(REG_SDSTATUS1);
 #ifdef DATA32_SUPPORT
 		volatile u16 ctl32 = sdmmc_read16(REG_SDDATACTL32);
@@ -123,6 +155,7 @@ void my_sdmmc_send_command(struct mmcdevice *ctx, uint32_t cmd, uint32_t args) {
 						}
 						#endif
 						size -= blkSize;
+						polls = SDMMC_POLL_LIMIT;
 					}
 				}
 
@@ -167,6 +200,7 @@ void my_sdmmc_send_command(struct mmcdevice *ctx, uint32_t cmd, uint32_t args) {
 						}
 						#endif
 						size -= blkSize;
+						polls = SDMMC_POLL_LIMIT;
 					}
 				}
 
@@ -187,7 +221,8 @@ void my_sdmmc_send_command(struct mmcdevice *ctx, uint32_t cmd, uint32_t args) {
 				ctx->error |= 0x2;
 			}
 
-			if ((status0 & flags) == flags)
+			// DATAEND may precede the final FIFO block becoming readable.
+			if ((status0 & flags) == flags && (!(readdata || writedata) || size == 0))
 				break;
 		}
 	}
@@ -197,259 +232,100 @@ void my_sdmmc_send_command(struct mmcdevice *ctx, uint32_t cmd, uint32_t args) {
 	sdmmc_write16(REG_SDSTATUS1,0);
 
 	if (getSDRESP != 0) {
-		ctx->ret[0] = (u32)(sdmmc_read16(REG_SDRESP0) | (sdmmc_read16(REG_SDRESP1) << 16));
-		ctx->ret[1] = (u32)(sdmmc_read16(REG_SDRESP2) | (sdmmc_read16(REG_SDRESP3) << 16));
-		ctx->ret[2] = (u32)(sdmmc_read16(REG_SDRESP4) | (sdmmc_read16(REG_SDRESP5) << 16));
-		ctx->ret[3] = (u32)(sdmmc_read16(REG_SDRESP6) | (sdmmc_read16(REG_SDRESP7) << 16));
+		ctx->ret[0] = (u32)(sdmmc_read16(REG_SDRESP0) | ((u32)sdmmc_read16(REG_SDRESP1) << 16));
+		ctx->ret[1] = (u32)(sdmmc_read16(REG_SDRESP2) | ((u32)sdmmc_read16(REG_SDRESP3) << 16));
+		ctx->ret[2] = (u32)(sdmmc_read16(REG_SDRESP4) | ((u32)sdmmc_read16(REG_SDRESP5) << 16));
+		ctx->ret[3] = (u32)(sdmmc_read16(REG_SDRESP6) | ((u32)sdmmc_read16(REG_SDRESP7) << 16));
 	}
 }
 
-static void sdmmc_send_command_nonblocking_ndma(struct mmcdevice *ctx, u32 cmd, u32 args)
-{
-	*((vu32*)0x4004100) = 0x80020000; //use round robin arbitration method;
+static u32 lastIoStatus, lastIoDma, lastIoLength, lastIoFifo;
 
-	*(vu32*)((u32)0x4004104+0x1C*ndmaSlot) = 0x0400490C;
-	*(vu32*)((u32)0x4004108+0x1C*ndmaSlot) = (u32)ctx->rData;
-
-	*(vu32*)((u32)0x400410C+0x1C*ndmaSlot) = ctx->size;
-
-	*(vu32*)((u32)0x4004110+0x1C*ndmaSlot) = 0x80;
-
-	*(vu32*)((u32)0x4004114+0x1C*ndmaSlot) = 0x10;
-
-	*(vu32*)((u32)0x400411C+0x1C*ndmaSlot) = 0xC8064000;
-
-	//const bool getSDRESP = (cmd << 15) >> 31;
-	u16 flags = (cmd << 15) >> 31;
-	const bool readdata = cmd & 0x20000;
-	const bool writedata = cmd & 0x40000;
-
-	if(readdata || writedata)
-	{
-		flags |= TMIO_STAT0_DATAEND;
-	}
-
-	ctx->error = 0;
-	while((sdmmc_read16(REG_SDSTATUS1) & TMIO_STAT1_CMD_BUSY)); //mmc working?
-	sdmmc_write16(REG_SDIRMASK0,0);
-	sdmmc_write16(REG_SDIRMASK1,0);
-	sdmmc_write16(REG_SDSTATUS0,0);
-	sdmmc_write16(REG_SDSTATUS1,0);
-	sdmmc_mask16(REG_SDDATACTL32,0x1800,0x400); // Disable TX32RQ and RX32RDY IRQ. Clear fifo.
-	sdmmc_write16(REG_SDCMDARG0,args &0xFFFF);
-	sdmmc_write16(REG_SDCMDARG1,args >> 16);
-	sdmmc_write16(REG_SDCMD,cmd &0xFFFF);
-
-	u32 size = ctx->size;
-	const u16 blkSize = sdmmc_read16(REG_SDBLKLEN32);
-	//u32 *rDataPtr32 = (u32*)ctx->rData;
-	//u8  *rDataPtr8  = ctx->rData;
-	const u32 *tDataPtr32 = (u32*)ctx->tData;
-	const u8  *tDataPtr8  = ctx->tData;
-
-	//bool rUseBuf = ( NULL != rDataPtr32 );
-	bool tUseBuf = ( NULL != tDataPtr32 );
-
-    //nocashMessage("main loop");
-
-	while(1)
-	{
-		volatile u16 status1 = sdmmc_read16(REG_SDSTATUS1);
-#ifdef DATA32_SUPPORT
-		volatile u16 ctl32 = sdmmc_read16(REG_SDDATACTL32);
-		if((ctl32 & 0x100))
-#else
-		if((status1 & TMIO_STAT1_RXRDY))
-#endif
-		{
-            /*
-            // should not be needed : ndma unit is taking care of data transfer
-            nocashMessage("readdata check");
-			if(readdata)
-			{
-                nocashMessage("readdata");
-				if(rUseBuf)
-				{
-					sdmmc_mask16(REG_SDSTATUS1, TMIO_STAT1_RXRDY, 0);
-					if(size >= blkSize)
-					{
-						size -= blkSize;
-					}
-				}
-
-				sdmmc_mask16(REG_SDDATACTL32, 0x800, 0);
-			}*/
-		}
-#ifdef DATA32_SUPPORT
-		if(!(ctl32 & 0x200))
-#else
-		if((status1 & TMIO_STAT1_TXRQ))
-#endif
-		{
-            //nocashMessage("writedata check");
-			if(writedata)
-			{
-                //nocashMessage("writedata");
-				if(tUseBuf)
-				{
-					sdmmc_mask16(REG_SDSTATUS1, TMIO_STAT1_TXRQ, 0);
-					if(size >= blkSize)
-					{
-						#ifdef DATA32_SUPPORT
-						if(!((u32)tDataPtr32 & 3))
-						{
-							for(u32 i = 0; i < blkSize; i += 4)
-							{
-								sdmmc_write32(REG_SDFIFO32, *tDataPtr32++);
-							}
-						}
-						else
-						{
-							for(u32 i = 0; i < blkSize; i += 4)
-							{
-								u32 data = *tDataPtr8++;
-								data |= (u32)*tDataPtr8++ << 8;
-								data |= (u32)*tDataPtr8++ << 16;
-								data |= (u32)*tDataPtr8++ << 24;
-								sdmmc_write32(REG_SDFIFO32, data);
-							}
-						}
-						#else
-						if(!((u32)tDataPtr16 & 1))
-						{
-							for(u32 i = 0; i < blkSize; i += 2)
-							{
-								sdmmc_write16(REG_SDFIFO, *tDataPtr16++);
-							}
-						}
-						else
-						{
-							for(u32 i = 0; i < blkSize; i += 2)
-							{
-								u16 data = *tDataPtr8++;
-								data |= (u16)(*tDataPtr8++ << 8);
-								sdmmc_write16(REG_SDFIFO, data);
-							}
-						}
-						#endif
-						size -= blkSize;
-					}
-				}
-
-				sdmmc_mask16(REG_SDDATACTL32, 0x1000, 0);
-			}
-		}
-		if(status1 & TMIO_MASK_GW)
-		{
-            //nocashMessage("error 4");
-			ctx->error |= 4;
-			break;
-		}
-		if(status1 & TMIO_STAT1_CMD_BUSY)
-		{
-            // command is ongoing : return
-            //nocashMessage("cmd busy");
-            break;
-		} 
-        else
-        {
-            // A fast command may finish before we observe CMD_BUSY. Accept
-            // its completion flags on every platform rather than waiting
-            // forever for a busy state which has already passed.
-            u16 status0 = sdmmc_read16(REG_SDSTATUS0);
-            //nocashMessage("already finished");
-            if((status0 & flags) == flags)
-            break;
-		}
-	}
-	//ctx->stat0 = sdmmc_read16(REG_SDSTATUS0);
-	//ctx->stat1 = sdmmc_read16(REG_SDSTATUS1);
-	//sdmmc_write16(REG_SDSTATUS0,0);
-	//sdmmc_write16(REG_SDSTATUS1,0);
-
-	/*if(getSDRESP != 0)
-	{
-		ctx->ret[0] = (u32)(sdmmc_read16(REG_SDRESP0) | (sdmmc_read16(REG_SDRESP1) << 16));
-		ctx->ret[1] = (u32)(sdmmc_read16(REG_SDRESP2) | (sdmmc_read16(REG_SDRESP3) << 16));
-		ctx->ret[2] = (u32)(sdmmc_read16(REG_SDRESP4) | (sdmmc_read16(REG_SDRESP5) << 16));
-		ctx->ret[3] = (u32)(sdmmc_read16(REG_SDRESP6) | (sdmmc_read16(REG_SDRESP7) << 16));
-	}*/
+static void snapshotIo(void) {
+    lastIoStatus = sdmmc_read16(REG_SDSTATUS0) | ((u32)sdmmc_read16(REG_SDSTATUS1) << 16);
+    lastIoDma = *(vu32*)(0x0400411C + 0x1C * ndmaSlot);
+    lastIoLength = *(vu32*)(0x0400410C + 0x1C * ndmaSlot);
+    lastIoFifo = sdmmc_read16(REG_SDDATACTL32) | ((u32)sdmmc_read16(REG_SDBLKCOUNT) << 16);
 }
 
-/* return true if the command is completed and false if it is still ongoing */
-static bool sdmmc_check_command_ndma(struct mmcdevice *ctx, u32 cmd)
-{
-	const bool getSDRESP = (cmd << 15) >> 31;
-    u16 flags = (cmd << 15) >> 31;
-	const bool readdata = cmd & 0x20000;
-	const bool writedata = cmd & 0x40000;
+static void finishDma(struct mmcdevice *ctx, bool failed) {
+    snapshotIo();
+    *(vu32*)(0x0400411C + 0x1C * ndmaSlot) = 0;
+    if (failed) {
+        ctx->error |= 4;
+        sdmmc_write16(REG_SDSTOP, 0x101); // Abort the data transfer with CMD12.
+    }
+    ctx->stat0 = sdmmc_read16(REG_SDSTATUS0);
+    ctx->stat1 = sdmmc_read16(REG_SDSTATUS1);
+    sdmmc_write16(REG_SDSTATUS0, 0);
+    sdmmc_write16(REG_SDSTATUS1, 0);
+}
 
-	if(readdata || writedata)
-	{
-		flags |= TMIO_STAT0_DATAEND;
-	}
+static void sdmmc_send_command_nonblocking_ndma(struct mmcdevice *ctx, u32 cmd, u32 args) {
+    ctx->error = 0;
+    if (!waitNotBusy(ctx)) return;
+    *(vu32*)0x04004100 = 0x80020000;
+    *(vu32*)(0x04004104 + 0x1C * ndmaSlot) = 0x0400490C;
+    *(vu32*)(0x04004108 + 0x1C * ndmaSlot) = (u32)ctx->rData;
+    // NDMA counts words, not bytes. Never request four times the buffer size.
+    *(vu32*)(0x0400410C + 0x1C * ndmaSlot) = ctx->size / sizeof(u32);
+    *(vu32*)(0x04004110 + 0x1C * ndmaSlot) = 512 / sizeof(u32);
+    *(vu32*)(0x04004114 + 0x1C * ndmaSlot) = 0;
+    // SDMMC trigger, fixed FIFO source, 16-word bursts. Completion is polled;
+    // requesting an NDMA IRQ is unnecessary and can inherit a loader's handler.
+    *(vu32*)(0x0400411C + 0x1C * ndmaSlot) = 0x88044000;
 
-    volatile u16 status1 = sdmmc_read16(REG_SDSTATUS1);
+    sdmmc_write16(REG_SDIRMASK0, 0);
+    sdmmc_write16(REG_SDIRMASK1, 0);
+    sdmmc_write16(REG_SDSTATUS0, 0);
+    sdmmc_write16(REG_SDSTATUS1, 0);
+    sdmmc_mask16(REG_SDDATACTL32, 0x1800, 0x400);
+    sdmmc_write16(REG_SDCMDARG0, args & 0xFFFF);
+    sdmmc_write16(REG_SDCMDARG1, args >> 16);
+    ctx->dmaLastLine = REG_VCOUNT;
+    ctx->dmaFramesLeft = 120;
+    ctx->dmaPollsLeft = SDMMC_POLL_LIMIT;
+    sdmmc_write16(REG_SDCMD, cmd & 0xFFFF);
+    // Return immediately. Waiting for CMD_BUSY here can deadlock the ARM7
+    // interrupt handler if hardware never asserts it or finishes too quickly.
+}
 
-    if(status1 & TMIO_MASK_GW)
-	{
-		ctx->error |= 4;
-
-        ctx->stat0 = sdmmc_read16(REG_SDSTATUS0);
-      	ctx->stat1 = sdmmc_read16(REG_SDSTATUS1);
-      	sdmmc_write16(REG_SDSTATUS0,0);
-      	sdmmc_write16(REG_SDSTATUS1,0);
-
-      	if(getSDRESP != 0)
-      	{
-      		ctx->ret[0] = (u32)(sdmmc_read16(REG_SDRESP0) | (sdmmc_read16(REG_SDRESP1) << 16));
-      		ctx->ret[1] = (u32)(sdmmc_read16(REG_SDRESP2) | (sdmmc_read16(REG_SDRESP3) << 16));
-      		ctx->ret[2] = (u32)(sdmmc_read16(REG_SDRESP4) | (sdmmc_read16(REG_SDRESP5) << 16));
-      		ctx->ret[3] = (u32)(sdmmc_read16(REG_SDRESP6) | (sdmmc_read16(REG_SDRESP7) << 16));
-      	}
-        *(vu32*)((u32)0x400411C+ndmaSlot*0x1C) = 0x48064000;
+// The IRQ returns between polls, so input, RTC and sound IRQs remain serviceable.
+static bool sdmmc_check_command_ndma(struct mmcdevice *ctx, u32 cmd) {
+    const u16 status1 = sdmmc_read16(REG_SDSTATUS1);
+    const u16 status0 = sdmmc_read16(REG_SDSTATUS0);
+    if (status1 & TMIO_MASK_GW) {
+        finishDma(ctx, true);
         return true;
     }
-
-    if(!(status1 & TMIO_STAT1_CMD_BUSY))
-	{
-		u16 status0 = sdmmc_read16(REG_SDSTATUS0);
-		if(sdmmc_read16(REG_SDSTATUS0) & TMIO_STAT0_CMDRESPEND)
-		{
-			ctx->error |= 0x1;
-		}
-		if(status0 & TMIO_STAT0_DATAEND)
-		{
-			ctx->error |= 0x2;
-		}
-
-        if((status0 & flags) != flags)
-        {
-            return false;
+    const u16 flags = 1 | TMIO_STAT0_DATAEND;
+    // DATAEND can precede draining the last FIFO block on real hardware.
+    // Do not disable DMA or return the buffer until NDMA has finished too.
+    if (!(status1 & TMIO_STAT1_CMD_BUSY) && (status0 & flags) == flags
+        && !(*(vu32*)(0x0400411C + 0x1C * ndmaSlot) & BIT(31))) {
+        ctx->error |= 3;
+        if (cmd & 0x10000) {
+            for (unsigned i = 0; i < 4; ++i)
+                ctx->ret[i] = sdmmc_read16(REG_SDRESP0 + i * 4)
+                    | ((u32)sdmmc_read16(REG_SDRESP1 + i * 4) << 16);
         }
-
-        ctx->stat0 = sdmmc_read16(REG_SDSTATUS0);
-      	ctx->stat1 = sdmmc_read16(REG_SDSTATUS1);
-      	sdmmc_write16(REG_SDSTATUS0,0);
-      	sdmmc_write16(REG_SDSTATUS1,0);
-
-      	if(getSDRESP != 0)
-      	{
-      		ctx->ret[0] = (u32)(sdmmc_read16(REG_SDRESP0) | (sdmmc_read16(REG_SDRESP1) << 16));
-      		ctx->ret[1] = (u32)(sdmmc_read16(REG_SDRESP2) | (sdmmc_read16(REG_SDRESP3) << 16));
-      		ctx->ret[2] = (u32)(sdmmc_read16(REG_SDRESP4) | (sdmmc_read16(REG_SDRESP5) << 16));
-      		ctx->ret[3] = (u32)(sdmmc_read16(REG_SDRESP6) | (sdmmc_read16(REG_SDRESP7) << 16));
-      	}
-        *(vu32*)((u32)0x400411C+ndmaSlot*0x1C) = 0x48064000; 
+        finishDma(ctx, false);
         return true;
-	} else return false;
+    }
+    const u16 line = REG_VCOUNT;
+    const bool frameExpired = line < ctx->dmaLastLine && --ctx->dmaFramesLeft == 0;
+    ctx->dmaLastLine = line;
+    if (frameExpired || --ctx->dmaPollsLeft == 0) {
+        finishDma(ctx, true);
+        return true;
+    }
+    return false;
 }
-
 
 //---------------------------------------------------------------------------------
 int my_sdmmc_cardinserted() {
 //---------------------------------------------------------------------------------
-	return 1; //my_sdmmc_cardready;
+	return enableSdmmc() && (sdmmc_read16(REG_SDSTATUS0) & TMIO_STAT0_SIGSTATE) != 0;
 }
 
 
@@ -461,12 +337,7 @@ void my_sdmmc_controller_init( bool force_init ) {
 
 	if (!force_init && my_sdmmc_controller_initialised) return;
 
-	// BlocksDS enables these in its native TMIO driver rather than crt0.
-	// The custom IPC driver must enable them too, including legacy DMA:
-	// older melonDS versions gate SD access on that bit as well.
-	if (REG_SCFG_EXT & SCFG_EXT_SCFG_MBK_REG) {
-		REG_SCFG_EXT |= SCFG_EXT_SDMMC | SCFG_EXT_INTERRUPT | SCFG_EXT_AES | SCFG_EXT_DMA;
-	}
+	if (!enableSdmmc()) return;
 
 	deviceSD.isSDHC = 0;
 	deviceSD.SDOPT = 0;
@@ -562,22 +433,25 @@ int my_sdmmc_sdcard_init() {
 
 	// card reset
 	my_sdmmc_send_command(&deviceSD,0,0);
+	if (deviceSD.error & 4) return -1;
 
 	// CMD8 0x1AA
 	my_sdmmc_send_command(&deviceSD,0x10408,0x1AA);
 	u32 temp = (deviceSD.error & 0x1) << 0x1E;
 
-	u32 temp2 = 0;
-	do {
-		do {
-			// CMD55
-			my_sdmmc_send_command(&deviceSD,0x10437,deviceSD.initarg << 0x10);
-			// ACMD41
-			my_sdmmc_send_command(&deviceSD,0x10769,0x00FF8000 | temp);
-			temp2 = 1;
-		} while ( !(deviceSD.error & 1) );
-
-	} while ((deviceSD.ret[0] & 0x80000000) == 0);
+	// Like the native BlocksDS driver, allow about one second of power-up
+	// retries. A failed CMD55/ACMD41 must not restart an infinite loop.
+	unsigned tries = 200;
+	for (;;) {
+		my_sdmmc_send_command(&deviceSD,0x10437,deviceSD.initarg << 0x10);
+		if (deviceSD.error & 4) return -1;
+		my_sdmmc_send_command(&deviceSD,0x10769,0x00FF8000 | temp);
+		if (deviceSD.error & 4) return -1;
+		if (deviceSD.ret[0] & 0x80000000) break;
+		if (--tries == 0) return -1;
+		swiDelay(5 * 8378);
+	}
+	u32 temp2 = 1;
 
 	if (!((deviceSD.ret[0] >> 30) & 1) || !temp)
 		temp2 = 0;
@@ -635,13 +509,16 @@ int my_sdmmc_nand_init() {
 	swiDelay(0xF000);
 
 	my_sdmmc_send_command(&deviceNAND,0,0);
+	if (deviceNAND.error & 4) return -1;
 
-	do {
-		do {
-			my_sdmmc_send_command(&deviceNAND,0x10701,0x100000);
-		} while ( !(deviceNAND.error & 1) );
+	unsigned tries = 200;
+	for (;;) {
+		my_sdmmc_send_command(&deviceNAND,0x10701,0x100000);
+		if (deviceNAND.error & 4) return -1;
+		if (deviceNAND.ret[0] & 0x80000000) break;
+		if (--tries == 0) return -1;
+		swiDelay(5 * 8378);
 	}
-	while ((deviceNAND.ret[0] & 0x80000000) == 0);
 
 	my_sdmmc_send_command(&deviceNAND,0x10602,0x0);
 	if ((deviceNAND.error & 0x4))return -1;
@@ -700,6 +577,7 @@ u32 my_sdmmc_readsectors(struct mmcdevice *device, u32 sector_no, u32 numsectors
 	} else {
         //nocashMessage("my_sdmmc_sdcard_readsectors");
         sdmmc_send_command_nonblocking_ndma(device,0x33C12,sector_no);
+        if (device->error & 4) return my_geterror(device);
         //nocashMessage("command sent");
         if (!sdmmc_check_command_ndma(device,0x33C12)) {
 			return 0x474E4950; // 'PING'
@@ -772,6 +650,7 @@ void my_sdmmc_get_cid(int devicenumber, u32 *cid) {
 //---------------------------------------------------------------------------------
 int my_sdmmc_nand_startup() {
 //---------------------------------------------------------------------------------
+	if (!enableSdmmc()) return -1;
 	my_sdmmc_controller_init(false);
 	return my_sdmmc_nand_init();
 }
@@ -779,12 +658,13 @@ int my_sdmmc_nand_startup() {
 //---------------------------------------------------------------------------------
 int my_sdmmc_sd_startup() {
 //---------------------------------------------------------------------------------
+	if (!my_sdmmc_cardinserted()) return -1;
 	my_sdmmc_controller_init(false);
 	return my_sdmmc_sdcard_init();
 }
 
 //---------------------------------------------------------------------------------
-void my_sdmmcHandler() {
+void my_sdmmcHandler(void) {
 //---------------------------------------------------------------------------------
 	u32 result = 0;
 	int sdflag = 0;
@@ -793,14 +673,19 @@ void my_sdmmcHandler() {
 	switch(*(u32*)0x02FFFA0C) {
 
 	case 0x56484453: // SDMMC_HAVE_SD
-		result = (sdmmc_read16(REG_SDSTATUS0) & BIT(5)) != 0;
+		result = my_sdmmc_cardinserted();
+		// These argument words are unused for the presence query. Preserve
+		// word 1, which holds the iEvolution DLDI marker during startup.
+		*(vu32*)0x02FFFA00 = REG_SCFG_EXT;
+		*(vu32*)0x02FFFA08 = (REG_SCFG_EXT & SCFG_EXT_SDMMC)
+			? sdmmc_read16(REG_SDSTATUS0) | ((u32)sdmmc_read16(REG_SDSTATUS1) << 16) : 0;
 		break;
 
 	case 0x54534453: // SDMMC_SD_START
 		sdflag = 1;
 		/* Falls through. */
 	case 0x5453414E: // SDMMC_NAND_START
-		if (sdmmc_read16(REG_SDSTATUS0) == 0) {
+		if (!enableSdmmc()) {
 			result = 1;
 		} else {
 			result = (sdflag == 1) ? my_sdmmc_sd_startup() : my_sdmmc_nand_startup();
@@ -817,6 +702,13 @@ void my_sdmmcHandler() {
 			}
 		}
 		break;
+
+	case 0x47445353: // SDMMC_LAST_IO_SNAPSHOT
+        *(vu32*)0x02FFFA00 = lastIoStatus;
+        *(vu32*)0x02FFFA04 = lastIoDma;
+        *(vu32*)0x02FFFA08 = lastIoLength;
+        result = lastIoFifo;
+        break;
 
 	case 0x4E494453: // SDMMC_SD_IS_INSERTED
 		result = useDLDI ? io_dldi_data->ioInterface.isInserted() : my_sdmmc_cardinserted();
@@ -844,7 +736,7 @@ void my_sdmmcHandler() {
 		u32 sector = *(u32*)0x02FFFA00;
 		u32 numSectors = *(u32*)0x02FFFA04;
 		void* buffer = (void*)*(u32*)0x02FFFA08;
-		for (int i = 0; i < numSectors; i++) {
+		for (u32 i = 0; i < numSectors; i++) {
 			result =
 				useDLDI ? (io_dldi_data->ioInterface.writeSectors(sector+i, 1, buffer+(i*512)) ? 0 : 1)
 						: my_sdmmc_writesectors(&deviceSD, sector+i, 1, buffer+(i*512));

@@ -1,3 +1,4 @@
+#include "common/startupprofile.h"
 /*-----------------------------------------------------------------
  Copyright (C) 2015
 	Matthew Scholefield
@@ -42,6 +43,7 @@
 #include "../iconTitle.h"
 #include "graphics.h"
 #include "common/lodepng.h"
+#include "common/menuImage.h"
 #include "color.h"
 #include "fontHandler.h"
 #include "../iconTitle.h"
@@ -292,17 +294,9 @@ static void bootModeIconLoad() {
 
 	u16 imageBuffer[11*11] = { 0 };
 
-	FILE* file = fopen(filePath, "rb");
-	if (file) {
-		// Start loading
-		std::vector<unsigned char> image;
-		unsigned width, height;
-		lodepng::decode(image, width, height, filePath);
-		for (unsigned i=0;i<image.size()/4;i++) {
-			imageBuffer[i] = image[i*4]>>3 | (image[(i*4)+1]>>3)<<5 | (image[(i*4)+2]>>3)<<10 | BIT(15);
-			if (colorTable) {
-				imageBuffer[i] = colorTable[imageBuffer[i] % 0x8000] | BIT(15);
-			}
+	if (menuImage::Image image; image.load(filePath, 11, 11, colorTable)) {
+		for (unsigned i=0;i<image.size();i++) {
+			imageBuffer[i] = image.color(i);
 		}
 
 		u16* src = imageBuffer;
@@ -314,7 +308,6 @@ static void bootModeIconLoad() {
 		}
 	}
 
-	fclose(file);
 }
 
 void batteryIconLoad() {
@@ -329,23 +322,14 @@ void batteryIconLoad() {
 		filePath = "nitro:/graphics/battery/batteryfullDS.png";
 	}
 
-	FILE* file = fopen(filePath, "rb");
-
-	if (file) {
-		// Start loading
-		std::vector<unsigned char> image;
-		unsigned width, height;
-		lodepng::decode(image, width, height, filePath);
+	if (menuImage::Image image; image.load(filePath, 12, 7, colorTable)) {
 
 		int x = batteryXPos, y = batteryYPos;
 		int xEnd = x + 12;
-		for (unsigned i=0;i<image.size()/4;i++) {
-			u16 color = image[i*4]>>3 | (image[(i*4)+1]>>3)<<5 | (image[(i*4)+2]>>3)<<10 | BIT(15);
-			if (colorTable) {
-				color = colorTable[color % 0x8000] | BIT(15);
-			}
+		for (unsigned i=0;i<image.size();i++) {
+			u16 color = image.color(i);
 			
-			if (image[(i*4)+3] == 0) {
+			if (image.alpha(i) == 0) {
 				batteryFullImageBuffer[i] = bmpImageBuffer[(y*256)+x];
 			} else {
 				batteryFullImageBuffer[i] = color;
@@ -359,7 +343,6 @@ void batteryIconLoad() {
 		}
 	}
 
-	fclose(file);
 
 	// Load low battery icon
 
@@ -368,22 +351,14 @@ void batteryIconLoad() {
 		filePath = "nitro:/graphics/battery/batteryfullPurple.png";
 	}
 
-	file = fopen(filePath, "rb");
-	if (file) {
-		// Start loading
-		std::vector<unsigned char> image;
-		unsigned width, height;
-		lodepng::decode(image, width, height, filePath);
+	if (menuImage::Image image; image.load(filePath, 12, 7, colorTable)) {
 
 		int x = batteryXPos, y = batteryYPos;
 		int xEnd = x + 12;
-		for (unsigned i=0;i<image.size()/4;i++) {
-			u16 color = image[i*4]>>3 | (image[(i*4)+1]>>3)<<5 | (image[(i*4)+2]>>3)<<10 | BIT(15);
-			if (colorTable) {
-				color = colorTable[color % 0x8000] | BIT(15);
-			}
+		for (unsigned i=0;i<image.size();i++) {
+			u16 color = image.color(i);
 			
-			if (image[(i*4)+3] == 0) {
+			if (image.alpha(i) == 0) {
 				batteryLowImageBuffer[i] = bmpImageBuffer[(y*256)+x];
 			} else {
 				batteryLowImageBuffer[i] = color;
@@ -397,7 +372,6 @@ void batteryIconLoad() {
 		}
 	}
 
-	fclose(file);
 }
 
 static bool isBatteryLow(void) {
@@ -447,17 +421,9 @@ void gbaModeIconLoad(bool bottomScreen) {
 
 	u16 imageBuffer[11*11] = {0};
 
-	FILE* file = fopen(filePath, "rb");
-	if (file) {
-		// Start loading
-		std::vector<unsigned char> image;
-		unsigned width, height;
-		lodepng::decode(image, width, height, filePath);
-		for (unsigned i=0;i<image.size()/4;i++) {
-			imageBuffer[i] = image[i*4]>>3 | (image[(i*4)+1]>>3)<<5 | (image[(i*4)+2]>>3)<<10 | BIT(15);
-			if (colorTable) {
-				imageBuffer[i] = colorTable[imageBuffer[i] % 0x8000] | BIT(15);
-			}
+	if (menuImage::Image image; image.load(filePath, 11, 11, colorTable)) {
+		for (unsigned i=0;i<image.size();i++) {
+			imageBuffer[i] = image.color(i);
 		}
 
 		u16* src = imageBuffer;
@@ -469,7 +435,6 @@ void gbaModeIconLoad(bool bottomScreen) {
 		}
 	}
 
-	fclose(file);
 }
 
 void bottomBgLoad() {
@@ -510,16 +475,12 @@ void bottomBgLoad() {
 	else if (tempNested[0] != '\0' && access(tempNested, F_OK) == 0)
 		bottomBGFile = std::string(tempNested);
 
-	std::vector<unsigned char> image;
-	uint imageWidth, imageHeight;
-	lodepng::decode(image, imageWidth, imageHeight, bottomBGFile);
-	if (imageWidth > 256 || imageHeight > 192)	return;
+	menuImage::Image image;
+	if (!image.load(bottomBGFile, 256, 192, colorTable)
+	    && !image.load("nitro:/graphics/bottombg.png", 256, 192, colorTable)) return;
 
-	for (uint i=0;i<image.size()/4;i++) {
-		bmpImageBuffer[i] = image[i*4]>>3 | (image[(i*4)+1]>>3)<<5 | (image[(i*4)+2]>>3)<<10 | BIT(15);
-		if (colorTable) {
-			bmpImageBuffer[i] = colorTable[bmpImageBuffer[i] % 0x8000] | BIT(15);
-		}
+	for (uint i=0;i<image.size();i++) {
+		bmpImageBuffer[i] = image.color(i);
 	}
 
 	// Start loading
@@ -612,7 +573,7 @@ void vBlankHandler()
 {
 	if (fadeType) {
 		if (!fadeDelay) {
-			screenBrightness--;
+			screenBrightness -= fadeSpeed ? 2 : 1;
 			if (screenBrightness < 0) screenBrightness = 0;
 		}
 		if (!fadeSpeed) {
@@ -624,7 +585,7 @@ void vBlankHandler()
 	} else {
 		if (fadeSpeed || waitUntilFadeOut == 15) {
 			if (!fadeDelay) {
-				screenBrightness++;
+				screenBrightness += fadeSpeed ? 2 : 1;
 				if (screenBrightness > 31) screenBrightness = 31;
 			}
 			if (!fadeSpeed) {
@@ -990,20 +951,11 @@ void calendarLoad(void) {
 	int calendarY = calendarYPos;
 
 	const char* filePath = "nitro:/graphics/calendar/calendar.png";
-	FILE* file = fopen(filePath, "rb");
+	if (menuImage::Image image; image.load(filePath, 117, 115, colorTable)) {
+		for (unsigned i=0;i<image.size();i++) {
+			calendarImageBuffer[i] = image.color(i);
 
-	if (file) {
-		// Start loading
-		std::vector<unsigned char> image;
-		unsigned width, height;
-		lodepng::decode(image, width, height, filePath);
-		for (unsigned i=0;i<image.size()/4;i++) {
-			calendarImageBuffer[i] = image[i*4]>>3 | (image[(i*4)+1]>>3)<<5 | (image[(i*4)+2]>>3)<<10 | BIT(15);
-			if (colorTable) {
-				calendarImageBuffer[i] = colorTable[calendarImageBuffer[i] % 0x8000] | BIT(15);
-			}
-
-			calendarImageBuffer[i] = alphablend(calendarImageBuffer[i], topImageBuffer[(calendarY*256)+calendarX], image[(i*4)+3]);
+			calendarImageBuffer[i] = alphablend(calendarImageBuffer[i], topImageBuffer[(calendarY*256)+calendarX], image.alpha(i));
 
 			calendarX++;
 			if (calendarX >= calendarXPos + 117) {
@@ -1013,27 +965,17 @@ void calendarLoad(void) {
 		}
 	}
 
-	fclose(file);
 	
 	// Big calendar
 	calendarX = calendarXPos;
 	calendarY = calendarYPos;
 
 	filePath = "nitro:/graphics/calendar/calendarbig.png";
-	file = fopen(filePath, "rb");
+	if (menuImage::Image image; image.load(filePath, 117, 131, colorTable)) {
+		for (unsigned i=0;i<image.size();i++) {
+			calendarBigImageBuffer[i] = image.color(i);
 
-	if (file) {
-		// Start loading
-		std::vector<unsigned char> image;
-		unsigned width, height;
-		lodepng::decode(image, width, height, filePath);
-		for (unsigned i=0;i<image.size()/4;i++) {
-			calendarBigImageBuffer[i] = image[i*4]>>3 | (image[(i*4)+1]>>3)<<5 | (image[(i*4)+2]>>3)<<10 | BIT(15);
-			if (colorTable) {
-				calendarBigImageBuffer[i] = colorTable[calendarBigImageBuffer[i] % 0x8000] | BIT(15);
-			}
-
-			calendarBigImageBuffer[i] = alphablend(calendarBigImageBuffer[i], topImageBuffer[(calendarY*256)+calendarX], image[(i*4)+3]);
+			calendarBigImageBuffer[i] = alphablend(calendarBigImageBuffer[i], topImageBuffer[(calendarY*256)+calendarX], image.alpha(i));
 
 			calendarX++;
 			if (calendarX >= calendarXPos + 117) {
@@ -1043,7 +985,6 @@ void calendarLoad(void) {
 		}
 	}
 
-	fclose(file);
 
 	calendarDraw();
 }
@@ -1052,23 +993,13 @@ void clockLoad(void) {
 	if (ms().macroMode) return;
 
 	const char* filePath = "nitro:/graphics/clock.png";
-	FILE* file = fopen(filePath, "rb");
-
 	int clockX = clockXPos;
 	int clockY = clockYPos;
+	if (menuImage::Image image; image.load(filePath, 101, 101, colorTable)) {
+		for (unsigned i=0;i<image.size();i++) {
+			clockImageBuffer[i] = image.color(i);
 
-	if (file) {
-		// Start loading
-		std::vector<unsigned char> image;
-		unsigned width, height;
-		lodepng::decode(image, width, height, filePath);
-		for (unsigned i=0;i<image.size()/4;i++) {
-			clockImageBuffer[i] = image[i*4]>>3 | (image[(i*4)+1]>>3)<<5 | (image[(i*4)+2]>>3)<<10 | BIT(15);
-			if (colorTable) {
-				clockImageBuffer[i] = colorTable[clockImageBuffer[i] % 0x8000] | BIT(15);
-			}
-
-			clockImageBuffer[i] = alphablend(clockImageBuffer[i], topImageBuffer[(clockY*256)+clockX], image[(i*4)+3]);
+			clockImageBuffer[i] = alphablend(clockImageBuffer[i], topImageBuffer[(clockY*256)+clockX], image.alpha(i));
 
 			clockX++;
 			if (clockX >= clockXPos + 101) {
@@ -1079,7 +1010,6 @@ void clockLoad(void) {
 
 		clockDraw();
 	}
-	fclose(file);
 }
 
 void clockDraw() {
@@ -1230,16 +1160,12 @@ void topBgLoad(void) {
 	else if (tempNested[0] != '\0' && access(tempNested, F_OK) == 0)
 		sprintf(filePath, "%s", tempNested);
 
-	std::vector<unsigned char> image;
-	uint imageWidth, imageHeight;
-	lodepng::decode(image, imageWidth, imageHeight, std::string(filePath));
-	if (imageWidth > 256 || imageHeight > 192)	return;
+	menuImage::Image image;
+	if (!image.load(std::string(filePath), 256, 192, colorTable)
+	    && !image.load("nitro:/graphics/topbg.png", 256, 192, colorTable)) return;
 
-	for (uint i=0;i<image.size()/4;i++) {
-		topImageBuffer[i] = image[i*4]>>3 | (image[(i*4)+1]>>3)<<5 | (image[(i*4)+2]>>3)<<10 | BIT(15);
-		if (colorTable) {
-			topImageBuffer[i] = colorTable[topImageBuffer[i] % 0x8000] | BIT(15);
-		}
+	for (uint i=0;i<image.size();i++) {
+		topImageBuffer[i] = image.color(i);
 	}
 
 	// Start loading
@@ -1431,6 +1357,8 @@ void graphicsInit()
 		}
 	};
 	
+	startupProfileMark("video setup");
+
 	dlp_icons.bitmap = dlp_iconsBitmap + 0x1000 * getDlpBitmapOffset();
 
 	cursor.palette = (u16*)cursorPals+(getFavoriteColor()*16);
@@ -1468,7 +1396,9 @@ void graphicsInit()
 		pictochat_images = &pictochat.images;
 	}
 
+	startupProfileMark("sprite setup");
 	loadConsoleIcons();
+	startupProfileMark("console icons");
 
 	updateCursorTargetPos();
 	cursorTL = cursorTargetTL;

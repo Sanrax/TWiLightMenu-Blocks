@@ -31,6 +31,7 @@ License:
 
 #include "fat.h"
 #include "card.h"
+#include "common/bootloaderFatCache.h"
 
 
 //---------------------------------------------------------------
@@ -200,7 +201,7 @@ int discBytePerClus;
 enum {FS_UNKNOWN, FS_FAT12, FS_FAT16, FS_FAT32} discFileSystem;
 
 // Global sector buffer to save on stack space
-unsigned char globalBuffer[BYTES_PER_SECTOR];
+unsigned char globalBuffer[BYTES_PER_SECTOR] __attribute__((aligned(4)));
 
 
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -218,6 +219,7 @@ u32 FAT_NextCluster(u32 cluster)
 {
 	u32 nextCluster = CLUSTER_FREE;
 	u32 sector;
+	const u8 *fatData;
 	int offset;
 	
 	
@@ -230,8 +232,9 @@ u32 FAT_NextCluster(u32 cluster)
 		case FS_FAT12:
 			sector = discFAT + (((cluster * 3) / 2) / BYTES_PER_SECTOR);
 			offset = ((cluster * 3) / 2) % BYTES_PER_SECTOR;
-			CARD_ReadSector(sector, globalBuffer);
-			nextCluster = ((u8*) globalBuffer)[offset];
+			fatData = bootFatReadSector(sector);
+			if (!fatData) return CLUSTER_FREE;
+			nextCluster = fatData[offset];
 			offset++;
 			
 			if (offset >= BYTES_PER_SECTOR) {
@@ -239,14 +242,16 @@ u32 FAT_NextCluster(u32 cluster)
 				sector++;
 			}
 			
-			CARD_ReadSector(sector, globalBuffer);
-			nextCluster |= (((u8*) globalBuffer)[offset]) << 8;
+			fatData = bootFatReadSector(sector);
+			if (!fatData) return CLUSTER_FREE;
+			nextCluster |= (fatData[offset]) << 8;
 			
 			if (cluster & 0x01) {
 				nextCluster = nextCluster >> 4;
 			} else 	{
 				nextCluster &= 0x0FFF;
 			}
+			if (nextCluster >= 0xFF7) nextCluster = CLUSTER_EOF;
 			
 			break;
 			
@@ -254,9 +259,10 @@ u32 FAT_NextCluster(u32 cluster)
 			sector = discFAT + ((cluster << 1) / BYTES_PER_SECTOR);
 			offset = cluster % (BYTES_PER_SECTOR >> 1);
 			
-			CARD_ReadSector(sector, globalBuffer);
+			fatData = bootFatReadSector(sector);
+			if (!fatData) return CLUSTER_FREE;
 			// read the nextCluster value
-			nextCluster = ((u16*)globalBuffer)[offset];
+			nextCluster = ((const u16*)fatData)[offset];
 			
 			if (nextCluster >= 0xFFF7) {
 				nextCluster = CLUSTER_EOF;
@@ -267,9 +273,10 @@ u32 FAT_NextCluster(u32 cluster)
 			sector = discFAT + ((cluster << 2) / BYTES_PER_SECTOR);
 			offset = cluster % (BYTES_PER_SECTOR >> 2);
 			
-			CARD_ReadSector(sector, globalBuffer);
+			fatData = bootFatReadSector(sector);
+			if (!fatData) return CLUSTER_FREE;
 			// read the nextCluster value
-			nextCluster = (((u32*)globalBuffer)[offset]) & 0x0FFFFFFF;
+			nextCluster = (((const u32*)fatData)[offset]) & 0x0FFFFFFF;
 			
 			if (nextCluster >= 0x0FFFFFF7) {
 				nextCluster = CLUSTER_EOF;
@@ -305,6 +312,7 @@ bool return OUT: true if successful.
 -----------------------------------------------------------------*/
 bool FAT_InitFiles (bool initCard)
 {
+	bootFatCacheInvalidate();
 	int i;
 	int bootSector;
 	BOOT_SEC* bootSec;
@@ -467,84 +475,4 @@ u32 getBootFileCluster (const char* bootName)
 	return (dir.startCluster | (dir.startClusterHigh << 16));
 }
 
-/*-----------------------------------------------------------------
-fileRead(buffer, cluster, startOffset, length)
------------------------------------------------------------------*/
-u32 fileRead (char* buffer, u32 cluster, u32 startOffset, u32 length)
-{
-	int curByte;
-	int curSect;
-	
-	int dataPos = 0;
-	int chunks;
-	int beginBytes;
-
-	if (cluster == CLUSTER_FREE || cluster == CLUSTER_EOF) 
-	{
-		return 0;
-	}
-	
-	// Follow cluster list until desired one is found
-	for (chunks = startOffset / discBytePerClus; chunks > 0; chunks--) {
-		cluster = FAT_NextCluster (cluster);
-	}
-	
-	// Calculate the sector and byte of the current position,
-	// and store them
-	curSect = (startOffset % discBytePerClus) / BYTES_PER_SECTOR;
-	curByte = startOffset % BYTES_PER_SECTOR;
-
-	// Load sector buffer for new position in file
-	CARD_ReadSector(curSect + FAT_ClustToSect(cluster), globalBuffer);
-	curSect++;
-
-	// Number of bytes needed to read to align with a sector
-	beginBytes = (BYTES_PER_SECTOR < length + curByte ? (BYTES_PER_SECTOR - curByte) : length);
-
-	// Read first part from buffer, to align with sector boundary
-	for (dataPos = 0 ; dataPos < beginBytes; dataPos++) {
-		buffer[dataPos] = globalBuffer[curByte++];
-	}
-
-	// Read in all the 512 byte chunks of the file directly, saving time
-	for (chunks = ((int)length - beginBytes) / BYTES_PER_SECTOR; chunks > 0;) {
-		int sectorsToRead;
-
-		// Move to the next cluster if necessary
-		if (curSect >= discSecPerClus) {
-			curSect = 0;
-			cluster = FAT_NextCluster (cluster);
-		}
-
-		// Calculate how many sectors to read (read a maximum of discSecPerClus at a time)
-		sectorsToRead = discSecPerClus - curSect;
-		if (chunks < sectorsToRead)
-			sectorsToRead = chunks;
-
-		// Read the sectors
-		CARD_ReadSectors(curSect + FAT_ClustToSect(cluster), sectorsToRead, buffer + dataPos);
-		chunks  -= sectorsToRead;
-		curSect += sectorsToRead;
-		dataPos += BYTES_PER_SECTOR * sectorsToRead;
-	}
-
-	// Take care of any bytes left over before end of read
-	if (dataPos < length) {
-
-		// Update the read buffer
-		curByte = 0;
-		if (curSect >= discSecPerClus) {
-			curSect = 0;
-			cluster = FAT_NextCluster (cluster);
-		}
-		CARD_ReadSector(curSect + FAT_ClustToSect(cluster), globalBuffer);
-		
-		// Read in last partial chunk
-		for (; dataPos < length; dataPos++) {
-			buffer[dataPos] = globalBuffer[curByte];
-			curByte++;
-		}
-	}
-	
-	return dataPos;
-}
+#include "common/bootloaderFileRead.h"

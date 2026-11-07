@@ -7,6 +7,7 @@ void esrbDescFontInit(bool dsFont);
 void esrbDescFontDeinit();
 
 void updateText(bool top);
+void copyTextToScreen();
 void updateTextImg(u16* img, bool top);
 void clearText(bool top);
 void clearText();

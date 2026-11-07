@@ -28,6 +28,7 @@
 
 ---------------------------------------------------------------------------------*/
 #include <nds.h>
+#include "common/powerButton.h"
 #include <string.h>
 #include <maxmod7.h>
 #include "common/isPhatCheck.h"
@@ -167,7 +168,7 @@ volatile bool exitflag = false;
 //---------------------------------------------------------------------------------
 void powerButtonCB(void) {
 //---------------------------------------------------------------------------------
-	exitflag = true;
+	requestPowerButtonReboot();
 }
 
 TWL_CODE void set_ctr(u32* ctr){
@@ -322,6 +323,7 @@ int main() {
 
 	// Keep the ARM7 mostly idle
 	while (!exitflag) {
+		processPowerButtonReboot(ReturntoDSiMenu);
 		if ((REG_KEYINPUT & (KEY_SELECT | KEY_START | KEY_L | KEY_R)) == 0) {
 			exitflag = true;
 		}

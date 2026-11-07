@@ -121,6 +121,8 @@ typedef struct mmcdevice {
     u32 devicenumber;
     u32 total_size; //size in sectors of the device
     u32 res;
+    u32 dmaPollsLeft;
+    u16 dmaLastLine, dmaFramesLeft;
 } mmcdevice;
 
 enum {

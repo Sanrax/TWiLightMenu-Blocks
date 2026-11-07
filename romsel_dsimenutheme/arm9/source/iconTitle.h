@@ -23,6 +23,7 @@
 
 #include <string_view>
 
+void resetGameInfo(int num);
 void getGameInfo(bool isDir, const char* name, int num, bool fromArgv = false, bool checkCustomIcons = true);
 void iconUpdate(bool isDir, const char* name, int num);
 void titleUpdate(bool isDir, std::string_view name, int num);

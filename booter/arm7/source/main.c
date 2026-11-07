@@ -28,6 +28,7 @@
 
 ---------------------------------------------------------------------------------*/
 #include <nds.h>
+#include "common/powerButton.h"
 #include <string.h>
 
 #define SD_IRQ_STATUS (*(vu32*)0x400481C)
@@ -125,7 +126,7 @@ volatile bool exitflag = false;
 //---------------------------------------------------------------------------------
 void powerButtonCB() {
 //---------------------------------------------------------------------------------
-	exitflag = true;
+	requestPowerButtonReboot();
 }
 
 //---------------------------------------------------------------------------------
@@ -192,6 +193,7 @@ int main() {
 
 	// Keep the ARM7 mostly idle
 	while (!exitflag) {
+		processPowerButtonReboot(ReturntoDSiMenu);
 		if ((REG_KEYINPUT & (KEY_SELECT | KEY_START | KEY_L | KEY_R)) == 0) {
 			exitflag = true;
 		}

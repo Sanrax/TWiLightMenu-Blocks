@@ -73,7 +73,7 @@ public:
 	static void commitBgMainModify();
 	static void commitBgMainModifyAsync();
 
-	void drawTopBg();
+	void drawInitialTopBg();
 
 	void drawProfileName();
 	void resetProfileName();

@@ -28,6 +28,7 @@
 
 ---------------------------------------------------------------------------------*/
 #include <nds.h>
+#include "common/powerButton.h"
 void my_sdmmc_get_cid(int devicenumber, u32 *cid);
 #include <string.h>
 #include <maxmod7.h>
@@ -126,7 +127,7 @@ volatile bool exitflag = false;
 //---------------------------------------------------------------------------------
 void powerButtonCB() {
 //---------------------------------------------------------------------------------
-	exitflag = true;
+	requestPowerButtonReboot();
 }
 
 TWL_CODE void set_ctr(u32* ctr){
@@ -275,6 +276,7 @@ int main() {
 
 	// Keep the ARM7 mostly idle
 	while (!exitflag) {
+		processPowerButtonReboot(ReturntoDSiMenu);
 		if ((REG_KEYINPUT & (KEY_SELECT | KEY_START | KEY_L | KEY_R)) == 0) {
 			exitflag = true;
 		}

@@ -36,6 +36,10 @@ void clearBoxArt();
 // Resume the 3DS theme's background video after the band has been covered.
 void resumeRotatingCubesVideo();
 void graphicsInit();
+// Fade the icon row around an update, keeping the surrounding interface steady.
+void beginMenuContentUpdate();
+void endMenuContentUpdate();
+bool menuContentUpdating();
 extern u16* colorTable;
 
 template<typename T> inline const T abs(T const & x)

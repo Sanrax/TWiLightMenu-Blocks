@@ -56,6 +56,9 @@ int runNds (const void* loader, u32 loaderSize)
 	*((vu32*)0x02FFFE04) = (u32)0xE59FF018;
 	*((vu32*)0x02FFFE24) = (u32)0x02FFFE04;
 
+	// The SD IPC can leave sync value 1 asserted. Clear it before the SDK
+	// reset handshake, or ARM7 may acknowledge before ARM9 starts waiting.
+	REG_IPC_SYNC = 0;
 	resetARM7(0x06000000);
 
 	swiSoftReset(); 

@@ -39,6 +39,7 @@
 #include "common/my_rumble.h"
 #include "common/logging.h"
 #include "common/startupprofile.h"
+#include "common/indexedPhoto.h"
 #include "myDSiMode.h"
 #include "date.h"
 #include "iconHandler.h"
@@ -728,6 +729,59 @@ void playRotatingCubesVideo(void) {
 	advanceVideoFrame();
 }
 
+// Main-thread updates publish one complete page to the VBlank renderer.
+// 0 = ready, 1 = updating, 2 = ready with a required redraw.
+static volatile unsigned menuContentState;
+static volatile unsigned menuIconAlpha = 31;
+static volatile bool menuIconsAnimating;
+
+bool menuContentUpdating() {
+	return menuContentState == 1;
+}
+
+static void menuTransitionFrame(unsigned alpha) {
+	menuIconAlpha = alpha;
+	snd().updateStream();
+	swiWaitForVBlank();
+}
+
+void beginMenuContentUpdate() {
+	if (menuContentState == 1) return;
+	menuIconsAnimating = displayGameIcons && screenFadedIn();
+	if (menuIconsAnimating) {
+		// Fade before replacing the old icon banks. Zero alpha must skip the
+		// sprites: on the DS, polygon alpha zero selects wireframe rendering.
+		for (int alpha = 24; alpha >= 0; alpha -= 8)
+			menuTransitionFrame(alpha);
+	}
+	menuContentState = 1;
+	displayGameIcons = false;
+}
+
+void endMenuContentUpdate() {
+	displayGameIcons = true;
+	menuContentState = 2;
+	if (menuIconsAnimating) {
+		// Publish the new title and background with the icons hidden, then
+		// reveal only the icon row. Nine frames total, excluding metadata I/O.
+		menuTransitionFrame(0);
+		for (unsigned alpha = 8; alpha <= 32; alpha += 8)
+			menuTransitionFrame(std::min(alpha, 31u));
+		menuIconsAnimating = false;
+	}
+}
+
+static void drawMenuIcon(int x, int y, int num, unsigned polygonId) {
+	if (menuIconAlpha == 31) {
+		drawIcon(x, y, num);
+		return;
+	}
+	// Tile and banner overlap, so they need distinct translucent polygon IDs.
+	glPolyFmt(POLY_ALPHA(menuIconAlpha) | POLY_CULL_NONE | POLY_ID(polygonId + 1));
+	drawIcon(x, y, num);
+	glPolyFmt(POLY_ALPHA(menuIconAlpha) | POLY_CULL_NONE | POLY_ID(polygonId));
+}
+
 void vBlankHandler() {
 	execQueue();		   // Execute any actions queued during last vblank.
 	execDeferredIconUpdates(); // Update any icons queued during last vblank.
@@ -896,6 +950,19 @@ void vBlankHandler() {
 		SetBrightness(0, tc().darkLoading() ? -screenBrightness : screenBrightness);
 	if (controlTopBright && !ms().macroMode)
 		SetBrightness(1, tc().darkLoading() ? -screenBrightness : screenBrightness);
+	// 3D polygon alpha blends with the 2D background only when it is a
+	// second target. Preserve the theme's blend mode and restore its target.
+	static bool iconBlendEnabled;
+	static u16 savedIconBlendTarget;
+	if (menuIconsAnimating != iconBlendEnabled) {
+		if (menuIconsAnimating) {
+			savedIconBlendTarget = REG_BLDCNT & BLEND_DST_BG3;
+			REG_BLDCNT |= BLEND_DST_BG3;
+		} else {
+			REG_BLDCNT = (REG_BLDCNT & ~BLEND_DST_BG3) | savedIconBlendTarget;
+		}
+		iconBlendEnabled = menuIconsAnimating;
+	}
 
 	if (showdialogbox) {
 		// Dialogbox moving into view...
@@ -1166,7 +1233,12 @@ void vBlankHandler() {
 	// if (applaunchprep && ms().theme == TWLSettings::EThemeDSi)
 	// 	launchDotDoFrameChange = !launchDotDoFrameChange;
 
-	if (updateFrame) {
+	if (menuContentState || menuIconsAnimating) updateFrame = true;
+	if (menuContentState == 2) {
+		copyTextToScreen();
+		menuContentState = 0;
+	}
+	if (updateFrame && menuContentState != 1) {
 		glBegin2D();
 
 		int bg_R = bottomScreenBrightness / 8;
@@ -1218,7 +1290,7 @@ void vBlankHandler() {
 			glSprite(66 - titleboxXpos[ms().secondaryDevice], 81, GL_FLIP_NONE, tex().braceImage());
 		}
 
-		if (displayGameIcons) {
+		if (displayGameIcons && menuIconAlpha) {
 			// for (int i = 0; i < 11; i++) {
 			// 		glSprite(76 + launchDotX[i], 69 + launchDotY[i], GL_FLIP_NONE,
 			// 			&tex().launchdotImage()[5 & 15]);
@@ -1313,6 +1385,9 @@ void vBlankHandler() {
 				if (boxScreenX <= -64 || boxScreenX >= SCREEN_WIDTH)
 					continue;
 
+				const unsigned polygonId = 1 + (pos % 8) * 2;
+				if (menuIconAlpha != 31)
+					glPolyFmt(POLY_ALPHA(menuIconAlpha) | POLY_CULL_NONE | POLY_ID(polygonId));
 				if (i < spawnedtitleboxes) {
 					if (isDirectory[i]) {
 						if (ms().theme == TWLSettings::ETheme3DS)
@@ -1324,9 +1399,9 @@ void vBlankHandler() {
 									 (titleboxYpos - 3) + titleboxYposDropDown[i % 5],
 									 GL_FLIP_NONE, tex().folderImage());
 						if (customIcon[i])
-							drawIcon(iconXpos - titleboxXpos[ms().secondaryDevice],
+							drawMenuIcon(iconXpos - titleboxXpos[ms().secondaryDevice],
 									 (titleboxYpos + iconYposOnTitleBox) + titleboxYposDropDown[i % 5],
-									 i);
+									 i, polygonId);
 					} else if (!applaunchprep || CURPOS != i) { // Only draw the icon if we're not launching the selcted app
 						if (!bnrSysSettings[i]) {
 							if (ms().theme == TWLSettings::ETheme3DS) {
@@ -1344,9 +1419,9 @@ void vBlankHandler() {
 									 (titleboxYpos - 1) + titleboxYposDropDown[i % 5],
 									 GL_FLIP_NONE, &tex().settingsImage()[1]);
 						else
-							drawIcon(iconXpos - titleboxXpos[ms().secondaryDevice],
+							drawMenuIcon(iconXpos - titleboxXpos[ms().secondaryDevice],
 										(titleboxYpos + iconYposOnTitleBox) + titleboxYposDropDown[i % 5],
-										i);
+										i, polygonId);
 					}
 				} else {
 					// Empty box
@@ -1363,6 +1438,8 @@ void vBlankHandler() {
 			}
 
 			if (movingApp != -1) {
+				if (menuIconAlpha != 31)
+					glPolyFmt(POLY_ALPHA(menuIconAlpha) | POLY_CULL_NONE | POLY_ID(17));
 				// movingAppXpos is the carried box'''s screen x: 96 when it sits on the
 				// gap (the keypad move mode never changes it), or wherever the stylus
 				// has dragged it to. +16 is the icon'''s inset inside the 64px box, the
@@ -1375,9 +1452,9 @@ void vBlankHandler() {
 						glSprite(movingAppXpos, titleboxYpos - movingAppYpos + titleboxYposDropDown[movingApp % 5],
 								 GL_FLIP_NONE, tex().folderImage());
 					if (customIcon[MOVING_APP_SLOT])
-						drawIcon(movingIconXpos,
+						drawMenuIcon(movingIconXpos,
 								 (titleboxYpos + iconYposOnTitleBox) - movingAppYpos + titleboxYposDropDown[movingApp % 5],
-								 -1);
+								 -1, 17);
 				} else {
 					if (!bnrSysSettings[MOVING_APP_SLOT]) {
 						if (ms().theme == TWLSettings::ETheme3DS) {
@@ -1394,7 +1471,7 @@ void vBlankHandler() {
 								 (titleboxYpos - 1) - movingAppYpos + titleboxYposDropDown[movingApp % 5],
 								 GL_FLIP_NONE, &tex().settingsImage()[1]);
 					else
-						drawIcon(movingIconXpos, (titleboxYpos + iconYposOnTitleBox) - movingAppYpos + titleboxYposDropDown[movingApp % 5], -1);
+						drawMenuIcon(movingIconXpos, (titleboxYpos + iconYposOnTitleBox) - movingAppYpos + titleboxYposDropDown[movingApp % 5], -1, 17);
 				}
 			}
 
@@ -1406,6 +1483,7 @@ void vBlankHandler() {
 				glSprite(115, movingArrowYpos, GL_FLIP_NONE, tex().movingArrowImage());
 			}
 		}
+		glPolyFmt(POLY_ALPHA(31) | POLY_CULL_NONE);
 
 		// Top icons for 3DS theme
 		if (ms().theme == TWLSettings::ETheme3DS) {
@@ -1473,16 +1551,19 @@ void vBlankHandler() {
 			// Draw dots after selecting a game/app
 			dots().drawAuto();
 		}
-		if (showSTARTborder && displayGameIcons && (ms().theme < 4)) {
+		if (showSTARTborder && displayGameIcons && menuIconAlpha && (ms().theme < 4)) {
+			glPolyFmt(POLY_ALPHA(menuIconAlpha) | POLY_CULL_NONE | POLY_ID(19));
 			glSprite(96, tc().startBorderRenderY(), GL_FLIP_NONE,
 				 &tex().startbrdImage()[startBorderZoomAnimSeq[startBorderZoomAnimNum] &
 							(tc().startBorderSpriteH() - 1)]);
 			glSprite(96 + tc().startBorderSpriteW(), tc().startBorderRenderY(), GL_FLIP_H,
 				 &tex().startbrdImage()[startBorderZoomAnimSeq[startBorderZoomAnimNum] &
 							(tc().startBorderSpriteH() - 1)]);
-			if (bnrWirelessIcon[CURPOS] > 0)
+			if (bnrWirelessIcon[CURPOS] > 0) {
+				glPolyFmt(POLY_ALPHA(menuIconAlpha) | POLY_CULL_NONE | POLY_ID(21));
 				glSprite(96, tc().startBorderRenderY(), GL_FLIP_NONE,
 					 &tex().wirelessIcons()[(bnrWirelessIcon[CURPOS] - 1) & 31]);
+			}
 
 			if (currentBg == 1 && tc().playStopSound() && needToPlayStopSound &&
 				waitForNeedToPlayStopSound == 0) {
@@ -1501,13 +1582,16 @@ void vBlankHandler() {
 				// 		 &tex().wirelessIcons()[(bnrWirelessIcon[CURPOS] - 1) & 31]);
 			// }
 		}
+		glPolyFmt(POLY_ALPHA(31) | POLY_CULL_NONE);
 
 		// Refresh the background layer.
 		if (currentBg == 1 && ms().theme != TWLSettings::EThemeSaturn && ms().theme != TWLSettings::EThemeHBL)
 			drawBubble(tex().bubbleImage());
-		if (showSTARTborder && displayGameIcons && ms().theme == TWLSettings::EThemeDSi) {
+		if (showSTARTborder && displayGameIcons && menuIconAlpha && ms().theme == TWLSettings::EThemeDSi) {
+			glPolyFmt(POLY_ALPHA(menuIconAlpha) | POLY_CULL_NONE | POLY_ID(20));
 			glSprite(96, tc().startTextRenderY(), GL_FLIP_NONE, &tex().startImage()[ms().getGameLanguage()]);
 		}
+		glPolyFmt(POLY_ALPHA(31) | POLY_CULL_NONE);
 
 		glColor(RGB15(31, 31, 31));
 		if (dbox_Ypos != -192 || (ms().theme == TWLSettings::EThemeSaturn && currentBg == 1) || ms().theme == TWLSettings::EThemeHBL) {
@@ -1635,7 +1719,7 @@ void vBlankHandler() {
 		secondBuffer = !secondBuffer;
 	}
 
-	bottomBgRefresh(); // Refresh the background image on vblank
+	if (menuContentState != 1) bottomBgRefresh();
 }
 
 bool allowNewPhotoLoad = true;
@@ -1645,6 +1729,7 @@ static int currentBootstrapPhoto = 0;
 
 void loadPhoto(const std::string &path);
 void loadBootstrapScreenshot(FILE *file);
+static bool loadDefaultPhoto();
 
 bool loadPhotoList() {
 	if (!allowNewPhotoLoad) {
@@ -1700,38 +1785,23 @@ bool loadPhotoList() {
 			currentBootstrapPhoto = screenshots[rand() % screenshots.size()];
 			fseek(file, 0x200 + 0x18400 * currentBootstrapPhoto, SEEK_SET);
 			loadBootstrapScreenshot(file);
+			fclose(file);
 			currentPhotoIsBootstrap = true;
 			return true;
 		}
+		fclose(file);
 	}
 
 	// If no photos or screenshots found, then draw the default
 	char path[64];
 	snprintf(path, sizeof(path), "nitro:/languages/%s/photo_default.png", ms().getGuiLanguageString().c_str());
 	currentPhotoPath = path;
-	loadPhoto(path);
+	if (!loadDefaultPhoto()) loadPhoto(path);
 	currentPhotoIsBootstrap = false;
 	return true;
 }
 
-void loadPhoto(const std::string &path) {
-	std::vector<unsigned char> image;
-	bool alternatePixel = false;
-	bool alternatePixel2 = false;
-
-	unsigned error = lodepng::decode(image, photoWidth, photoHeight, path);
-
-	if (error || !photoWidth || !photoHeight || photoWidth > 208 || photoHeight > 156) {
-		image.clear();
-		// Invalid or oversized photos use the language's default image.
-		char path[64];
-		snprintf(path, sizeof(path), "nitro:/languages/%s/photo_default.png", ms().getGuiLanguageString().c_str());
-		currentPhotoPath = path;
-		error = lodepng::decode(image, photoWidth, photoHeight, path);
-	}
-	if (error || !photoWidth || !photoHeight || photoWidth > 208 || photoHeight > 156
-		|| image.size() != photoWidth * photoHeight * 4) return;
-
+static u16 *beginPhotoDraw() {
 	u16* topBorderBuffer = tex().topBorderBuffer();
 	u16* topBorderBuffer2 = tex().topBorderBuffer2();
 	u16 *bgSubBuffer = tex().beginBgSubModify();
@@ -1747,8 +1817,62 @@ void loadPhoto(const std::string &path) {
 			dmaFillHalfWords(0x8000, bgSubBuffer2 + (y * 256) + 24, 208 * 2);
 		}
 	}
+	return bgSubBuffer;
+}
+
+static bool loadDefaultPhoto() {
+	char path[64];
+	snprintf(path, sizeof(path), "nitro:/languages/%s/photo_default.pht", ms().getGuiLanguageString().c_str());
+	FILE *file = fopen(path, "rb");
+	if (!file) return false;
+	indexedPhoto::Image image;
+	const bool loaded = image.load(file);
+	fclose(file);
+	if (!loaded) return false;
+	photoWidth = image.width;
+	photoHeight = image.height;
+	startupProfileMark("photo decode");
+	u16 *background = beginPhotoDraw();
+	startupProfileMark("photo clear");
+	const unsigned start = (24 + (156 - photoHeight) / 2) * 256 + 24 + (208 - photoWidth) / 2;
+	for (unsigned frame = 0; frame < unsigned(boxArtColorDeband) + 1; frame++) {
+		u16 *border = (frame ? tex().topBorderBuffer2() : tex().topBorderBuffer()) + start;
+		u16 *bg = (frame ? tex().bgSubBuffer2() : background) + start;
+		indexedPhoto::render(image, border, 256, boxArtColorDeband, frame != 0, colorTable);
+		for (unsigned row = 0; row < photoHeight; row++)
+			tonccpy(bg + row * 256, border + row * 256, photoWidth * sizeof(u16));
+	}
+	startupProfileMark("photo pixels");
+	tex().commitBgSubModify();
+	return true;
+}
+
+void loadPhoto(const std::string &path) {
+	std::vector<unsigned char> image;
+	bool alternatePixel = false;
+	bool alternatePixel2 = false;
+
+	unsigned error = lodepng::decode(image, photoWidth, photoHeight, path);
+
+	if (error || !photoWidth || !photoHeight || photoWidth > 208 || photoHeight > 156) {
+		image.clear();
+		// Invalid or oversized photos use the language's default image.
+		if (loadDefaultPhoto()) return;
+		char path[64];
+		snprintf(path, sizeof(path), "nitro:/languages/%s/photo_default.png", ms().getGuiLanguageString().c_str());
+		currentPhotoPath = path;
+		error = lodepng::decode(image, photoWidth, photoHeight, path);
+	}
+	if (error || !photoWidth || !photoHeight || photoWidth > 208 || photoHeight > 156
+		|| image.size() != photoWidth * photoHeight * 4) return;
+	startupProfileMark("photo decode");
+	u16 *bgSubBuffer = beginPhotoDraw();
+	u16 *bgSubBuffer2 = tex().bgSubBuffer2();
+	u16 *topBorderBuffer = tex().topBorderBuffer();
+	u16 *topBorderBuffer2 = tex().topBorderBuffer2();
 
 	// Start loading
+	startupProfileMark("photo clear");
 	uint startX = 24 + (208 - photoWidth) / 2;
 	for (int b = 0; b < boxArtColorDeband+1; b++) {
 		const uint startY = 24 + ((156 - photoHeight) / 2);
@@ -1811,6 +1935,7 @@ void loadPhoto(const std::string &path) {
 		alternatePixel = !alternatePixel;
 	}
 
+	startupProfileMark("photo pixels");
 	tex().commitBgSubModify();
 }
 
@@ -2000,7 +2125,7 @@ void graphicsInit() {
 	}
 
 	if (!ms().macroMode) {
-		tex().drawTopBg();
+		tex().drawInitialTopBg();
 	}
 	bottomBgLoad(false, true);
 	// consoleDemoInit();

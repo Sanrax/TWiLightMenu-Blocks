@@ -1,6 +1,6 @@
 #include "common/startupprofile.h"
 
-#if defined(TWLM_PROFILE_STARTUP) && CURRENT_SCREEN_MODE == 3
+#if defined(TWLM_PROFILE_STARTUP) && (CURRENT_SCREEN_MODE == 0 || CURRENT_SCREEN_MODE == 2 || CURRENT_SCREEN_MODE == 3)
 #include <nds.h>
 #include <cstdio>
 #include "common/systemdetails.h"
@@ -10,16 +10,17 @@ struct Point {
     const char *phase;
     u32 ticks;
 };
-Point points[32];
+Point points[64];
 unsigned count;
 bool active;
+// The title's GIF splash uses ARM9 timer 0. Maxmod streams use ARM7 timers.
+constexpr int timer = CURRENT_SCREEN_MODE == 0 ? 2 : 0;
 }
 
 void startupProfileBegin()
 {
-    // ARM9 timers 0/1 are unused by this menu. Maxmod's stream timer is ARM7.
-    // Capture in memory; no filesystem writes until the first menu frame.
-    cpuStartTiming(0);
+    // Capture in RAM; write only after the measured interval ends.
+    cpuStartTiming(timer);
     points[0] = {"main", 0};
     count = 1;
     active = true;
@@ -37,8 +38,10 @@ void startupProfileEnd()
     startupProfileMark("ready");
     cpuEndTiming();
     active = false;
-    const char *path = sys().isRunFromSD() ? "sd:/_nds/TWiLightMenu/startup-profile.csv"
-                                         : "fat:/_nds/TWiLightMenu/startup-profile.csv";
+    constexpr const char *filename = CURRENT_SCREEN_MODE == 0 ? "title-startup-profile.csv"
+        : CURRENT_SCREEN_MODE == 2 ? "classic-startup-profile.csv" : "startup-profile.csv";
+    char path[96];
+    snprintf(path, sizeof(path), "%s:/_nds/TWiLightMenu/%s", sys().isRunFromSD() ? "sd" : "fat", filename);
     FILE *file = fopen(path, "wb");
     if (!file) return;
     fputs("phase,total_us,phase_us\n", file);

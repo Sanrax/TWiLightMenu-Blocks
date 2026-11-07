@@ -28,6 +28,7 @@
 
 ---------------------------------------------------------------------------------*/
 #include <nds.h>
+#include "common/powerButton.h"
 
 void my_installSystemFIFO(void);
 u8 my_cdcReadReg(u8 bank, u8 reg);
@@ -64,7 +65,7 @@ volatile bool exitflag = false;
 //---------------------------------------------------------------------------------
 void powerButtonCB() {
 //---------------------------------------------------------------------------------
-	exitflag = true;
+	requestPowerButtonReboot();
 }
 
 //---------------------------------------------------------------------------------
@@ -119,6 +120,7 @@ int main() {
 	fifoSendValue32(FIFO_USER_07, isRegularDS);
 	// Keep the ARM7 mostly idle
 	while (!exitflag) {
+		processPowerButtonReboot(ReturntoDSiMenu);
 		if (fifoCheckValue32(FIFO_USER_01)) {
 			if (!isRegularDS) {
 				ReturntoDSiMenu(); // reboot into System Menu (power-off/sleep mode screen skipped)

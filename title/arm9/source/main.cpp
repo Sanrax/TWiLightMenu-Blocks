@@ -1,5 +1,6 @@
 #include "common/filetypes.h"
 #include "common/storage.h"
+#include "common/startupprofile.h"
 #include <sys/stat.h>
 #include <limits.h>
 #include <time.h>
@@ -133,6 +134,7 @@ void loadMainMenu()
 	while (!screenFadedOut())
 		swiWaitForVBlank();
 	fifoSendValue32(FIFO_USER_01, 0); // Cancel sound fade out
+	startupProfileEnd();
 
 	logPrint("Opening DS Classic Menu...\n");
 
@@ -152,6 +154,7 @@ void loadROMselect(void)
 	while (!screenFadedOut())
 		swiWaitForVBlank();
 	fifoSendValue32(FIFO_USER_01, 0); // Cancel sound fade out
+	startupProfileEnd();
 
 	vector<char *> argarray;
 
@@ -2496,6 +2499,7 @@ int titleMode(void)
 	}
 
 	*(u32*)(0x02000000) = softResetParamsBak;
+	startupProfileMark("boot environment");
 
 	scanKeys();
 	if ((keysHeld() & KEY_A)
@@ -2519,10 +2523,12 @@ int titleMode(void)
 	#ifndef _NO_BOOTSTUB_
 	installBootStub(sdFound(), sys().isRunFromSD(), false);
 	#endif
+	startupProfileMark("flashcard/bootstub");
 
 	ms().loadSettings();
 	bs().loadSettings();
 	logInit();
+	startupProfileMark("settings");
 
 	// Get SysNAND region and launcher app
 	if (isDSiMode() && sdFound() && !is3DS && (ms().sysRegion == TWLSettings::ERegionDefault || ms().launcherApp == -1)) {
@@ -2577,6 +2583,7 @@ int titleMode(void)
 		}
 	}
 
+	startupProfileMark("system region");
 	// Set DSi donor ROM
 	if (useTwlCfg && isDSiMode() && sdFound()) {
 		if (sys().arm7SCFGLocked()) {
@@ -2588,6 +2595,7 @@ int titleMode(void)
 		}
 	}
 
+	startupProfileMark("donor selection");
 	{
 		char currentSettingPath[40];
 		sprintf(currentSettingPath, "%s:/_nds/colorLut/currentSetting.txt", (sys().isRunFromSD() ? "sd" : "fat"));
@@ -2620,6 +2628,7 @@ int titleMode(void)
 		}
 	}
 
+	startupProfileMark("color LUT");
 	if (!ms().languageSet) {
 		runGraphicIrq();
 		languageSelect();
@@ -2663,6 +2672,7 @@ int titleMode(void)
 	}
 
 	const bool fcFound = flashcardFound();
+	startupProfileMark("user prompts");
 
 	if (dsiFeatures() && ms().consoleModel == 0 && !ms().previousUsedDevice && ms().launchType[false] == Launch::EDSiWareLaunch && ms().dsiWareBooter == TWLSettings::EDSiWareUnlaunch && ms().saveLocation != TWLSettings::EGamesFolder) {
 		// Move .pub and/or .prv back to "saves" folder
@@ -2830,6 +2840,7 @@ int titleMode(void)
 		}
 	}
 
+	startupProfileMark("save recovery");
 	if (sdFound()) {
 		mkdir("sd:/_gba", 0777);
 		mkdir("sd:/_nds", 0777);
@@ -2881,6 +2892,7 @@ int titleMode(void)
 		}
 	}
 
+	startupProfileMark("installation dirs");
 	if (isDSiMode()) {
 		// Extend the MPU region that is mapped at address 0xC000000 up to
 		// 0xE000000 instead of potentially ending at 0xD000000.
@@ -2955,6 +2967,7 @@ int titleMode(void)
 		ms().saveSettings();
 	}
 
+	startupProfileMark("reset/settings");
 	if (!softResetParamsFound && !(*(u32*)0x02000000 & BIT(3)) && ms().dsiSplash && ((REG_SCFG_EXT != 0 && !sys().i2cBricked() && ms().consoleModel < 2) ? fifoGetValue32(FIFO_USER_04) != 0x01 : !(*(u32*)0x02000000 & BIT(0)))) {
 		runGraphicIrq();
 		bootSplashInit();
@@ -3030,6 +3043,7 @@ int titleMode(void)
 	}
 	*(u32*)0x02000000 &= ~BIT(1);
 	*(u32*)0x02000000 &= ~BIT(2);
+	startupProfileMark("splash/startup");
 
 	scanKeys();
 

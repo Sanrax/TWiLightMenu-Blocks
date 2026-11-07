@@ -52,6 +52,10 @@
 #define LOADFROMRAM_OFFSET 36
 #define COMMON_CACHE_OFFSET 40
 
+#ifdef TWLM_BOOT_DIAGNOSTICS
+void bootStage(const char* stage);
+#endif
+
 
 typedef signed int addr_t;
 typedef unsigned char data_t;
@@ -319,6 +323,9 @@ int runNds (const void* loader, u32 loaderSize, u32 cluster, bool initDisc, bool
 	*((vu32*)0x02FFFE04) = (u32)0xE59FF018;
 	*((vu32*)0x02FFFE24) = (u32)0x02FFFE04;
 
+	// The SD IPC can leave sync value 1 asserted. Clear it before the SDK
+	// reset handshake, or ARM7 may acknowledge before ARM9 starts waiting.
+	REG_IPC_SYNC = 0;
 	resetARM7(0x06020000);
 
 	swiSoftReset(); 
@@ -388,11 +395,22 @@ int runNdsFile (const char* filename, int argc, const char** argv, u32 commonCac
 		argv = args;
 	}
 
+	bool loadFromRam;
 	if (isDSiMode()) {
+#ifdef TWLM_BOOT_DIAGNOSTICS
+		bootStage("Staging DS/DSi binaries");
+#endif
 		runNds9i(filename);
+		// All four binaries are already staged. Reuse them even when an
+		// internal SD is present, instead of reading the same image again
+		// from the ARM7 bootloader after resetting the storage environment.
+		loadFromRam = true;
+	} else {
+		loadFromRam = runNds9(filename);
 	}
-
-	const bool loadFromRam = (runNds9(filename) || (isDSiMode() && access("sd:/", F_OK) != 0));
+#ifdef TWLM_BOOT_DIAGNOSTICS
+	bootStage(loadFromRam ? "Handoff: staged RAM" : "Handoff: storage");
+#endif
 	
 	return runNds (load_bin, load_bin_size, st.st_ino, true, (memcmp(io_dldi_data->friendlyName, "Default", 7) != 0), loadFromRam, argc, argv, commonCache);
 }

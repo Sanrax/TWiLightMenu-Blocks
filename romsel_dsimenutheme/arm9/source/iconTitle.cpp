@@ -68,8 +68,6 @@ static bool infoFound[41] = {false};
 static const char16_t *cachedTitle[41];
 static const char16_t *blankTitle = u"";
 
-static u32 arm9StartSig[4];
-
 // One staging slot per icon bank, holding tiles already in texture order.
 //
 // The tile conversion below is roughly eight times the cost of the VRAM copy for
@@ -263,10 +261,7 @@ void clearTitle(int num) {
 	cachedTitle[num] = blankTitle;
 }
 
-void getGameInfo(bool isDir, const char *name, int num, bool fromArgv, bool checkCustomIcons) {
-	if (num == -1)
-		num = MOVING_APP_SLOT;
-
+static void resetGameClassification(int num) {
 	bnriconPalLine[num] = 0;
 	bnriconPalLoaded[num] = 0;
 	bnriconframenumY[num] = 0;
@@ -282,11 +277,30 @@ void getGameInfo(bool isDir, const char *name, int num, bool fromArgv, bool chec
 	isModernHomebrew[num] = true;
 	requiresRamDisk[num] = false;
 	requiresDonorRom[num] = false;
-	if (!fromArgv) {
-		bnriconisDSi[num] = false;
-		customIcon[num] = 0;
-		infoFound[num] = false;
-	}
+	bnrSysSettings[num] = false;
+	romVersion[num] = 0;
+	unitCode[num] = 0;
+	headerCRC[num] = 0;
+	a7mbk6[num] = 0;
+}
+
+// Clear a page slot without opening its file. In particular, stop the previous
+// page's animated icon before the VBlank handler can sample its palette again.
+void resetGameInfo(int num) {
+	bnriconisDSi[num] = false;
+	resetGameClassification(num);
+	customIcon[num] = 0;
+	infoFound[num] = false;
+	clearTitle(num);
+}
+
+void getGameInfo(bool isDir, const char *name, int num, bool fromArgv, bool checkCustomIcons) {
+	if (num == -1)
+		num = MOVING_APP_SLOT;
+	if (fromArgv)
+		resetGameClassification(num);
+	else
+		resetGameInfo(num);
 
 	// A user-defined file-type banner (extras/config.<ext>.ini) backs up the per-file
 	// icons/ overrides below, and applies even when custom icons are turned off.
@@ -542,6 +556,7 @@ void getGameInfo(bool isDir, const char *name, int num, bool fromArgv, bool chec
 		}
 
 		sNDSHeaderExt ndsHeader{};
+		u32 arm9StartSig[4] = {};
 
 		// Browsing only uses fields in the first sector, including DSi flags,
 		// access control and ARM7i destinations. Save sizes are read at launch.
@@ -853,6 +868,9 @@ void iconUpdate(bool isDir, const char *name, int num) {
 		// getGameInfo() already resolved the target and cached its banner. An
 		// invalid argv has no cached title; valid targets use the NDS path below.
 		clearIcon(spriteIdx);
+	} else if (isNds && !infoFound[num]) {
+		// A failed header read must not display the previous page's banner.
+		loadUnkIcon(spriteIdx);
 	} else if (isNds) {
 		// this is an nds/app file!
 		logPrint("NDS icon found!");

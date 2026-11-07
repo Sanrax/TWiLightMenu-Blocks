@@ -114,6 +114,9 @@ void runLaunchEngine (bool altBootloader, bool isDSBrowser)
 	
 	// Reset ARM7
 	nocashMessage("resetARM7");
+	// The SD IPC can leave sync value 1 asserted. Clear it before the SDK
+	// reset handshake, or ARM7 may acknowledge before ARM9 starts waiting.
+	REG_IPC_SYNC = 0;
 	resetARM7(0x06020000);	
 
 	// swi soft reset

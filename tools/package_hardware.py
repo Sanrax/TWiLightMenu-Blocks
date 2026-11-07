@@ -38,11 +38,14 @@ def main():
     args = parser.parse_args()
     bootstrap = args.bootstrap.resolve()
     cia = args.cia.resolve()
+    entrypoint = ROOT / 'booter/booter.nds'
     output = args.output.resolve()
     dependencies = ['nds-bootstrap-release.nds', 'nds-bootstrap-hb-release.nds', 'release-bootstrap.ver']
-    for path in [*(bootstrap / name for name in dependencies), cia]:
+    for path in [*(bootstrap / name for name in dependencies), cia, entrypoint]:
         if not path.is_file():
             parser.error(f'Missing build dependency: {path}')
+    if entrypoint.read_bytes() not in cia.read_bytes():
+        parser.error('CIA does not contain the rebuilt booter.nds; regenerate it before packaging')
     subprocess.run(['python3', 'tests/check_build.py'], cwd=ROOT, check=True)
     output.mkdir(parents=True, exist_ok=True)
 
@@ -61,7 +64,9 @@ def main():
         'sdk': 'BlocksDS 1.24.0',
         'bootstrap_version': (bootstrap / 'release-bootstrap.ver').read_text().strip(),
         'bootstrap_sha256': {name: sha256(bootstrap / name) for name in dependencies},
-        'validation': ['make -j6 all', 'make test', 'make package', 'make check-build'],
+        'cia_sha256': sha256(cia),
+        'cia_entrypoint_sha256': sha256(entrypoint),
+        'validation': ['make all', 'make test', 'make package', 'make check-build'],
     }
     install = {
         'DSi': 'Merge the archive contents into the SD card root. Select BOOT.NDS in Unlaunch.\n'
@@ -119,15 +124,41 @@ def main():
                 'Internal-SD retail bootstrap stalled in this emulator, including a direct\n'
                 'official-bootstrap control. The user has confirmed retail bootstrap and\n'
                 'pico-loader gameplay input on DSpico hardware.\n\n'
-                'This revision addresses the reported scroll-sound interrupt deadlock,\n'
-                'splash/cursor palette colors, bootstrap version display and Settings\n'
-                'backlight restoration. It also reduces banner I/O and menu fade waits.\n'
-                'These fixes still need hardware retesting, especially DSi-mode ALT boot\n'
-                'through Pico-Launcher and scrolling through folders.\n\n'
-                'Useful console tests: cold boot; Settings and folder navigation; retail\n'
-                'bootstrap boot/save/relaunch; argv/emulator launching; internal DSi SD/NAND;\n'
-                '3DS widescreen/reboot; pico-loader; ALT boot from Pico-Launcher; lid\n'
-                'close/open in Settings. See BLOCKSDS-PORT.md.\n')
+                'Hardware feedback confirms the previous normal BOOT.NDS revision works.\n'
+                'This build includes those fixes plus visible-entry banner loading,\n'
+                'selected box-art caching, build-decoded photos and UI PNGs, shorter menu\n'
+                'fades, shared translation parsing, batched font-map reads and cached,\n'
+                'batched reads in the ARM7 handoff loaders. GRF reads are sequential,\n'
+                'with padded GPU texture and palette upload buffers.\n'
+                'In the DS/DLDI emulator fixture, the menu program reads in 0.40 s\n'
+                'instead of 1.15 s. This is one loader phase, not a hardware cold-boot\n'
+                'measurement; the fixture uses 512-byte clusters. The additional gain\n'
+                'from batching is small with 32 KiB clusters in internal-SD emulation.\n'
+                'A separate full-font fixture reduces cold font setup from 651 to\n'
+                '112 ms in the emulator. This is not a hardware boot-time claim.\n'
+                'See BLOCKSDS-PORT.md for scope and validation.\n\n'
+                'The DSpico hardware log stopped while mounting internal SD. This build\n'
+                'enables ARM7 SD access before probing the controller and bounds failed\n'
+                'initialization waits. It also clears stale SD IPC sync state before\n'
+                'ARM7 reset, fixing a reproduced DSi-mode DLDI handoff race.\n'
+                'SD transfer r3 also corrects DMA word counts, waits for the complete\n'
+                'buffer, bounds stalled transfers, and prevents the native SD interrupt\n'
+                'handler from clearing flags needed by the custom polling driver.\n'
+                'The user confirmed ALT and TEST boot and function on DSpico with r3.\n'
+                'Power/navigation r4 routes the power button to firmware reboot instead\n'
+                'of the SDK return-to-loader path, and serializes I2C status polling.\n'
+                'Folder/page/device changes fade only the game/folder icon row;\n'
+                'the surrounding interface stays steady, without a loading overlay.\n'
+                'Startup fades directly into the prepared menu without a loading bar.\n'
+                'DS Classic also uses compressed indexed images and faster fast fades.\n'
+                'The power-button change needs a DSi LL / Pico-Launcher hardware retest.\n'
+                'The accompanying Power/navigation r4 BOOT_TEST.NDS provides a log\n'
+                'at _nds/TWiLightMenu/boot-diagnostic.log for that retest.\n'
+                'The entry files remain separate pending that power-button retest.\n\n'
+                'Useful console checks for this build: cold boot with splashes disabled;\n'
+                'open game folders; scroll and change pages; DS Classic round trips;\n'
+                'Settings return and lid reopening; argv/emulator launching. Compare\n'
+                'on the same card, folder and settings as your previous build.\n')
             (stage / 'version.txt').write_text(
                 'TWiLight Menu++ BlocksDS hardware-test build\n'
                 f'SDK: {info["sdk"]}\n'

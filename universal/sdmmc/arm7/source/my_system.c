@@ -28,15 +28,10 @@
 #include <nds/fifocommon.h>
 #include <nds/fifomessages.h>
 #include <nds/interrupts.h>
-#include <nds/bios.h>
-#include <nds/arm7/clock.h>
-#include <nds/arm7/i2c.h>
-// #include <string.h>
 
 void powerValueHandler(u32 value, void* user_data);
 void firmwareMsgHandler(int bytes, void *user_data);
-void my_sdmmcHandler();
-void my_sdmmcHandlerFifo(u32 value, void* user_data);
+void my_sdmmcHandler(void);
 
 //---------------------------------------------------------------------------------
 void my_installSystemFIFO(void) {
@@ -44,14 +39,14 @@ void my_installSystemFIFO(void) {
 
 	fifoSetValue32Handler(FIFO_PM, powerValueHandler, 0);
 	fifoSetDatamsgHandler(FIFO_FIRMWARE, firmwareMsgHandler, 0);
-	
-	//if (isDSiMode() || (REG_SCFG_EXT & BIT(18))) {
-	// if (strncmp((const char*)0x04FFFA00, "no$gba", 6) == 0) {
-		irqSet(IRQ_IPC_SYNC, my_sdmmcHandler);
-		irqEnable(IRQ_IPC_SYNC);
-	/* } else {
-		fifoSetValue32Handler(FIFO_SDMMC, my_sdmmcHandlerFifo, 0);
-	} */
+
+	// BlocksDS irqInit() installs a native TMIO ISR. It acknowledges the SD
+	// response/data flags that our polling IPC driver must read itself. Stop
+	// that ISR before accepting requests, including between continuation calls.
+	// Leave WiFi SDIO and power-button interrupts owned by their SDK drivers.
+	if (isDSiMode()) irqDisableAUX(IRQ_SDMMC);
+	irqSet(IRQ_IPC_SYNC, my_sdmmcHandler);
+	irqEnable(IRQ_IPC_SYNC);
 }
 
 

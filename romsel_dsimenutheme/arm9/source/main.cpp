@@ -1419,13 +1419,10 @@ int dsiMenuTheme(void) {
 	}
 
 	if (ms().theme != TWLSettings::EThemeSaturn) {
-		extern void displayNowLoading(void);
-		displayNowLoading();
-
 		logPrint("snd()\n");
 		snd();
 		startupProfileMark("sound effects");
-		snd().loadStream(true);
+		snd().loadStream(false);
 	}
 
 	startupProfileMark("sound");

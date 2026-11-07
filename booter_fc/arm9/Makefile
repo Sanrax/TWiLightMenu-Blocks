@@ -14,8 +14,8 @@ include $(TWLM_ROOT)/universal/blocksds.mk
 # DATA is a list of directories containing binary files embedded using bin2o
 #---------------------------------------------------------------------------------
 UNIVERSAL	:=	../../universal
-TARGET		:=	booter
-BUILD		:=	build
+TARGET		?=	booter
+BUILD		?=	build
 SOURCES		:=	source $(UNIVERSAL)/source/tonccpy $(UNIVERSAL)/sdmmc/arm9/source
 INCLUDES    :=  include $(UNIVERSAL)/include
 DATA        :=  ../data
@@ -31,7 +31,7 @@ CFLAGS	:=	-g -Wall -O2 \
 		-flto \
 		$(ARCH)
 
-CFLAGS	+=	$(INCLUDE) -DARM9 -DNO_SDMMC -DSTANDALONE -D_NO_MAIN_ALL
+CFLAGS	+=	$(INCLUDE) $(EXTRA_CFLAGS) -DARM9 -DNO_SDMMC -DSTANDALONE -D_NO_MAIN_ALL
 CXXFLAGS	:= $(CFLAGS) -fno-rtti -fno-exceptions
 
 ASFLAGS	:=	-g $(ARCH) $(INCLUDE) -flto
