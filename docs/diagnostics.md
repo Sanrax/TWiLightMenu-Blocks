@@ -1,10 +1,10 @@
 # Diagnostics branch
 
 This branch carries instrumentation as an overlay on production `master`.
-Release fixes and optimizations remain on both branches. Timing markers,
-boot/SD traces, emulator debug output, measurement records and the homebrew
-launch probe are kept here; production error handling and regression tests
-remain on `master`.
+Release fixes and optimizations remain on both branches. Agent regression tests,
+linked-image checks, timing markers, boot/SD traces, emulator debug output,
+measurement records and the homebrew launch probe live here. `master` contains
+no test suite or instrumentation; production error handling remains on both.
 
 ## Build
 
@@ -20,6 +20,23 @@ make -C settings profile-startup
 make -C romsel_dsimenutheme profile-startup
 make -C tests/nds-argv
 ```
+
+## Manual agent checks
+
+Run these explicitly on this branch when checking changes:
+
+```sh
+make test
+make check-build
+```
+
+`make test` runs host checks for storage/IPC, I2C/power, FAT loaders, launch
+arguments, INIs/translations, fonts, textures/photos, music queues and encoding.
+It requires a host C/C++ compiler and Python, without the SDK or console assets.
+`make check-build` requires `make all` outputs and checks 18 NDS headers, DLDI
+allocations, palettes, MPU setup, IRQ sound dispatch and ARM-state routines in
+seven ARM9 loaders. Builds, packaging and GitHub Actions on either branch do
+not invoke these agent checks.
 
 ## Startup/exit measurements
 

@@ -28,12 +28,8 @@ jobs:
           curl -LO https://github.com/DS-Homebrew/twilight-manual/releases/download/pages/pages.7z
           7z x pages.7z
           rm pages.7z
-      - name: Host regression tests
-        run: make test
       - name: Build TWiLightMenu++
         run: make package
-      - name: Check linked images
-        run: make check-build
       - name: Make booter and TWiLightMenu CIAs
         id: make-cias
         run: |

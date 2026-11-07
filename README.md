@@ -20,7 +20,7 @@ It can launch games for the Nintendo DS, Nintendo DSi, and GameBoy Advance, as w
 # Changes in this fork
 
 This is the `diagnostics` branch. Use `master` for production builds;
-[diagnostic/profiling instructions](docs/diagnostics.md) describe the instrumentation here.
+[agent test and profiling instructions](docs/diagnostics.md) describe the tools here.
 
 [TWiLightMenu-Blocks](https://github.com/Sanrax/TWiLightMenu-Blocks) ports TWiLight
 Menu++ to BlocksDS and reduces startup, folder-browsing and menu-switching work.
@@ -37,7 +37,8 @@ are retained. The fork diverged at upstream
   IRQ/FIFO work, palettes, Settings sleep recovery and power-button reboot.
 - Preserves device selection and launch arguments; fixes absolute argv paths,
   bootstrap-version detection and missing soft-reset-state handling.
-- Adds host regression tests, linked-image checks and reproducible test packaging.
+- Adds reproducible hardware-test packaging. Agent regression tests and
+  linked-image checks live on the `diagnostics` branch.
 
 Follow the [BlocksDS build and compatibility notes](docs/blocksds-port.md)
 for this fork. The upstream README and devkitPro instructions below are retained
@@ -57,7 +58,8 @@ Figures are paired **melonDS 1.1 phase measurements**, using different baselines
 they cannot be summed and are not hardware cold-boot claims. The
 [optimization map](docs/optimizations.md) lists each change, affected behavior,
 implementation files, test coverage and measurement scope for upstream developers.
-[Phase data](docs/benchmarks/startup.json) is included. Broader hardware coverage
+[Phase data](https://github.com/Sanrax/TWiLightMenu-Blocks/blob/diagnostics/docs/benchmarks/startup.json), tests and instrumentation
+are maintained on the `diagnostics` branch. Broader hardware coverage
 and the unchanged upstream DSi-mode Quit Game issue are documented in the port notes.
 
 # Add-ons
