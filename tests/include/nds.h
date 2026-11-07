@@ -7,5 +7,4 @@ struct TestPersonalData { u8 theme; };
 extern TestPersonalData *PersonalData;
 enum DecompressType { LZ77, LZ77Vram };
 void decompress(const void *source, void *destination, DecompressType type);
-inline void nocashMessage(const char *) {}
 #endif

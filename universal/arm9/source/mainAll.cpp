@@ -12,7 +12,6 @@
 
 #include "common/twlmenusettings.h"
 #include "common/systemdetails.h"
-#include "common/startupprofile.h"
 #include "myDSiMode.h"
 
 #include "my_gurumeditation.h"
@@ -47,7 +46,6 @@ static void stop(void) {
 static int screenMode = CURRENT_SCREEN_MODE;
 
 int main(int argc, char **argv) {
-	startupProfileBegin();
 	// overwrite reboot stub identifier
 	/*extern char *fake_heap_end;
 	*fake_heap_end = 0;*/
@@ -56,7 +54,6 @@ int main(int argc, char **argv) {
 	fifoSendValue32(FIFO_PM, PM_REQ_SLEEP_DISABLE);		// Disable libnds sleep mode to prevent unexpected crashes from exiting sleep mode
 
 	sys().initFilesystem(argc==0 ? (isDSiMode() ? "sd:/_nds/TWiLightMenu/main.srldr" : "fat:/_nds/TWiLightMenu/main.srldr") : argv[0]);
-	startupProfileMark("filesystems");
 	sys().initArm7RegStatuses();
 
 	if (!sys().fatInitOk()) {

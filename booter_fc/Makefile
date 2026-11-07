@@ -26,12 +26,6 @@ include $(TWLM_ROOT)/universal/blocksds.mk
 
 all:	bootloader bootstub $(TARGET).nds
 
-# Isolated hybrid boot probe. Normal objects and BOOT.NDS remain unchanged.
-.PHONY: diagnostic
-diagnostic: all
-	$(MAKE) -C arm9 BUILD=build-diagnostic TARGET=booter-diagnostic EXTRA_CFLAGS=-DTWLM_BOOT_DIAGNOSTICS
-	ndstool -c booter_fc-diagnostic.nds -7 $(TARGET)_r4ils.arm7.elf -9 arm9/booter-diagnostic.elf -g SRLA 01 "TWLMENUPP" -b icon.bmp "TWiLight boot diagnostics;Rocket Robz"
-
 makearm7_fc:
 	$(MAKE) -C arm7
 	cp arm7/$(TARGET).elf $(TARGET)_fc.arm7.elf
@@ -321,7 +315,6 @@ clean:
 	@rm -fr $(TARGET)_r4idsn.nds $(TARGET)_r4idsn.arm9.elf
 	@rm -fr $(TARGET)_acekard2.nds $(TARGET)_acekard2.arm9.elf
 	@rm -fr $(TARGET)_r4ils.nds $(TARGET)_r4ils.arm7.elf
-	@rm -fr booter_fc-diagnostic.nds arm9/build-diagnostic arm9/booter-diagnostic.elf
 	@$(MAKE) -C bootloader clean
 	@$(MAKE) -C $(PROJECT)/universal/bootstub clean
 	@$(MAKE) -C arm9 clean

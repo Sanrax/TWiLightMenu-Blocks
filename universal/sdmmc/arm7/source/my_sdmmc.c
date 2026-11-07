@@ -239,17 +239,7 @@ void my_sdmmc_send_command(struct mmcdevice *ctx, uint32_t cmd, uint32_t args) {
 	}
 }
 
-static u32 lastIoStatus, lastIoDma, lastIoLength, lastIoFifo;
-
-static void snapshotIo(void) {
-    lastIoStatus = sdmmc_read16(REG_SDSTATUS0) | ((u32)sdmmc_read16(REG_SDSTATUS1) << 16);
-    lastIoDma = *(vu32*)(0x0400411C + 0x1C * ndmaSlot);
-    lastIoLength = *(vu32*)(0x0400410C + 0x1C * ndmaSlot);
-    lastIoFifo = sdmmc_read16(REG_SDDATACTL32) | ((u32)sdmmc_read16(REG_SDBLKCOUNT) << 16);
-}
-
 static void finishDma(struct mmcdevice *ctx, bool failed) {
-    snapshotIo();
     *(vu32*)(0x0400411C + 0x1C * ndmaSlot) = 0;
     if (failed) {
         ctx->error |= 4;
@@ -575,14 +565,11 @@ u32 my_sdmmc_readsectors(struct mmcdevice *device, u32 sector_no, u32 numsectors
 	if (((u32)out % 4) != 0) {
 		my_sdmmc_send_command(device,0x33C12,sector_no);
 	} else {
-        //nocashMessage("my_sdmmc_sdcard_readsectors");
         sdmmc_send_command_nonblocking_ndma(device,0x33C12,sector_no);
         if (device->error & 4) return my_geterror(device);
-        //nocashMessage("command sent");
         if (!sdmmc_check_command_ndma(device,0x33C12)) {
 			return 0x474E4950; // 'PING'
 		}
-        //nocashMessage("command checked");
 	}
 	my_setTarget(&deviceSD);
 	return my_geterror(device);
@@ -674,11 +661,6 @@ void my_sdmmcHandler(void) {
 
 	case 0x56484453: // SDMMC_HAVE_SD
 		result = my_sdmmc_cardinserted();
-		// These argument words are unused for the presence query. Preserve
-		// word 1, which holds the iEvolution DLDI marker during startup.
-		*(vu32*)0x02FFFA00 = REG_SCFG_EXT;
-		*(vu32*)0x02FFFA08 = (REG_SCFG_EXT & SCFG_EXT_SDMMC)
-			? sdmmc_read16(REG_SDSTATUS0) | ((u32)sdmmc_read16(REG_SDSTATUS1) << 16) : 0;
 		break;
 
 	case 0x54534453: // SDMMC_SD_START
@@ -702,13 +684,6 @@ void my_sdmmcHandler(void) {
 			}
 		}
 		break;
-
-	case 0x47445353: // SDMMC_LAST_IO_SNAPSHOT
-        *(vu32*)0x02FFFA00 = lastIoStatus;
-        *(vu32*)0x02FFFA04 = lastIoDma;
-        *(vu32*)0x02FFFA08 = lastIoLength;
-        result = lastIoFifo;
-        break;
 
 	case 0x4E494453: // SDMMC_SD_IS_INSERTED
 		result = useDLDI ? io_dldi_data->ioInterface.isInserted() : my_sdmmc_cardinserted();

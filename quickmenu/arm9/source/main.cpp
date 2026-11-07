@@ -1,4 +1,3 @@
-#include "common/startupprofile.h"
 #include "common/launchpath.h"
 #include "common/filetypes.h"
 #include "common/storage.h"
@@ -1360,7 +1359,6 @@ int dsClassicMenu(void) {
 
 	ms().loadSettings();
 	bs().loadSettings();
-	startupProfileMark("settings");
 	logInit();
 	//widescreenEffects = (ms().consoleModel >= 2 && ms().wideScreen && access("sd:/luma/sysmodules/TwlBg.cxi", F_OK) == 0);
 	if (sdFound() && ms().consoleModel >= 2 && (!isDSiMode() || !sys().arm7SCFGLocked())) {
@@ -1376,7 +1374,6 @@ int dsClassicMenu(void) {
 	loadCustomLaunchers();	// User-defined file-type launchers from _nds/TWiLightMenu/extras/config.<ext>.ini
 
 	findPictochatAndDownladPlay();
-	startupProfileMark("launchers/system apps");
 
 	if (sdFound() && ms().consoleModel < 2 && ms().launcherApp != -1) {
 		u8 setRegion = 0;
@@ -1421,17 +1418,12 @@ int dsClassicMenu(void) {
 	}
 
 	graphicsInit();
-	startupProfileMark("graphics");
 	fontInit();
-	startupProfileMark("fonts");
 	langInit();
-	startupProfileMark("language");
 
 	iconTitleInit();
-	startupProfileMark("icons");
 
 	InitSound();
-	startupProfileMark("sound");
 
 	keysSetRepeat(25,5);
 
@@ -1469,13 +1461,9 @@ int dsClassicMenu(void) {
 	}
 
 	topBgLoad();
-	startupProfileMark("top background");
 	bottomBgLoad();
-	startupProfileMark("bottom background");
 	calendarLoad();
-	startupProfileMark("calendar");
 	clockLoad();
-	startupProfileMark("clock");
 
 	bool romFound[2] = {false};
 	char boxArtPath[2][256];
@@ -1523,9 +1511,7 @@ int dsClassicMenu(void) {
 	}
 
 	topBarLoad();
-	startupProfileMark("ROM metadata/top bar");
 	batteryIconLoad();
-	startupProfileMark("battery");
 
 	bool gbaUseBottomScreen = false;
 	if (sys().isRegularDS() && ms().gbaBooter == TWLSettings::EGbaNativeGbar2) {
@@ -1537,7 +1523,6 @@ int dsClassicMenu(void) {
 		gbaUseBottomScreen = (gbarunner2ini.GetString("emulation", "useBottomScreen", "false")=="false" ? false : true);
 	}
 	gbaModeIconLoad(gbaUseBottomScreen);
-	startupProfileMark("GBA icon");
 
 	whiteScreen = false;
 	fadeType = true;	// Fade in from white
@@ -1552,7 +1537,6 @@ int dsClassicMenu(void) {
 	updateBBackText();
 	fadeSpeed = false;
 
-	startupProfileEnd();
 
 	Datetime previousTime;
 	int colonTimer = 0;

@@ -1,5 +1,4 @@
 #include "common/launchpath.h"
-#include "common/startupprofile.h"
 #include "common/storage.h"
 #include <time.h>
 #include <sys/statvfs.h>
@@ -1256,7 +1255,6 @@ static void launchWithConfig(const CustomLauncher *launcher, const std::string &
 int dsiMenuTheme(void) {
 	ms().loadSettings();
 	bs().loadSettings();
-	startupProfileMark("settings");
 	logInit();
 	if (sdFound() && ms().consoleModel >= 2 && (!isDSiMode() || !sys().arm7SCFGLocked())) {
 		CIniFile lumaConfig("sd:/luma/config.ini");
@@ -1270,19 +1268,15 @@ int dsiMenuTheme(void) {
 
 	// Before any texture is loaded, as the NAND key from ARM7 is kept in main RAM
 	findPictochatAndDownloadPlay();
-	startupProfileMark("system apps");
 
 	tfn(); //
 	tc().loadConfig();
 	tex().videoSetup(); // allocate texture pointers
-	startupProfileMark("skin configuration");
 
 	fontInit();
-	startupProfileMark("fonts");
 	logPrint("\n");
 
 	langInit();
-	startupProfileMark("language");
 
 	if (ms().theme == TWLSettings::EThemeSaturn || ms().theme == TWLSettings::EThemeHBL) {
 		whiteScreen = false;
@@ -1299,11 +1293,9 @@ int dsiMenuTheme(void) {
 	}
 
 	srand(time(NULL));
-	startupProfileMark("theme textures");
 	
 	graphicsInit();
 	iconManagerInit();
-	startupProfileMark("graphics/icons");
 
 	keysSetRepeat(10, 2);
 
@@ -1327,7 +1319,6 @@ int dsiMenuTheme(void) {
 	}
 
 	loadCustomLaunchers();	// User-defined file-type launchers from _nds/TWiLightMenu/extras/config.<ext>.ini
-	startupProfileMark("launchers");
 
 	std::string filename;
 
@@ -1422,11 +1413,9 @@ int dsiMenuTheme(void) {
 	if (ms().theme != TWLSettings::EThemeSaturn) {
 		logPrint("snd()\n");
 		snd();
-		startupProfileMark("sound effects");
 		snd().loadStream(false);
 	}
 
-	startupProfileMark("sound");
 	while (1) {
 		std::vector<std::string_view> extensionList = {
 			".nds", ".ndz", ".dsi", ".ids", ".srl", ".app", ".argv" // NDS

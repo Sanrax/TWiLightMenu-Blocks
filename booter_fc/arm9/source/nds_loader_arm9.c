@@ -52,9 +52,6 @@
 #define LOADFROMRAM_OFFSET 36
 #define COMMON_CACHE_OFFSET 40
 
-#ifdef TWLM_BOOT_DIAGNOSTICS
-void bootStage(const char* stage);
-#endif
 
 
 typedef signed int addr_t;
@@ -397,9 +394,6 @@ int runNdsFile (const char* filename, int argc, const char** argv, u32 commonCac
 
 	bool loadFromRam;
 	if (isDSiMode()) {
-#ifdef TWLM_BOOT_DIAGNOSTICS
-		bootStage("Staging DS/DSi binaries");
-#endif
 		runNds9i(filename);
 		// All four binaries are already staged. Reuse them even when an
 		// internal SD is present, instead of reading the same image again
@@ -408,9 +402,6 @@ int runNdsFile (const char* filename, int argc, const char** argv, u32 commonCac
 	} else {
 		loadFromRam = runNds9(filename);
 	}
-#ifdef TWLM_BOOT_DIAGNOSTICS
-	bootStage(loadFromRam ? "Handoff: staged RAM" : "Handoff: storage");
-#endif
 	
 	return runNds (load_bin, load_bin_size, st.st_ino, true, (memcmp(io_dldi_data->friendlyName, "Default", 7) != 0), loadFromRam, argc, argv, commonCache);
 }

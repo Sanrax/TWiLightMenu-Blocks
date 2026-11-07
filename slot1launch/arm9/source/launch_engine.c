@@ -52,7 +52,6 @@ extern int language;
 
 void runLaunchEngine (bool altBootloader, bool isDSBrowser)
 {
-	nocashMessage("runLaunchEngine");
 
 	if (altBootloader)
 		TWLVRAM = false;
@@ -81,7 +80,6 @@ void runLaunchEngine (bool altBootloader, bool isDSBrowser)
 	toncset32 ((u8*)LCDC_BANK_D+SLEEPMODE_OFFSET, sleepMode, 1);
 	toncset32 ((u8*)LCDC_BANK_D+RUNCARDENGINE_OFFSET, runCardEngine, 1);
 
-	nocashMessage("irqDisable(IRQ_ALL);");
 	irqDisable(IRQ_ALL);
 
 	if (altBootloader) {
@@ -99,11 +97,9 @@ void runLaunchEngine (bool altBootloader, bool isDSBrowser)
 	}
 
 	// Give the VRAM to the ARM7
-	nocashMessage("Give the VRAM to the ARM7");
 	VRAM_D_CR = VRAM_ENABLE | VRAM_D_ARM7_0x06020000;
 	
 	// Reset into a passme loop
-	nocashMessage("Reset into a passme loop");
 	REG_EXMEMCNT |= ARM7_OWNS_ROM | ARM7_OWNS_CARD;
 	
 	*(vu32*)0x02FFFFFC = 0;
@@ -113,14 +109,12 @@ void runLaunchEngine (bool altBootloader, bool isDSBrowser)
 	*(vu32*)0x02FFFE24 = (u32)0x02FFFE04;  // Set ARM9 Loop address --> resetARM9(0x02FFFE04);
 	
 	// Reset ARM7
-	nocashMessage("resetARM7");
 	// The SD IPC can leave sync value 1 asserted. Clear it before the SDK
 	// reset handshake, or ARM7 may acknowledge before ARM9 starts waiting.
 	REG_IPC_SYNC = 0;
 	resetARM7(0x06020000);	
 
 	// swi soft reset
-	nocashMessage("swiSoftReset");
 	swiSoftReset();
 }
 

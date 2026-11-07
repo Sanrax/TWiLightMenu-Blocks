@@ -95,14 +95,8 @@ ipch/
 */nitrofiles/languages/ic
 romsel_aktheme/nitrofiles/language/lang_ic
 
-# Separate diagnostic build of the DSi/3DS menu
-romsel_dsimenutheme/arm9/build-profile/
-title/arm9/build-profile/
-quickmenu/arm9/build-profile/
-settings/arm9/build-profile/
 */nitrofiles/languages/*/language.lng
 quickmenu/nitrofiles/graphics/*.pht
 quickmenu/nitrofiles/graphics/*/*.pht
-booter_fc/arm9/build-diagnostic/
 romsel_dsimenutheme/nitrofiles/languages/*/photo_default.pht
 romsel_dsimenutheme/nitrofiles/themes/*/*/*/*.pht

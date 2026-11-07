@@ -1111,10 +1111,7 @@ void arm7_main (void) {
 		const u32 cardengine_arm7_bin_size = *(u32*)0x02800000;
 		copyLoop ((u32*)ENGINE_LOCATION_ARM7, (u32*)0x02800004, cardengine_arm7_bin_size);
 		errorCode = hookNdsRetail(ndsHeader, (u32*)ENGINE_LOCATION_ARM7);
-		if (errorCode == ERR_NONE) {
-			nocashMessage("card hook Sucessfull");
-		} else {
-			nocashMessage("error during card hook");
+		if (errorCode != ERR_NONE) {
 			debugOutput(errorCode);
 		}
 		if (*(u32*)(0x023F0000) != 0xCF000000) {

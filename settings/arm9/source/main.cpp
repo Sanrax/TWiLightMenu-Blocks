@@ -36,7 +36,6 @@
 
 #include "soundeffect.h"
 #include "common/systemdetails.h"
-#include "common/startupprofile.h"
 #include "myDSiMode.h"
 
 #define DSI_SYSTEM_UI_DIRECTORY "/_nds/TWiLightMenu/dsimenu/themes/"
@@ -1025,7 +1024,6 @@ int settingsMode(void)
 	ms().loadSettings();
 	gs().loadSettings();
 	bs().loadSettings();
-	startupProfileMark("settings");
 	logInit();
 	loadAkThemeList();
 	loadR4ThemeList();
@@ -1039,11 +1037,9 @@ int settingsMode(void)
 		loadUnlaunchBgList();
 	}
 	loadFontList();
-	startupProfileMark("theme-lists");
 	swiWaitForVBlank();
 
 	snd().init();
-	startupProfileMark("sound-effects");
 	keysSetRepeat(25, 5);
 	
 	// ARM9 POWCNT1 bits 2/3 control the 3D engine, not the backlights.
@@ -1072,11 +1068,8 @@ int settingsMode(void)
 	sysSetCartOwner(BUS_OWNER_ARM9); // Allow arm9 to access GBA ROM
 
 	graphicsInit();
-	startupProfileMark("graphics");
 	fontInit();
-	startupProfileMark("fonts");
 	langInit();
-	startupProfileMark("language");
 	fadeType = true;
 
 	srand(time(NULL));
@@ -1704,17 +1697,13 @@ int settingsMode(void)
 		.onExit(defaultExitHandler)
 		// Prep and show the first page.
 		.show();
-	startupProfileMark("pages");
 	//	stop();
 	while (1) {
 		if (!gui().isExited()) {
 			snd().playBgMusic(ms().settingsMusic);
 		}
-		startupProfileMark("music");
 
 		gui().draw();
-		startupProfileMark("draw");
-		startupProfileEnd();
 		do
 		{
 			if (currentMacroMode) {

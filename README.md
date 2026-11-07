@@ -54,7 +54,8 @@ Figures are paired **melonDS 1.1 phase measurements**, using different baselines
 they cannot be summed and are not hardware cold-boot claims. The
 [optimization map](docs/optimizations.md) lists each change, affected behavior,
 implementation files, test coverage and measurement scope for upstream developers.
-[Phase data](docs/benchmarks/startup.json) is included. Broader hardware coverage
+[Phase data](https://github.com/Sanrax/TWiLightMenu-Blocks/blob/diagnostics/docs/benchmarks/startup.json) and instrumentation
+are maintained on the `diagnostics` branch. Broader hardware coverage
 and the unchanged upstream DSi-mode Quit Game issue are documented in the port notes.
 
 # Add-ons

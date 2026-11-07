@@ -30,9 +30,6 @@ extern volatile s32 streaming_buf_ptr;
 #define SAMPLES_USED (STREAMING_BUF_LENGTH - samples_left)
 #define REFILL_THRESHOLD STREAMING_BUF_LENGTH >> 2
 
-#ifdef SOUND_DEBUG
-extern char debug_buf[256];
-#endif
 
 extern volatile u32 sample_delay_count; */
 
@@ -201,10 +198,6 @@ volatile void SoundControl::updateStream() {
 				 sizeof(s16), (instance_to_fill - instance_filled), stream_source);
 		}
 
-		#ifdef SOUND_DEBUG
-		sprintf(debug_buf, "FC: SAMPLES_LEFT_TO_FILL: %li, SAMPLES_TO_FILL: %li, instance_filled: %i, filled_samples %li, to_fill: %i", SAMPLES_LEFT_TO_FILL, SAMPLES_TO_FILL, instance_filled, filled_samples, instance_to_fill);
-    	nocashMessage(debug_buf);
-		#endif
 
 		// maintain invariant 0 < filled_samples <= STREAMING_BUF_LENGTH
 		filled_samples = std::min<s32>(filled_samples + instance_filled, STREAMING_BUF_LENGTH);

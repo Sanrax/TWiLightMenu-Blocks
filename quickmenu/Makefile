@@ -30,12 +30,6 @@ $(INDEXED_PNG_CONVERTER): ../tools/photo_index.cpp ../universal/include/common/i
 
 all:	bootloader bootstub $(TARGET).nds
 
-.PHONY: profile-startup
-profile-startup: all
-	$(MAKE) -C arm9 BUILD=build-profile TARGET=mainmenu-profile PROFILE_STARTUP=1
-	ndstool -u 00030004 -g SRLA 01 "TWLMENUPP" -c mainmenu-profile.nds -7 $(TARGET).arm7.elf -9 arm9/mainmenu-profile.elf -d $(NITRODATA) \
-  -b icon.bmp "DS Classic startup profile;TWiLight Menu++;Rocket Robz"
-
 makearm7:
 	$(MAKE) -C arm7
 	cp arm7/$(TARGET).elf $(TARGET).arm7.elf
@@ -60,7 +54,6 @@ clean:
 	@rm -fr $(BUILD) $(TARGET).elf $(TARGET).nds
 	@rm -fr $(TARGET).arm7.elf
 	@rm -fr $(TARGET).arm9.elf
-	@rm -fr arm9/build-profile arm9/mainmenu-profile.elf mainmenu-profile.nds
 	@rm -f $(INDEXED_PNG_OUTPUTS)
 	@$(MAKE) -C $(PROJECT)/universal/bootloader_menu clean
 	@$(MAKE) -C $(PROJECT)/universal/bootstub clean

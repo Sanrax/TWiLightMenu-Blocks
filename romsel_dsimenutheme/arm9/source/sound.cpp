@@ -5,7 +5,6 @@
 #include "common/twlmenusettings.h"
 #include "common/systemdetails.h"
 #include "common/logging.h"
-#include "common/startupprofile.h"
 #include "graphics/fontHandler.h"
 #include "language.h"
 #include "fileCopy.h"
@@ -84,7 +83,6 @@ void SoundControl::loadSfxEffects() {
 	loadEffect(SFX_WRONG);
 	loadEffect(SFX_BACK);
 	loadEffect(SFX_SWITCH);
-	startupProfileMark("navigation SFX");
 
 	snd_launch = {
 	    {SFX_LAUNCH},	    // id
@@ -139,9 +137,7 @@ void SoundControl::loadSfxEffects() {
 	if (!sfxHasLidSounds()) return;
 
 	loadEffect(SFX_LIDCLOSE);
-	startupProfileMark("lid close SFX");
 	loadEffect(SFX_LIDOPEN);
-	startupProfileMark("lid open SFX");
 
 	snd_lidClose = {
 	    {SFX_LIDCLOSE},	     // id
@@ -170,7 +166,6 @@ SoundControl::SoundControl()
 	sndSys.fifo_channel = FIFO_MAXMOD;
 
 	mmInit(&sndSys);
-	startupProfileMark("Maxmod init");
 	reloadSfxData();
 }
 
@@ -370,7 +365,6 @@ void SoundControl::loadStream(const bool prepMsg) {
 
 void SoundControl::reloadSfxData() {
 	if (sfxDataLoaded || !readSfxBank()) return;
-	startupProfileMark("SFX bank header");
 	if (sfxFilePath) mmSoundBankInFiles(sfxFilePath);
 	else mmSoundBankInMemory((mm_addr)SFX_DATA);
 	loadedEffects = 0;

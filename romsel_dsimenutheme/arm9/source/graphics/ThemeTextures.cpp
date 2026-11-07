@@ -23,7 +23,6 @@
 #include "common/lzss.h"
 #include "common/tonccpy.h"
 #include "common/lodepng.h"
-#include "common/startupprofile.h"
 #include "language.h"
 #include "ndsheaderbanner.h"
 #include "ndma.h"
@@ -262,7 +261,6 @@ unique_ptr<glImage[]> ThemeTextures::loadTexture(int *textureId, const Texture &
 	u16 paletteLength = texture.paletteUploadLength();
 
 	if (*textureId != 0) {
-		nocashMessage("Existing texture found!?");
 		glDeleteTextures(1, textureId);
 	}
 
@@ -433,7 +431,6 @@ void ThemeTextures::load3DSTheme() {
 
 	loadVolumeTextures();
 	loadBatteryTextures();
-	startupProfileMark("battery textures");
 
 	_bubbleTexture = std::make_unique<Texture>(TFN_GRF_BUBBLE, TFN_FALLBACK_GRF_BUBBLE);
 	_settingsIconTexture = std::make_unique<Texture>(TFN_GRF_ICON_SETTINGS, TFN_FALLBACK_GRF_ICON_SETTINGS);
@@ -448,9 +445,7 @@ void ThemeTextures::load3DSTheme() {
 	_startBorderTexture = std::make_unique<Texture>(TFN_GRF_CURSOR, TFN_FALLBACK_GRF_CURSOR);
 	_dialogBoxTexture = std::make_unique<Texture>(TFN_GRF_DIALOGBOX, TFN_FALLBACK_GRF_DIALOGBOX);
 
-	startupProfileMark("sprite textures");
 	applyUserPaletteToAllGrfTextures();
-	startupProfileMark("sprite palettes");
 
 	loadBubbleImage(*_bubbleTexture, tc().bubbleTipSpriteW(), tc().bubbleTipSpriteH());
 	loadSettingsImage(*_settingsIconTexture);
@@ -464,7 +459,6 @@ void ThemeTextures::load3DSTheme() {
 	loadDialogboxImage(*_dialogBoxTexture);
 	loadProgressImage(*_progressTexture);
 	loadWirelessIcons(*_wirelessIconsTexture);
-	startupProfileMark("sprite uploads");
 }
 
 void ThemeTextures::loadDSiTheme() {
@@ -479,7 +473,6 @@ void ThemeTextures::loadDSiTheme() {
 	loadVolumeTextures();
 	//iprintf("loadBatteryTextures()\n");
 	loadBatteryTextures();
-	startupProfileMark("battery textures");
 
 	_bipsTexture = std::make_unique<Texture>(TFN_GRF_BIPS, TFN_FALLBACK_GRF_BIPS);
 	_boxTexture = std::make_unique<Texture>(TFN_GRF_BOX, TFN_FALLBACK_GRF_BOX);
@@ -504,9 +497,7 @@ void ThemeTextures::loadDSiTheme() {
 	_manualIconTexture = std::make_unique<Texture>(TFN_GRF_ICON_MANUAL, TFN_FALLBACK_GRF_ICON_MANUAL);
 
 	// Apply the DSi palette shifts
-	startupProfileMark("sprite textures");
 	applyUserPaletteToAllGrfTextures();
-	startupProfileMark("sprite palettes");
 
 	//iprintf("loadBipsImage(*_bipsTexture)\n");
 	loadBipsImage(*_bipsTexture);
@@ -551,11 +542,9 @@ void ThemeTextures::loadDSiTheme() {
 	loadProgressImage(*_progressTexture);
 	//iprintf("loadWirelessIcons(*_wirelessIconsTexture)\n");
 	loadWirelessIcons(*_wirelessIconsTexture);
-	startupProfileMark("sprite uploads");
 }
 
 void ThemeTextures::loadVolumeTextures() {
-	startupProfileMark("UI textures");
 	if (dsiFeatures() && !sys().i2cBricked()) {
 		_volume0Texture = std::make_unique<Texture>(TFN_VOLUME0, TFN_FALLBACK_VOLUME0);
 		_volume1Texture = std::make_unique<Texture>(TFN_VOLUME1, TFN_FALLBACK_VOLUME1);
@@ -566,7 +555,6 @@ void ThemeTextures::loadVolumeTextures() {
 }
 
 void ThemeTextures::loadBatteryTextures() {
-	startupProfileMark("volume textures");
 	if (dsiFeatures() && !sys().i2cBricked()) {
 		_batterychargeTexture = std::make_unique<Texture>(TFN_BATTERY_CHARGE, TFN_FALLBACK_BATTERY_CHARGE);
 		_batterychargeblinkTexture = std::make_unique<Texture>(TFN_BATTERY_CHARGE_BLINK, TFN_FALLBACK_BATTERY_CHARGE_BLINK);
@@ -594,7 +582,6 @@ void ThemeTextures::loadBatteryTextures() {
 }
 
 void ThemeTextures::loadUITextures() {
-	startupProfileMark("background textures");
 	_dateTimeFont = std::make_unique<FontGraphic>(((access((TFN_FONT_DATE_TIME).c_str(), F_OK) == 0) ? TFN_FONT_DATE_TIME : TFN_FALLBACK_FONT_DATE_TIME).c_str(), false, false, false);
 	if (access((TFN_FONT_USERNAME).c_str(), F_OK) == 0) {
 		_usernameFont = std::make_unique<FontGraphic>((TFN_FONT_USERNAME).c_str(), false, false, false);
@@ -2647,7 +2634,6 @@ void ThemeTextures::videoSetup() {
 	bgSetPriority(bg3Main, 3);
 
 	int bg2Main = bgInit(2, BgType_Bmp8, BgSize_B8_256x256, 6, 0);
-	nocashMessage(std::to_string(bg2Main).c_str());
 	bgSetPriority(bg2Main, 0);
 
 	int bg3Sub = bgInitSub(3, BgType_Bmp16, BgSize_B16_256x256, 0, 0);

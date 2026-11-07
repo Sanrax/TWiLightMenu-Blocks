@@ -72,7 +72,6 @@ void soundFadeOut(void) {
 //---------------------------------------------------------------------------------
 void ReturntoDSiMenu(void) {
 //---------------------------------------------------------------------------------
-	nocashMessage("ARM7 ReturnToDSiMenu");
 	if (isDSiMode() && !i2cBricked) {
 		i2cWriteRegister(0x4A, 0x12, i2cReadRegister(0x4A, 0x12) | 1); // 3DS - is_twl - Do not trust gbatek for this register - Thanks TuxSH!
 		i2cWriteRegister(0x4A, 0x70, 0x01);		// Bootflag = Warmboot/SkipHealthSafety
@@ -229,7 +228,6 @@ TWL_CODE void twlmGetConsoleKey(u32 offset) {
 //---------------------------------------------------------------------------------
 int main() {
 //---------------------------------------------------------------------------------
-	//nocashMessage("ARM7 main.c main");
 
 	// Grab from DS header in GBA slot
 	*(u16*)0x02FFFC36 = *(u16*)0x0800015E;	// Header CRC16

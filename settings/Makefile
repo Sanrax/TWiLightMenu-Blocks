@@ -18,12 +18,6 @@ include $(TWLM_ROOT)/universal/languagepacks.mk
 
 all:	bootloader bootstub $(TARGET).nds
 
-.PHONY: profile-startup
-profile-startup: all
-	$(MAKE) -C arm9 BUILD=build-profile TARGET=settings-profile PROFILE_STARTUP=1
-	ndstool -u 00030004 -g SRLA 01 "TWLMENUPP" -c settings-profile.nds -7 $(TARGET).arm7.elf -9 arm9/settings-profile.elf -d $(NITRODATA) \
-		-b icon.bmp "Settings startup profile;TWiLight Menu++;Rocket Robz"
-
 makearm7:
 	$(MAKE) -C arm7
 	cp arm7/$(TARGET).elf $(TARGET).arm7.elf
@@ -48,7 +42,6 @@ clean:
 	@rm -fr $(BUILD) $(TARGET).elf $(TARGET).nds
 	@rm -fr $(TARGET).arm7.elf
 	@rm -fr $(TARGET).arm9.elf
-	@rm -fr arm9/build-profile arm9/settings-profile.elf settings-profile.nds
 	@$(MAKE) -C bootloader clean
 	@$(MAKE) -C $(PROJECT)/universal/bootstub clean
 	@$(MAKE) -C arm9 clean

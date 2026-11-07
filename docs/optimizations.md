@@ -9,7 +9,7 @@ within each comparison. DS/DLDI and DSi/DLDI denote emulated execution modes.
 Startup means ARM9 `main()` to the first interactive frame unless a narrower
 phase is named; it excludes preceding loaders/title/SDK startup. Rows use
 different baselines and must not be added into an overall speedup. Hardware
-cold-boot gains have not been quantified. [Phase data](benchmarks/startup.json)
+cold-boot gains have not been quantified. [Phase data](https://github.com/Sanrax/TWiLightMenu-Blocks/blob/diagnostics/docs/benchmarks/startup.json)
 and the host tests preserve the comparison evidence without BIOS, NAND or ROMs.
 
 ## Browsing and common work
@@ -46,21 +46,18 @@ and the host tests preserve the comparison evidence without BIOS, NAND or ROMs.
 | Load built-in launch/jingle SFX on demand, preload navigation/lid sounds and retain the memory loader for long custom-skin paths. | [sound.cpp](../romsel_dsimenutheme/arm9/source/sound.cpp), [soundbank.h](../universal/include/common/soundbank.h). | Initial built-in sample data: 435,500 → 183,424 bytes. No isolated startup-time improvement claimed. |
 | Replace copying PCM halves with a circular queue; preload several seconds and refill in bounded main-thread reads. IRQs copy published samples only. Retain mono/stereo layouts, jingle delay, fades, intro/loop handling and split-allocation fallback. | [audioRing.h](../universal/include/common/audioRing.h), [pcmStream.h](../universal/include/common/pcmStream.h), [streamingaudio.c](../romsel_dsimenutheme/arm9/source/streamingaudio.c), sound.cpp. | Same 384,000-byte capacity. DSi/DLDI audio setup: 88 → 24 ms; browser startup: 557 → 489 ms. |
 
-## Measuring and verifying
+## Verifying and measuring
+
+Production regression checks remain on `master`:
 
 ```sh
 make test
-make -C title profile-startup
-make -C quickmenu profile-startup
-make -C settings profile-startup
-make -C romsel_dsimenutheme profile-startup
+make check-build
 ```
 
-Install the chosen `*-profile.nds` as its usual `.srldr` in a test installation.
-It writes `title-startup-profile.csv`, `classic-startup-profile.csv`,
-`settings-startup-profile.csv` or `startup-profile.csv` under `_nds/TWiLightMenu/`.
-Settings also records its exit phase. Separate build directories keep normal
-binaries free of profiling; restore production `.srldr` files after measuring.
+Profiling targets, timing markers, boot/SD traces, the argv homebrew probe and
+measurement records live on the [`diagnostics` branch](https://github.com/Sanrax/TWiLightMenu-Blocks/blob/diagnostics/docs/diagnostics.md).
+Use its instructions when measuring; `master` contains no runtime instrumentation.
 
 Host coverage maps directly to changes: `loaderfat`, `ndsmetadata`, `inifile`,
 `clocktext`, `photo`/`menuimage`/`texture`/`nitrofile`, `language`/`languagepack`,
