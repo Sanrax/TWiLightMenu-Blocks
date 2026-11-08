@@ -214,6 +214,10 @@ int runNds (
 		return 3;
 	}
 
+	// Value 2 retains the fade's white screen while another menu is loaded.
+	const bool menuHandoff = clearMasterBright
+		&& strstr(filename, "/_nds/TWiLightMenu/") && strstr(filename, ".srldr");
+
 	irqDisable(IRQ_ALL);
 
 	// Direct CPU access to VRAM bank D
@@ -233,7 +237,7 @@ int runNds (
 		writeAddr ((data_t*) LCDC_BANK_D, HAVE_DSISD_OFFSET, 1);
 	}
 
-	writeAddr ((data_t*) LCDC_BANK_D, CLEAR_MASTER_BRIGHT_OFFSET, clearMasterBright);
+	writeAddr ((data_t*) LCDC_BANK_D, CLEAR_MASTER_BRIGHT_OFFSET, menuHandoff ? 2 : clearMasterBright);
 	if (isDSiMode()) {
 		writeAddr ((data_t*) LCDC_BANK_D, DSMODE_SWITCH_OFFSET, dsModeSwitch);
 	}

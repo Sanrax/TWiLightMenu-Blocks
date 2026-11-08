@@ -1,4 +1,4 @@
-// Keep the menu's ARM7 IPC storage protocol while using BlocksDS's FatFS.
+// Mount native BlocksDS storage while retaining late discovery and FAT metadata.
 #ifdef __BLOCKSDS__
 #include <nds/arm9/dldi.h>
 #include <nds/arm9/sdmmc.h>
@@ -88,35 +88,18 @@ unsigned twlmStorageClusterSize(bool secondaryDevice) {
 	return mounts[secondaryDevice ? 0 : 1].csize * 512;
 }
 
-extern const DISC_INTERFACE __my_io_dsisd;
 extern const DISC_INTERFACE io_dsi_nand __attribute__((weak));
-
-const DISC_INTERFACE *__wrap_get_io_dsisd(void) {
-	return interfaces[1] ? interfaces[1] : (isDSiMode() || REG_SCFG_EXT != 0) ? &__my_io_dsisd : NULL;
-}
 
 const DISC_INTERFACE *__wrap_get_io_dsinand(void) {
 	return interfaces[2] ? interfaces[2] : isDSiMode() ? &io_dsi_nand : NULL;
 }
 
-u8 __wrap_sdmmc_GetDiskStatus(void) {
-	return __my_io_dsisd.isInserted() ? 0 : SDMMC_STATUS_NODISK;
-}
-
-u8 __wrap_nand_GetDiskStatus(void) {
-	return SDMMC_STATUS_PROTECT;
-}
-
 const DISC_INTERFACE *__real_dldiGetInternal(void);
 const DISC_INTERFACE *__wrap_dldiGetInternal(void) {
 	if (interfaces[0]) return interfaces[0];
-	// iEvolution runs its DLDI storage driver on the ARM7 through the SD IPC.
-	if (isDSiMode() && strncmp(io_dldi_data->friendlyName, "CycloDS iEvolution", 18) == 0) {
-		*(vu32 *)0x02fffa04 = 0x49444c44;
-		return &__my_io_dsisd;
-	}
-	// The custom ARM7 core uses the menu IPC protocol, not FIFO_STORAGE.
-	dldiSetMode(DLDI_MODE_ARM9);
+	// iEvolution requires ARM7 execution; the SDK FIFO service supports it.
+	if (isDSiMode() && strncmp(io_dldi_data->friendlyName, "CycloDS iEvolution", 18) == 0)
+		dldiSetMode(DLDI_MODE_ARM7);
 	return __real_dldiGetInternal();
 }
 #endif

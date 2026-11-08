@@ -572,7 +572,7 @@ void vBlankHandler()
 {
 	if (fadeType) {
 		if (!fadeDelay) {
-			screenBrightness -= fadeSpeed ? 2 : 1;
+			screenBrightness -= (fadeSpeed && ms().fastMenuFades) ? 2 : 1;
 			if (screenBrightness < 0) screenBrightness = 0;
 		}
 		if (!fadeSpeed) {
@@ -584,7 +584,7 @@ void vBlankHandler()
 	} else {
 		if (fadeSpeed || waitUntilFadeOut == 15) {
 			if (!fadeDelay) {
-				screenBrightness += fadeSpeed ? 2 : 1;
+				screenBrightness += (fadeSpeed && ms().fastMenuFades) ? 2 : 1;
 				if (screenBrightness > 31) screenBrightness = 31;
 			}
 			if (!fadeSpeed) {

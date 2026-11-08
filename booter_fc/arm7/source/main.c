@@ -28,9 +28,9 @@
 
 ---------------------------------------------------------------------------------*/
 #include <nds.h>
+#include "common/storage7.h"
 #include "common/powerButton.h"
 
-void my_installSystemFIFO(void);
 u8 my_cdcReadReg(u8 bank, u8 reg);
 void my_cdcWriteReg(u8 bank, u8 reg, u8 value);
 
@@ -98,6 +98,7 @@ int main() {
 	readUserSettings();
 	ledBlink(0);
 
+	twlmPrepareStorage();
 	irqInit();
 	// Start the RTC tracking IRQ
 	initClockIRQTimer(LIBNDS_DEFAULT_TIMER_RTC);
@@ -106,7 +107,7 @@ int main() {
 
 	SetYtrigger(80);
 
-	my_installSystemFIFO();
+	installSystemFIFO();
 
 	irqSet(IRQ_VCOUNT, VcountHandler);
 	irqSet(IRQ_VBLANK, VblankHandler);

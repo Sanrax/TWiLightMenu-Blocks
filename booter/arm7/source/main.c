@@ -28,13 +28,11 @@
 
 ---------------------------------------------------------------------------------*/
 #include <nds.h>
+#include "common/storage7.h"
 #include "common/powerButton.h"
 #include <string.h>
 
-#define SD_IRQ_STATUS (*(vu32*)0x400481C)
 
-void my_installSystemFIFO(void);
-void my_sdmmc_get_cid(int devicenumber, u32 *cid);
 
 static void DSiTouchscreenMode(void) {
 	// Touchscreen
@@ -138,8 +136,6 @@ int main() {
 		REG_SCFG_EXT = 0x93FFFB06;
 		*(vu16*)0x04004012 = 0x1988;
 		*(vu16*)0x04004014 = 0x264C;
-		*(vu32*)0x400481C = 0;				// Clear SD IRQ stat register
-		*(vu32*)0x4004820 = 0;				// Clear SD IRQ mask register
 		*(vu16*)0x04004C02 = 0x4000;	// enable powerbutton irq (Fix for Unlaunch 1.3)
 
 		if ((REG_SCFG_ROM & BIT(1)) || (REG_SCFG_ROM & BIT(9))) {
@@ -172,6 +168,7 @@ int main() {
 	readUserSettings();
 	ledBlink(0);
 
+	twlmPrepareStorage();
 	irqInit();
 	// Start the RTC tracking IRQ
 	initClockIRQTimer(LIBNDS_DEFAULT_TIMER_RTC);
@@ -180,7 +177,7 @@ int main() {
 	
 	SetYtrigger(80);
 	
-	my_installSystemFIFO();
+	installSystemFIFO();
 
 	irqSet(IRQ_VCOUNT, VcountHandler);
 	irqSet(IRQ_VBLANK, VblankHandler);
@@ -196,14 +193,6 @@ int main() {
 		processPowerButtonReboot(ReturntoDSiMenu);
 		if ((REG_KEYINPUT & (KEY_SELECT | KEY_START | KEY_L | KEY_R)) == 0) {
 			exitflag = true;
-		}
-		if (*(u32*)0x02FFFD0C == 0x54534453) { // 'SDST'
-			fifoSendValue32(FIFO_USER_04, SD_IRQ_STATUS);
-			*(u32*)0x02FFFD0C = 0;
-		}
-		if (*(u32*)0x02FFFD0C == 0x47444943) { // 'CIDG'
-			my_sdmmc_get_cid(0, (u32*)0x02810000);
-			*(u32*)0x02FFFD0C = 0;
 		}
 		// fifocheck();
 		swiWaitForVBlank();

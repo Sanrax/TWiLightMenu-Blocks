@@ -637,7 +637,11 @@ int main (void) {
 	if (clearMasterBright) {
 		// ARM9 clears master brightness
 		// copy ARM9 function to RAM, and make the ARM9 jump to it
-		copyLoop((void*)TEMP_MEM, (void*)clearMasterBright_ARM9, clearMasterBright_ARM9_size);
+		if (clearMasterBright == 2) {
+			copyLoop((void*)TEMP_MEM, (void*)holdMasterWhite_ARM9, holdMasterWhite_ARM9_size);
+		} else {
+			copyLoop((void*)TEMP_MEM, (void*)clearMasterBright_ARM9, clearMasterBright_ARM9_size);
+		}
 		(*(vu32*)0x02FFFE24) = (u32)TEMP_MEM;	// Make ARM9 jump to the function
 		// Wait until the ARM9 has completed its task
 		while ((*(vu32*)0x02FFFE24) == (u32)TEMP_MEM);

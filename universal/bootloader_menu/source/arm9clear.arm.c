@@ -123,6 +123,16 @@ void __attribute__ ((long_call)) __attribute__((naked)) __attribute__((noreturn)
 	while (1);
 }
 
+// Hide disabled VRAM throughout a handoff to another menu module.
+void __attribute__((long_call, naked, noreturn)) holdMasterWhite_ARM9(void) {
+    *(vu16*)0x0400006C = 0x4010;
+    *(vu16*)0x0400106C = 0x4010;
+    *(vu32*)0x02FFFE04 = 0xE59FF018;
+    *(vu32*)0x02FFFE24 = 0x02FFFE04;
+    asm volatile("bx %0" : : "r" (0x02FFFE04));
+    while (1);
+}
+
 /*-------------------------------------------------------------------------
 startBinary_ARM9
 Jumps to the ARM9 NDS binary in sync with the display and ARM7

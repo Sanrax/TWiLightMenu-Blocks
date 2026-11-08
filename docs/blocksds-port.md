@@ -12,7 +12,8 @@ See [optimizations](optimizations.md) for performance work, its source files and
 Use **BlocksDS 1.24.0**, Wonderful Toolchain, GNU Make, Python 3 and a host
 C/C++ compiler. SDK paths default to `/opt/blocksds/core` and `/opt/wonderful`;
 override `BLOCKSDS` and `WONDERFUL_TOOLCHAIN` as needed. This version is pinned
-because the storage adapter uses its internal FatFS ABI.
+because the storage adapter uses its internal FatFS ABI and the menu startup
+hook preserves its shared clock/bootstub layout.
 
 ```sh
 git clone --recursive https://github.com/Sanrax/TWiLightMenu-Blocks.git
@@ -33,11 +34,13 @@ reference; the commands above apply to this fork.
 | Area | Change | Source |
 | --- | --- | --- |
 | Toolchain/build | BlocksDS/Wonderful tools, native library paths, dependency rules, ARM-state rules for copied loader routines, custom memory layouts and 32 KiB DLDI space. All live subprojects build; archived projects are untouched. | [blocksds.mk](../universal/blocksds.mk), ARM7/ARM9 component Makefiles, [ARM9 layout](../universal/arm9/ds_arm9_twlm.mem), Dockerfile and workflows. |
-| FAT storage | Mount FatFS through the existing DLDI/SD/NAND drivers; retain late mounts/remounts and prevent native NitroFS from replacing these mounts. Replace private libfat aliases/attributes with SDK APIs. | [blocksds_storage.c](../universal/sdmmc/arm9/source/blocksds_storage.c), [pinned FatFS headers](../universal/include/blocksds/fatfs/), [fat_ext.h](../universal/arm9/include/fat_ext.h). |
+| FAT storage | Mount native BlocksDS DLDI/SD interfaces; retain late mounts/remounts and prevent NitroFS from replacing these mounts. Replace private libfat aliases/attributes with SDK APIs. iEvolution uses the SDK's ARM7 DLDI mode. | [blocksds_storage.c](../universal/sdmmc/arm9/source/blocksds_storage.c), [pinned FatFS headers](../universal/include/blocksds/fatfs/), [fat_ext.h](../universal/arm9/include/fat_ext.h). |
 | Embedded filesystems | Use native `nitro:` for menu assets and an independent read-only `boot:` for nds-bootstrap templates/loaders, with bounded paths, file tables and independent streams. | [systemdetails.cpp](../universal/source/common/systemdetails.cpp), [bootfs.c](../universal/source/common/bootfs.c), [legacy fallback](../universal/source/common/nitrofs.c). |
 | ARM7/SDK interfaces | Adapt input, touch, clock, FIFO, Maxmod, AES/NAND types and GL uploads to native SDK interfaces while retaining custom ARM7 cores and launch engines. Correct OAM palette-bank sizes and pad short GL palettes to avoid missing colors. | Component `arm7/source/main.c`, `arm9/source/nand/`, [ARM7 helpers](../universal/arm7/), [splash palettes](../title/arm9/Makefile), [Classic cursor](../quickmenu/gfx/cursor.grit), [Texture.cpp](../romsel_dsimenutheme/arm9/source/graphics/Texture.cpp). |
-| DSi SD/NAND | Enable accessible SD hardware before probing; use DMA word counts, wait for complete transfers, bound failed polls and keep the native IRQ from consuming polling flags. Use an uncached IPC mailbox and clear stale sync before CPU reset. Retain locked-access/iEvolution fallbacks. | [ARM7 SD driver](../universal/sdmmc/arm7/source/my_sdmmc.c), [ARM9 SD IPC](../universal/sdmmc/arm9/source/my_sd.c), [custom FIFO](../universal/sdmmc/arm7/source/my_system.c), reset callers in the shared/component loaders. |
-| SD read completion | Invalidate ARM9 read buffers after ARM7 finishes; batch unaligned/private buffers through aligned scratch memory to preserve neighboring cache lines. All five internal-SD handoff loaders wait for every FIFO byte, even when DATAEND arrives early, and reject stalled reads. | [ARM9 SD IPC](../universal/sdmmc/arm9/source/my_sd.c); `source/sdmmc.c` in `booter/bootloader`, `title/bootloader`, `settings/bootloader`, `universal/bootloader_app` and `universal/bootloader_menu`. |
+| DSi SD/NAND | Remove the legacy IPC Sync storage driver and custom system FIFO. Enable accessible hardware before SDK IRQ initialization; the SDK owns TMIO interrupts, DMA and FIFO storage requests. Retain read-only software NAND decryption over native raw-sector reads and the raw CID required by its crypto. | [storage7.h](../universal/arm7/include/common/storage7.h), [storage.c](../universal/sdmmc/arm7/source/storage.c), component ARM7 mains and ARM9 `nand/nandio.c`. |
+| Stand-alone handoff reads | The small loaders run with IRQs disabled and retain their own polling reader. Wait for every FIFO byte, even when DATAEND arrives early, and reject stalled reads. This is separate from runtime SDK storage. | `source/sdmmc.c` in `booter/bootloader`, `title/bootloader`, `settings/bootloader`, `universal/bootloader_app` and `universal/bootloader_menu`. |
+| Menu handoff display | Hold master brightness white while loading internal `.srldr` modules and through the SDK startup hook, so cleared VRAM is hidden until the UI is prepared. External programs keep the usual brightness reset. | [menuStartup.c](../universal/source/common/menuStartup.c), [pinned SDK layout](../universal/include/blocksds/libnds_internal.h), shared loader and four `arm9clear.arm.c` routines. |
+| Settings persistence | Write and close a temporary INI before replacing the original. Keep a backup, restore it if publishing fails, and read it if the original is missing after an interrupted rename. | [inifile.cpp](../universal/source/common/inifile.cpp). |
 | Power/sleep | Queue power requests for the main loop; reboot through firmware and serialize I2C transactions. Read real backlight state and restore Settings screens on lid reopening. Keep filesystem, formatting and allocation work outside graphics IRQs. | [powerButton.h](../universal/arm7/include/common/powerButton.h), [ARM7 I2C](../universal/arm7/source/my_i2c.c), [Settings ARM7](../settings/arm7/source/main.c), [graphics.cpp](../romsel_dsimenutheme/arm9/source/graphics/graphics.cpp). |
 | Launch compatibility | Preserve bootstrap/pico-loader selection, configured emulators, NDZ, RAM disks, argument order and FAT aliases. Fix duplicated device prefixes in absolute `.argv` paths and provide fallback `argv[0]`. Detect flashcard/internal-SD installations explicitly. | [launcherArgs.cpp](../universal/source/common/launcherArgs.cpp), [launch executor](../universal/source/launch/launchExecutor.cpp), [nds_loader_arm9.c](../universal/source/nds_loader/nds_loader_arm9.c), [bootpath.h](../universal/include/common/bootpath.h), [flashcard entry](../booter_fc/arm9/source/main.cpp). |
 | CPU reset coherency | Clean and disable ARM9 caches before changing RAM mappings or publishing shared reset addresses. BlocksDS caches the header at `0x02FFFE00`; its soft reset otherwise discards dirty reset addresses and can restart stale code. Preserve the SDK reset routine's `r8` clobber. | [ndsReset.h](../universal/include/common/ndsReset.h), shared NDS/homebrew-bootstrap loaders, flashcard entry, Slot-1 launcher and GBA patcher. |
@@ -63,12 +66,16 @@ The DSi-mode flashcard Quit Game black screen is reported upstream in
 [nds-bootstrap #1925](https://github.com/DS-Homebrew/nds-bootstrap/issues/1925).
 This fork applies no menu-side workaround and does not modify bootstrap.
 
-Console-SD/Unlaunch Mario Kart launching and intermittent Settings return remain
-unresolved on hardware after the ARM9 reset coherency correction. Bootstrap's
-hardware log reaches header validation; the following loading phase stalls.
-The additional SD read-completion/cache corrections pass controlled regression
-checks but still need device confirmation. Emulator Settings round trips alone
-do not validate hardware caching.
+Console-SD/Unlaunch Mario Kart launching, intermittent Settings return and
+reported SD corruption remained unresolved in r12. The replacement with native
+SDK storage needs a new hardware check; earlier emulator passes do not establish
+that these regressions are fixed. Bootstrap's hardware log stopped after header
+validation. Official nds-bootstrap binaries remain unchanged.
+
+A control built with BlocksDS 1.24.0's default ARM7 also stalls on its first SD
+write in the local melonDS 1.1 setup. The native-storage menu reaches the same
+write wait. This limits current internal-SD emulator validation; the control
+and inspection tools belong on `diagnostics`.
 
 ## Packaging
 

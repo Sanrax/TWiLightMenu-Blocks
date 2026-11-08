@@ -238,6 +238,11 @@ void ClearBrightness(void) {
 
 bool screenFadedIn(void) { return (screenBrightness == 0); }
 bool screenFadedOut(void) { return (screenBrightness > 24); }
+bool iconDropFinished(void) {
+	if (ms().theme != TWLSettings::EThemeDSi || !dropDown) return true;
+	for (int i = 0; i < 5; i++) if (dropBounce[i] < 4) return false;
+	return true;
+}
 
 bool invertedColors = false;
 bool noWhiteFade = false;

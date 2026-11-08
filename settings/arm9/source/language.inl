@@ -438,3 +438,6 @@ STRING(HOTKEY_SETTING_CANCELLED, "Hotkey setting cancelled!")
 // STRING(DESCRIPTION_AK_VIEWMODE, "Sets the default view mode in the Acekard theme.")
 
 // STRING(DESCRIPTION_DEFAULT_LAUNCHER_1_DSIMENUPP, "Launch Nintendo DSi Menu or TWiLight Menu++ on boot.")
+
+STRING(FAST_MENU_FADES, "Fast menu fades")
+STRING(DESCRIPTION_FAST_MENU_FADES, "Use faster fades in the DSi and DS Classic menus. Off keeps the original transition speed.")

@@ -15,7 +15,7 @@ export LIBNDS := $(BLOCKSDS)/libs/libnds
 export PATH := $(BLOCKSDS)/tools/ndstool:$(BLOCKSDS)/tools/grit:$(BLOCKSDS)/tools/mmutil:$(BLOCKSDS)/tools/dlditool:$(PATH)
 
 CPPFLAGS = -I$(BLOCKSDS)/libs/version/include -D__NDS__ -D__BLOCKSDS__ -I$(BLOCKSDS)/libs/maxmod/include
-STORAGE_WRAPS = $(if $(filter blocksds_storage.o,$(OFILES)),$(foreach fn,get_io_dsisd get_io_dsinand sdmmc_GetDiskStatus nand_GetDiskStatus dldiGetInternal fatInit,-Wl$(comma)--wrap=$(fn)))
+STORAGE_WRAPS = $(if $(filter blocksds_storage.o,$(OFILES)),$(foreach fn,get_io_dsinand dldiGetInternal fatInit,-Wl$(comma)--wrap=$(fn)))
 comma := ,
 BLOCKSDS_LIBPATHS = -L$(BLOCKSDS)/libs/maxmod/lib
 BLOCKSDS_LDFLAGS = $(if $(filter -lnds9,$(LIBS)),-Wl$(comma)--defsym=__dldi_size=32768)

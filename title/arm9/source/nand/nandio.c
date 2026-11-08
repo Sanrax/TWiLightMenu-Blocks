@@ -2,6 +2,7 @@
 #include <nds.h>
 #include <nds/bios.h>
 #include <nds/disc_io.h>
+#include <nds/arm9/sdmmc.h>
 #include <malloc.h>
 #include <stdio.h>
 #include "crypto.h"
@@ -12,8 +13,6 @@
 //#define SECTOR_SIZE 512
 #define CRYPT_BUF_LEN 64
 
-extern vu32* sharedAddr;
-// extern bool my_sdio_isNoSGba;
 
 static bool is3DS;
 
@@ -57,71 +56,14 @@ void twlmGetConsoleKey(u8 *consoleID){
 }
 
 //---------------------------------------------------------------------------------
-bool my_nand_ReadSectors(sec_t sector, sec_t numSectors,void* buffer) {
-//---------------------------------------------------------------------------------
-	DC_FlushRange(buffer,numSectors * 512);
-
-	sharedAddr[0] = sector;
-	sharedAddr[1] = numSectors;
-	sharedAddr[2] = (vu32)buffer;
-	
-	sharedAddr[3] = 0x4452414E; // 'NARD'
-	// if (my_sdio_isNoSGba) {
-		IPC_SendSync(6);
-	/* } else {
-		fifoSendValue32(FIFO_SDMMC, 6);
-	} */
-	while (sharedAddr[3] == 0x4452414E) {
-		swiDelay(100);
-	}
-	while (1) {
-		if (sharedAddr[3] == 0x474E4950) { // 'PING'
-			sharedAddr[3] = 0x5243414E; // 'NACR'
-			IPC_SendSync(6);
-			while (sharedAddr[3] == 0x5243414E) {
-				swiDelay(100);
-			}
-		} else {
-			break;
-		}
-	}
-
-	int result = sharedAddr[3];
-	
-	return result == 0;
+bool my_nand_ReadSectors(sec_t sector, sec_t numSectors, void* buffer) {
+	return nand_ReadSectors(sector, numSectors, buffer);
 }
 
 bool nandio_startup() {
-	int result = 0;
+	if (!nand_Startup()) return false;
 
-	sharedAddr[3] = 0x56484453;
-	// if (my_sdio_isNoSGba) {
-		IPC_SendSync(1);
-	/* } else {
-		fifoSendValue32(FIFO_SDMMC, 1);
-	} */
-	while (sharedAddr[3] == 0x56484453) {
-		swiDelay(100);
-	}
-	result = sharedAddr[3];
-
-	if (result==0) return false;
-
-	sharedAddr[3] = 0x5453414E;
-	// if (my_sdio_isNoSGba) {
-		IPC_SendSync(2);
-	/* } else {
-		fifoSendValue32(FIFO_SDMMC, 2);
-	} */
-	while (sharedAddr[3] == 0x5453414E) {
-		swiDelay(100);
-	}
-
-	result = sharedAddr[3];
-
-	if (result != 0) return false;
-
-	my_nand_ReadSectors(0, 1, sector_buf);
+	if (!my_nand_ReadSectors(0, 1, sector_buf)) return false;
 	is3DS = parse_ncsd(sector_buf, 0) == 0;
 
 	if (*(u32*)(0x2FFD7BC) == 0) {

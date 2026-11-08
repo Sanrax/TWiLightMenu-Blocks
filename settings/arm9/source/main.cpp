@@ -1185,6 +1185,7 @@ int settingsMode(void)
 				Option::Nul(opt_theme_select),
 				{STR_PRESS_A},
 				{0})
+		.option(STR_FAST_MENU_FADES, STR_DESCRIPTION_FAST_MENU_FADES, Option::Bool(&ms().fastMenuFades), {STR_OFF, STR_ON}, {false, true})
 		.option(STR_DSCLASSICMENU, STR_DESCRIPTION_DSCLASSICMENU, Option::Bool(&ms().showMainMenu), {STR_YES, STR_NO}, {true, false})
 		.option("DSi/Saturn: SELECT", STR_DESCRIPTION_SELECTBUTTONOPTION, Option::Bool(&ms().showSelectMenu), {STR_SELECT_MENU, STR_DS_CLASSIC_MENU}, {true, false});
 	if (extraUIMusicInstalled) {

@@ -3305,7 +3305,7 @@ std::string browseForFile(const std::vector<std::string_view> &extensionList) {
 			musicplaying = true;
 		}
 
-		fadeSpeed = true; // Fast fade speed
+		fadeSpeed = !revealStartup || ms().fastMenuFades;
 		bool gameTapped = false;
 		bool dsiBinariesChecked = false;
 		bool hasDsiBinaries = true;
@@ -3362,8 +3362,10 @@ std::string browseForFile(const std::vector<std::string_view> &extensionList) {
 					printSmall(false, 256-4, 4, (showRshoulder ? STR_NEXT_R : STR_R), Alignment::right, FontPalette::overlay);
 				}
 				if (CURPOS + PAGENUM * 40 < ((int)dirContents[scrn].size())) {
-					currentBg = (ms().theme == TWLSettings::EThemeSaturn ? 0 : 1), displayBoxArt = ms().showBoxArt;
-					if (!bannerTextShown) {
+					const bool waitForDrop = revealStartup && pageNeedsPublish && ms().theme == TWLSettings::EThemeDSi;
+					currentBg = (ms().theme == TWLSettings::EThemeSaturn || waitForDrop) ? 0 : 1;
+					displayBoxArt = ms().showBoxArt;
+					if (!bannerTextShown && !waitForDrop) {
 						clearText();
 						titleUpdate(dirContents[scrn].at(CURPOS + PAGENUM * 40).isDirectory,
 								dirContents[scrn].at(CURPOS + PAGENUM * 40).name, CURPOS);
@@ -3433,8 +3435,16 @@ std::string browseForFile(const std::vector<std::string_view> &extensionList) {
 					endMenuContentUpdate();
 					pageNeedsPublish = false;
 					if (revealStartup) {
-						do { bgOperations(true); } while (!screenFadedIn());
+						do { bgOperations(true); } while (!screenFadedIn() || !iconDropFinished());
 						controlTopBright = false;
+						fadeSpeed = true;
+						if (ms().theme == TWLSettings::EThemeDSi && CURPOS + PAGENUM * 40 < (int)dirContents[scrn].size()) {
+							currentBg = 1;
+							const auto &entry = dirContents[scrn][CURPOS + PAGENUM * 40];
+							titleUpdate(entry.isDirectory, entry.name, CURPOS);
+							bannerTextShown = true;
+							updateText(false);
+						}
 					}
 				}
 				buttonArrowTouched[0] = ((keysHeld() & KEY_TOUCH) && touch.py > 171 && touch.px < 19);

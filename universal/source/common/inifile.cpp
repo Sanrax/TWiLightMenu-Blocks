@@ -21,10 +21,12 @@
 #include "common/inifile.h"
 
 #include <algorithm>
+#include <cerrno>
 #include <cstdio>
 #include <cstdlib>
 #include <string_view>
 #include <utility>
+#include <unistd.h>
 
 bool gbar2Fix = false;
 
@@ -125,6 +127,8 @@ bool CIniFile::LoadIniFile(const std::string &FileName)
 {
     if (!FileName.empty()) m_sFileName = FileName;
     FILE *file = fopen(m_sFileName.c_str(), "rb");
+    // Recover a completed save interrupted between the two FAT renames.
+    if (!file && errno == ENOENT) file = fopen((m_sFileName + ".bak").c_str(), "rb");
     if (!file) return false;
 
     StringArray lines;
@@ -174,7 +178,9 @@ bool CIniFile::SaveIniFileModified(const std::string &FileName)
 bool CIniFile::SaveIniFile(const std::string &FileName)
 {
     if (!FileName.empty()) m_sFileName = FileName;
-    FILE *file = fopen(m_sFileName.c_str(), "wb");
+    const std::string temporary = m_sFileName + ".tmp";
+    const std::string backup = m_sFileName + ".bak";
+    FILE *file = fopen(temporary.c_str(), "wb");
     if (!file) return false;
 
     const std::string_view newline = gbar2Fix ? "\n" : "\r\n";
@@ -192,8 +198,27 @@ bool CIniFile::SaveIniFile(const std::string &FileName)
         write(newline);
     }
     if (fclose(file) != 0) ok = false;
-    if (ok) m_bModified = false;
-    return ok;
+    if (!ok) {
+        remove(temporary.c_str());
+        return false;
+    }
+
+    // FatFS doesn't replace an existing rename target. Keep the previous file
+    // until its replacement has been fully written and closed successfully.
+    const bool previousExists = access(m_sFileName.c_str(), F_OK) == 0;
+    if ((!previousExists && errno != ENOENT)
+        || (previousExists && remove(backup.c_str()) != 0 && errno != ENOENT)
+        || (previousExists && rename(m_sFileName.c_str(), backup.c_str()) != 0)) {
+        remove(temporary.c_str());
+        return false;
+    }
+    if (rename(temporary.c_str(), m_sFileName.c_str()) != 0) {
+        if (previousExists) rename(backup.c_str(), m_sFileName.c_str());
+        remove(temporary.c_str());
+        return false;
+    }
+    m_bModified = false;
+    return true;
 }
 
 void CIniFile::BuildIndex()

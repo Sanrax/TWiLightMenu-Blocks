@@ -62,9 +62,8 @@ int main(int argc, char **argv) {
 	bool flashcardFound = twlmMountStorage("fat", dldiGetInternal());
 	bool sdFound = false;
 	if (isDSiMode() || (!isRegularDS && REG_SCFG_EXT != 0)) {
-		extern const DISC_INTERFACE __my_io_dsisd;
-		//iprintf("Initing SD...\n");
-		sdFound = twlmMountStorage("sd", &__my_io_dsisd);
+			//iprintf("Initing SD...\n");
+		sdFound = twlmMountStorage("sd", get_io_dsisd());
 	}
 	const char* menuPath = bootpath::mainMenu(
 		flashcardFound && access(bootpath::flashcardMenu, F_OK) == 0,

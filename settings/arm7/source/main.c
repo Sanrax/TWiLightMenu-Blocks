@@ -28,8 +28,8 @@
 
 ---------------------------------------------------------------------------------*/
 #include <nds.h>
+#include "common/storage7.h"
 #include "common/powerButton.h"
-void my_sdmmc_get_cid(int devicenumber, u32 *cid);
 #include <string.h>
 #include <maxmod7.h>
 #include "card_init.h"
@@ -39,14 +39,12 @@ void my_sdmmc_get_cid(int devicenumber, u32 *cid);
 #define REG_SCFG_WL *(vu16*)0x4004020
 
 void my_touchInit();
-void my_installSystemFIFO(void);
 
 u8 my_i2cReadRegister(u8 device, u8 reg);
 u8 my_i2cWriteRegister(u8 device, u8 reg, u8 data);
 
 #define BIT_SET(c, n) ((c) << (n))
 
-#define SD_IRQ_STATUS (*(vu32*)0x400481C)
 
 volatile int timeTilVolumeLevelRefresh = 0;
 static int soundVolume = 127;
@@ -204,6 +202,7 @@ int main() {
 	readUserSettings();
 	ledBlink(0);
 
+	twlmPrepareStorage();
 	irqInit();
 	// Start the RTC tracking IRQ
 	initClockIRQTimer(LIBNDS_DEFAULT_TIMER_RTC);
@@ -215,7 +214,7 @@ int main() {
 	SetYtrigger(80);
 
 	installSoundFIFO();
-	my_installSystemFIFO();
+	installSystemFIFO();
 
 	irqSet(IRQ_VCOUNT, VcountHandler);
 	irqSet(IRQ_VBLANK, VblankHandler);
@@ -252,16 +251,14 @@ int main() {
 	// SD status -- bits 13-14
 	// Init status -- bits 15-18 (Bit 0 (15): hasRegulableBacklight, Bit 1 (16): scfgSdmmcEnabled, Bit 2 (17): REG_SNDEXTCNT, Bit 3 (18): isDSPhat, Bit 4 (19): i2cBricked)
 
-	*(vu32*)0x4004820 = 0x8B7F0305;
 
 	u8 initStatus = (BIT_SET(!!(REG_SNDEXTCNT), SNDEXTCNT_BIT)
-									| BIT_SET(*(vu32*)0x4004820, SCFGSDMMC_BIT)
+									| BIT_SET(twlmSdAccessible(), SCFGSDMMC_BIT)
 									| BIT_SET(!!(pmBacklight & BIT(4) || pmBacklight & BIT(5) || pmBacklight & BIT(6) || pmBacklight & BIT(7)), BACKLIGHT_BIT)
 									| BIT_SET(isPhat(), DSPHAT_BIT)
 									| BIT_SET(i2cBricked, I2CBRICKED_BIT)
 									| BIT_SET((readPowerManagement(PM_CONTROL_REG) & (PM_BACKLIGHT_TOP | PM_BACKLIGHT_BOTTOM)) == 0, BACKLIGHTS_OFF_BIT));
 
-	*(vu32*)0x4004820 = 0;
 
 	status = (status & ~INIT_MASK) | ((initStatus << INIT_OFF) & INIT_MASK);
 	fifoSendValue32(FIFO_USER_03, status);
@@ -317,11 +314,9 @@ int main() {
 		}
 
 		if (isDSiMode()) {
-			if (SD_IRQ_STATUS & BIT(4)) {
-				status = (status & ~SD_MASK) | ((2 << SD_OFF) & SD_MASK);
-				fifoSendValue32(FIFO_USER_03, status);
-			} else if (SD_IRQ_STATUS & BIT(3)) {
-				status = (status & ~SD_MASK) | ((1 << SD_OFF) & SD_MASK);
+			const u32 sdStatus = (twlmSdInserted() ? 2u : 1u) << SD_OFF;
+			if ((status & SD_MASK) != sdStatus) {
+				status = (status & ~SD_MASK) | sdStatus;
 				fifoSendValue32(FIFO_USER_03, status);
 			}
 		}
@@ -335,7 +330,7 @@ int main() {
 		}
 
 		if (*(u32*)(0x2FFFD0C) == 0x454D4D43) {
-			my_sdmmc_get_cid(1, (u32*)0x2FFD7BC);	// Get eMMC CID
+			twlmReadStorageCid(1, (u32*)0x2FFD7BC);	// Get eMMC CID
 			*(u32*)(0x2FFFD0C) = 0;
 		}
 		swiWaitForVBlank();
