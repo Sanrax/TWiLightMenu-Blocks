@@ -37,6 +37,7 @@ reference; the commands above apply to this fork.
 | Embedded filesystems | Use native `nitro:` for menu assets and an independent read-only `boot:` for nds-bootstrap templates/loaders, with bounded paths, file tables and independent streams. | [systemdetails.cpp](../universal/source/common/systemdetails.cpp), [bootfs.c](../universal/source/common/bootfs.c), [legacy fallback](../universal/source/common/nitrofs.c). |
 | ARM7/SDK interfaces | Adapt input, touch, clock, FIFO, Maxmod, AES/NAND types and GL uploads to native SDK interfaces while retaining custom ARM7 cores and launch engines. Correct OAM palette-bank sizes and pad short GL palettes to avoid missing colors. | Component `arm7/source/main.c`, `arm9/source/nand/`, [ARM7 helpers](../universal/arm7/), [splash palettes](../title/arm9/Makefile), [Classic cursor](../quickmenu/gfx/cursor.grit), [Texture.cpp](../romsel_dsimenutheme/arm9/source/graphics/Texture.cpp). |
 | DSi SD/NAND | Enable accessible SD hardware before probing; use DMA word counts, wait for complete transfers, bound failed polls and keep the native IRQ from consuming polling flags. Use an uncached IPC mailbox and clear stale sync before CPU reset. Retain locked-access/iEvolution fallbacks. | [ARM7 SD driver](../universal/sdmmc/arm7/source/my_sdmmc.c), [ARM9 SD IPC](../universal/sdmmc/arm9/source/my_sd.c), [custom FIFO](../universal/sdmmc/arm7/source/my_system.c), reset callers in the shared/component loaders. |
+| SD read completion | Invalidate ARM9 read buffers after ARM7 finishes; batch unaligned/private buffers through aligned scratch memory to preserve neighboring cache lines. All five internal-SD handoff loaders wait for every FIFO byte, even when DATAEND arrives early, and reject stalled reads. | [ARM9 SD IPC](../universal/sdmmc/arm9/source/my_sd.c); `source/sdmmc.c` in `booter/bootloader`, `title/bootloader`, `settings/bootloader`, `universal/bootloader_app` and `universal/bootloader_menu`. |
 | Power/sleep | Queue power requests for the main loop; reboot through firmware and serialize I2C transactions. Read real backlight state and restore Settings screens on lid reopening. Keep filesystem, formatting and allocation work outside graphics IRQs. | [powerButton.h](../universal/arm7/include/common/powerButton.h), [ARM7 I2C](../universal/arm7/source/my_i2c.c), [Settings ARM7](../settings/arm7/source/main.c), [graphics.cpp](../romsel_dsimenutheme/arm9/source/graphics/graphics.cpp). |
 | Launch compatibility | Preserve bootstrap/pico-loader selection, configured emulators, NDZ, RAM disks, argument order and FAT aliases. Fix duplicated device prefixes in absolute `.argv` paths and provide fallback `argv[0]`. Detect flashcard/internal-SD installations explicitly. | [launcherArgs.cpp](../universal/source/common/launcherArgs.cpp), [launch executor](../universal/source/launch/launchExecutor.cpp), [nds_loader_arm9.c](../universal/source/nds_loader/nds_loader_arm9.c), [bootpath.h](../universal/include/common/bootpath.h), [flashcard entry](../booter_fc/arm9/source/main.cpp). |
 | CPU reset coherency | Clean and disable ARM9 caches before changing RAM mappings or publishing shared reset addresses. BlocksDS caches the header at `0x02FFFE00`; its soft reset otherwise discards dirty reset addresses and can restart stale code. Preserve the SDK reset routine's `r8` clobber. | [ndsReset.h](../universal/include/common/ndsReset.h), shared NDS/homebrew-bootstrap loaders, flashcard entry, Slot-1 launcher and GBA patcher. |
@@ -62,9 +63,12 @@ The DSi-mode flashcard Quit Game black screen is reported upstream in
 [nds-bootstrap #1925](https://github.com/DS-Homebrew/nds-bootstrap/issues/1925).
 This fork applies no menu-side workaround and does not modify bootstrap.
 
-The ARM9 reset coherency correction still needs hardware confirmation for the
-reported console-SD/Unlaunch Mario Kart launch white screen and frozen Settings
-return. Emulator Settings round trips alone do not validate hardware caching.
+Console-SD/Unlaunch Mario Kart launching and intermittent Settings return remain
+unresolved on hardware after the ARM9 reset coherency correction. Bootstrap's
+hardware log reaches header validation; the following loading phase stalls.
+The additional SD read-completion/cache corrections pass controlled regression
+checks but still need device confirmation. Emulator Settings round trips alone
+do not validate hardware caching.
 
 ## Packaging
 

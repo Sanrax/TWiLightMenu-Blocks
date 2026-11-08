@@ -7,7 +7,8 @@
 #include <nds/memory.h>
 #include <nds/arm9/cache.h>
 #include <nds/arm9/dldi.h>
-// #include <string.h>
+#include <stdint.h>
+#include <string.h>
 
 vu32* sharedAddr = (vu32*)0x02FFFA00;
 // bool my_sdio_isNoSGba = false;
@@ -115,9 +116,7 @@ bool my_sdio_IsInserted() {
 }
 
 //---------------------------------------------------------------------------------
-bool my_sdio_ReadSectors(sec_t sector, sec_t numSectors, void* buffer) {
-    if (startupTimedOut) return false;
-    if (!numSectors) return true;
+static bool readSectorsAligned(sec_t sector, sec_t numSectors, void* buffer) {
     SdIoWait wait = beginIoWait();
     DC_FlushRange(buffer, numSectors * 512);
     sharedAddr[0] = sector;
@@ -133,7 +132,36 @@ bool my_sdio_ReadSectors(sec_t sector, sec_t numSectors, void* buffer) {
         if (!waitIoReply(0x52434453, &wait)) return false;
     }
     const u32 result = sharedAddr[3];
+    // Polling and interrupts may refill a line after the pre-transfer flush.
+    // ARM7 writes physical RAM, so discard those cached copies on completion.
+    DC_InvalidateRange(buffer, numSectors * 512);
     return result == 0;
+}
+
+bool my_sdio_ReadSectors(sec_t sector, sec_t numSectors, void* buffer) {
+    if (startupTimedOut) return false;
+    if (!numSectors) return true;
+    if (numSectors > UINT32_MAX / 512) return false;
+    const u32 bytes = numSectors * 512;
+    if (((uintptr_t)buffer & 31) == 0 && memBufferIsInMainRam(buffer, bytes)) {
+        return readSectorsAligned(sector, numSectors, buffer);
+    }
+
+    // FatFS can pass unaligned buffers. Invalidating their boundary lines
+    // would discard neighboring variables; ARM7 also cannot access ARM9 TCM.
+    // Batch through private, complete cache lines, retaining DMA on this path.
+    enum { BUFFER_SECTORS = 8 };
+    static u8 readBuffer[BUFFER_SECTORS * 512] __attribute__((aligned(32)));
+    u8 *destination = buffer;
+    while (numSectors) {
+        const sec_t count = numSectors < BUFFER_SECTORS ? numSectors : BUFFER_SECTORS;
+        if (!readSectorsAligned(sector, count, readBuffer)) return false;
+        memcpy(destination, readBuffer, count * 512);
+        destination += count * 512;
+        sector += count;
+        numSectors -= count;
+    }
+    return true;
 }
 
 //---------------------------------------------------------------------------------

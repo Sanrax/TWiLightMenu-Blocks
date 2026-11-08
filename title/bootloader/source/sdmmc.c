@@ -41,7 +41,13 @@ void sdmmc_send_command(struct mmcdevice *ctx, uint32_t cmd, uint32_t args) {
 	}
 
 	ctx->error = 0;
-	while ((sdmmc_read16(REG_SDSTATUS1) & TMIO_STAT1_CMD_BUSY)); //mmc working?
+	unsigned polls = 1u << 22;
+	while (sdmmc_read16(REG_SDSTATUS1) & TMIO_STAT1_CMD_BUSY) {
+		if (--polls == 0) {
+			ctx->error = 4;
+			return;
+		}
+	}
 	sdmmc_write16(REG_SDIRMASK0,0);
 	sdmmc_write16(REG_SDIRMASK1,0);
 	sdmmc_write16(REG_SDSTATUS0,0);
@@ -62,7 +68,13 @@ void sdmmc_send_command(struct mmcdevice *ctx, uint32_t cmd, uint32_t args) {
 	bool tUseBuf = ( NULL != tDataPtr32 );
 
 	u16 status0 = 0;
+	polls = 1u << 22;
 	while (1) {
+		if (--polls == 0) {
+			ctx->error |= 4;
+			sdmmc_write16(REG_SDSTOP, 0x101); // Abort the incomplete transfer.
+			break;
+		}
 		volatile u16 status1 = sdmmc_read16(REG_SDSTATUS1);
 #ifdef DATA32_SUPPORT
 		volatile u16 ctl32 = sdmmc_read16(REG_SDDATACTL32);
@@ -103,6 +115,7 @@ void sdmmc_send_command(struct mmcdevice *ctx, uint32_t cmd, uint32_t args) {
 						}
 						#endif
 						size -= blkSize;
+						polls = 1u << 22;
 					}
 				}
 
@@ -147,6 +160,7 @@ void sdmmc_send_command(struct mmcdevice *ctx, uint32_t cmd, uint32_t args) {
 						}
 						#endif
 						size -= blkSize;
+						polls = 1u << 22;
 					}
 				}
 
@@ -167,7 +181,9 @@ void sdmmc_send_command(struct mmcdevice *ctx, uint32_t cmd, uint32_t args) {
 				ctx->error |= 0x2;
 			}
 
-			if ((status0 & flags) == flags)
+			// DATAEND can arrive before the final FIFO block is readable.
+			// Never publish a binary until every requested byte is copied.
+			if ((status0 & flags) == flags && (!(readdata || writedata) || size == 0))
 				break;
 		}
 	}
