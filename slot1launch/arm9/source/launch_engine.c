@@ -24,6 +24,7 @@
 #include "cardengine_arm7_bin.h"
 #include "launch_engine.h"
 #include "common/tonccpy.h"
+#include "common/ndsReset.h"
 
 #define LCDC_BANK_D (u16*)0x06860000
 
@@ -82,6 +83,7 @@ void runLaunchEngine (bool altBootloader, bool isDSBrowser)
 
 	irqDisable(IRQ_ALL);
 
+	prepareArm9ForReset();
 	if (altBootloader) {
 		if (isDSBrowser || scfgUnlock) {
 			REG_SCFG_EXT = TWLVRAM ? 0x8300E000 : 0x8300C000;

@@ -28,6 +28,7 @@
 #include <unistd.h>
 
 #include "common/tonccpy.h"
+#include "common/ndsReset.h"
 #include "load_bin.h"
 
 #include "nds_loader_arm9.h"
@@ -48,6 +49,7 @@ int runNds (const void* loader, u32 loaderSize)
 
 	irqDisable(IRQ_ALL);
 	
+	prepareArm9ForReset();
 	// Give the VRAM to the ARM7
 	VRAM_C_CR = VRAM_ENABLE | VRAM_C_ARM7_0x06000000;	
 	// Reset into a passme loop
