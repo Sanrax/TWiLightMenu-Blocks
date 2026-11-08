@@ -30,6 +30,7 @@
 
 #include "common/lzss.h"
 #include "common/tonccpy.h"
+#include "common/ndsReset.h"
 //#include "locations.h"
 
 #include "common/nds_bootstrap_loader.h"
@@ -184,6 +185,8 @@ int bootstrapHbRunNds (const void* loader, u32 loaderSize, u32 cluster, u32 ramD
 	//nocashMessage("irqDisable(IRQ_ALL);");
 
 	irqDisable(IRQ_ALL);
+
+	prepareArm9ForReset();
 
 	if (!boostCpu) {
 		REG_SCFG_CLK = 0x80;

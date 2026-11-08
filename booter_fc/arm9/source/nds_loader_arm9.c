@@ -29,6 +29,7 @@
 #include <fat.h>
 
 #include "common/tonccpy.h"
+#include "common/ndsReset.h"
 #include "load_bin.h"
 
 #ifndef _NO_BOOTSTUB_
@@ -315,6 +316,7 @@ int runNds (const void* loader, u32 loaderSize, u32 cluster, bool initDisc, bool
 
 	irqDisable(IRQ_ALL);
 
+	prepareArm9ForReset();
 	// Give the VRAM to the ARM7
 	VRAM_D_CR = VRAM_ENABLE | VRAM_D_ARM7_0x06020000;	
 	// Reset into a passme loop

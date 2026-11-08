@@ -24,6 +24,7 @@
 
 bool screenFadedIn(void);
 bool screenFadedOut(void);
+bool iconDropFinished(void);
 void SetBrightness(u8 screen, s8 bright);
 
 void drawCurrentDate();

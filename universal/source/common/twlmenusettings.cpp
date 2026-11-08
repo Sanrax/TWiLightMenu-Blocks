@@ -53,6 +53,7 @@ TWLSettings::TWLSettings()
 	showMicroSd = false;
 	gbar2DldiAccess = false;
 	showMainMenu = false;
+	fastMenuFades = false;
 	showSelectMenu = false;
 	rocketRobzLogo = true;
 	theme = EThemeDSi;
@@ -235,6 +236,7 @@ void TWLSettings::loadSettings()
 	showMicroSd = settingsini.GetInt("SRLOADER", "SHOW_MICROSD", showMicroSd);
 	gbar2DldiAccess = settingsini.GetInt("SRLOADER", "GBAR2_DLDI_ACCESS", gbar2DldiAccess);
 	showMainMenu = settingsini.GetInt("SRLOADER", "SHOW_MAIN_MENU", showMainMenu);
+	fastMenuFades = settingsini.GetInt("SRLOADER", "FAST_MENU_FADES", fastMenuFades);
 	showSelectMenu = settingsini.GetInt("SRLOADER", "SHOW_SELECT_MENU", showSelectMenu);
 	rocketRobzLogo = settingsini.GetInt("SRLOADER", "ROCKET_ROBZ_LOGO", rocketRobzLogo);
 	theme = (TTheme)settingsini.GetInt("SRLOADER", "THEME", theme);
@@ -435,6 +437,7 @@ void TWLSettings::saveSettings()
 	settingsini.SetInt("SRLOADER", "SHOW_MICROSD", showMicroSd);
 	settingsini.SetInt("SRLOADER", "GBAR2_DLDI_ACCESS", gbar2DldiAccess);
 	settingsini.SetInt("SRLOADER", "SHOW_MAIN_MENU", showMainMenu);
+	settingsini.SetInt("SRLOADER", "FAST_MENU_FADES", fastMenuFades);
 	settingsini.SetInt("SRLOADER", "SHOW_SELECT_MENU", showSelectMenu);
 	settingsini.SetInt("SRLOADER", "ROCKET_ROBZ_LOGO", rocketRobzLogo);
 	settingsini.SetInt("SRLOADER", "THEME", theme);

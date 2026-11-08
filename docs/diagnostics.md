@@ -30,7 +30,7 @@ make test
 make check-build
 ```
 
-`make test` runs host checks for storage/IPC, I2C/power, FAT loaders, launch
+`make test` runs host checks for I2C/power, FAT loaders, launch
 arguments, INIs/translations, fonts, textures/photos, music queues and encoding.
 It requires a host C/C++ compiler and Python, without the SDK or console assets.
 `make check-build` requires `make all` outputs and checks 18 NDS headers, DLDI
@@ -59,9 +59,9 @@ keep separate optimization baselines separate. See [retained phase data](benchma
 
 Copy `booter_fc/booter_fc-diagnostic.nds` as `BOOT_TEST.NDS`. It displays stages
 and writes `_nds/TWiLightMenu/boot-diagnostic.log` after storage mounts.
-ARM9 keeps SD-read traces in RAM until disk callbacks finish; ARM7 provides
-controller/DMA snapshots. An unacknowledged IPC request stops disk logging.
-The normal timeout and transfer protections are also present on `master`.
+The legacy IPC Sync driver and its register snapshots were removed when
+production switched to native BlocksDS storage. Do not restore that driver
+merely to collect logs; inspect the SDK FIFO/TMIO path with a debugger instead.
 
 `tests/nds-argv/probe.nds` records launch arguments and optional filesystem
 checks in `argv-result.txt`. Press B to exercise normal homebrew exit back to
@@ -70,3 +70,18 @@ the menu. It is separate from nds-bootstrap's retail-game quit path.
 Restore production binaries after testing. To maintain this branch, merge
 new production commits from `master`, retain the instrumentation overlay,
 and keep new timing/trace hooks out of `master`.
+
+## Native SD control (r13)
+
+`make -C tests/native-sd-control` builds a small SD write/readback control with
+BlocksDS 1.24.0's unmodified default ARM7. It writes only
+`sd:/native-sd-probe.bin`; use a disposable SD image. In the local melonDS 1.1
+DSi setup it mounts successfully but stalls at `Mounted; writing...`, waiting
+for native CMD24 completion, as does the production menu. This is a controlled
+emulator observation, not a hardware result. Never bundle BIOS, NAND or ROMs.
+
+`tests/inisave.cpp` injects a short write and a failed publish rename into the
+actual INI implementation, checking original preservation, rollback and backup
+recovery. `tests/check_build.py` checks linked native storage ownership and the
+copied white-screen handoff routines. Set `TWLM_BUILD_ROOT` to a separately built
+production checkout to audit its outputs without rebuilding instrumentation.

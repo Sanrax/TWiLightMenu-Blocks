@@ -6,7 +6,7 @@ import re
 import struct
 import subprocess
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(os.environ.get('TWLM_BUILD_ROOT', Path(__file__).resolve().parents[1])).resolve()
 COMPONENTS = {
     '3dssplash': '3dssplash', 'booter': 'booter', 'booter_fc': 'booter_fc',
     'gbapatcher': 'gbapatcher', 'imageview': 'imageview', 'manual': 'manual',
@@ -81,3 +81,26 @@ for loader in loaders:
             found.add(fields[-1])
     assert required <= found, (path, found)
 print(f'{len(images)} NDS headers, DLDI allocations, title MPU mapping and {len(loaders)} ARM9 loader images passed')
+
+# Runtime SD/NAND traffic must use the SDK service; polling belongs only to
+# the stand-alone handoff loaders, whose IRQs are disabled.
+nm = toolchain/'toolchain/gcc-arm-none-eabi/bin/arm-none-eabi-nm'
+for component, name in COMPONENTS.items():
+    if component in ('slot1launch', 'gbapatcher'):
+        continue
+    symbols = subprocess.check_output([str(nm), str(ROOT/component/f'{name}.arm7.elf')], text=True)
+    assert ' storageMsgHandler' in symbols and ' TMIO_init' in symbols, component
+    assert not re.search(r'\b(?:my_sdmmc\w*|my_installSystemFIFO)\b', symbols), component
+    symbols = subprocess.check_output([str(nm), str(ROOT/component/f'{name}.arm9.elf')], text=True)
+    assert not re.search(r'\b(?:__my_io_dsisd|__wrap_get_io_dsisd|__wrap_sdmmc_GetDiskStatus)\b', symbols), component
+    if component != 'booter_fc':
+        assert re.search(r' T initSystem$', symbols, re.M), component
+
+for loader in ('settings/bootloader', 'title/bootloader',
+               'universal/bootloader_app', 'universal/bootloader_menu'):
+    body = subprocess.check_output([str(objdump), '-d', '--disassemble=holdMasterWhite_ARM9',
+                                    str(ROOT/loader/'load.elf')], text=True)
+    addresses = [int(address, 16) for address in re.findall(r'^\s*([0-9a-f]+):', body, re.M)]
+    assert addresses and max(addresses) - min(addresses) < 0x80, loader
+    assert not re.search(r'\bblx?\s', body), (loader, 'copied routine calls outside its image')
+print('Native SDK storage ownership, menu startup hooks and copied brightness routines passed')

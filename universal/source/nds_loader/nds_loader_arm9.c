@@ -30,6 +30,7 @@
 #include <fat.h>
 
 #include "common/tonccpy.h"
+#include "common/ndsReset.h"
 #include "load_bin.h"
 
 #ifndef _NO_BOOTSTUB_
@@ -208,6 +209,15 @@ int runNds (
 	int argSize;
 	const char* argChar;
 
+	// Leave the running program intact if the driver cannot be installed.
+	if (dldiPatchNds && !dldiPatchLoader()) {
+		return 3;
+	}
+
+	// Value 2 retains the fade's white screen while another menu is loaded.
+	const bool menuHandoff = clearMasterBright
+		&& strstr(filename, "/_nds/TWiLightMenu/") && strstr(filename, ".srldr");
+
 	irqDisable(IRQ_ALL);
 
 	// Direct CPU access to VRAM bank D
@@ -227,7 +237,7 @@ int runNds (
 		writeAddr ((data_t*) LCDC_BANK_D, HAVE_DSISD_OFFSET, 1);
 	}
 
-	writeAddr ((data_t*) LCDC_BANK_D, CLEAR_MASTER_BRIGHT_OFFSET, clearMasterBright);
+	writeAddr ((data_t*) LCDC_BANK_D, CLEAR_MASTER_BRIGHT_OFFSET, menuHandoff ? 2 : clearMasterBright);
 	if (isDSiMode()) {
 		writeAddr ((data_t*) LCDC_BANK_D, DSMODE_SWITCH_OFFSET, dsModeSwitch);
 	}
@@ -267,12 +277,7 @@ int runNds (
 	writeAddr ((data_t*) LCDC_BANK_D, ARG_SIZE_OFFSET, argSize);
 
 
-	if (dldiPatchNds) {
-		// Patch the loader with a DLDI for the card
-		if (!dldiPatchLoader ()) {
-			return 3;
-		}
-	}
+	prepareArm9ForReset();
 
 	if (REG_SCFG_EXT != 0 && dsModeSwitch) {
 		tonccpy((u32*)0x023F4000, (u32*)0x02FF4000, 0x8000); // Relocate data to 4MB RAM area

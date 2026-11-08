@@ -300,6 +300,7 @@ public:
 	bool showMicroSd;
 	bool gbar2DldiAccess;
 	bool showMainMenu;
+	bool fastMenuFades;
 	bool showSelectMenu;
 	bool rocketRobzLogo;
 	TTheme theme;

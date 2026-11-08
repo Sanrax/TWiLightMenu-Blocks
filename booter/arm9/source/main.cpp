@@ -1,4 +1,5 @@
 #include "common/storage.h"
+#include <nds/arm9/sdmmc.h>
 /*-----------------------------------------------------------------
  Copyright (C) 2005 - 2013
 	Michael "Chishm" Chisholm
@@ -157,11 +158,10 @@ int main(int argc, char **argv) {
 		}
 	}
 
-	*(u32*)0x0CFFFD0C = 0x54534453; // 'SDST'
-	while (*(u32*)0x0CFFFD0C != 0) { swiDelay(100); }
-
-	u32 sdIrqStatus = fifoGetValue32(FIFO_USER_04);
-	if ((sdIrqStatus & BIT(5)) != 0 && (sdIrqStatus & BIT(7)) == 0) {
+	const DISC_INTERFACE *sdInterface = get_io_dsisd();
+	if (sdInterface) sdInterface->startup();
+	const u8 sdStatus = sdmmc_GetDiskStatus();
+	if (!(sdStatus & SDMMC_STATUS_NODISK) && (sdStatus & SDMMC_STATUS_PROTECT)) {
 		graphicsInit();
 		fontInit();
 		fadeType = true;
@@ -200,10 +200,9 @@ int main(int argc, char **argv) {
 
 	fadeType = true;
 
-	extern const DISC_INTERFACE __my_io_dsisd;
 	bool fatInited = false;
 	for (int i = 0; i < 30; i++) { // Run 30 times in case ntrboot is used
-		fatInited = twlmMountStorage("sd", &__my_io_dsisd);
+		fatInited = twlmMountStorage("sd", get_io_dsisd());
 		if (fatInited) {
 			break;
 		} else {
@@ -211,12 +210,7 @@ int main(int argc, char **argv) {
 		}
 	}
 
-	*(u32*)0x0CFFFD0C = 0x47444943; // 'CIDG'
-	while (*(u32*)0x0CFFFD0C != 0) { swiDelay(100); }
-
-	// DC_FlushRange((void*)0x02810000, 16);
-
-	if (!fatInited && *(u16*)0x0C81000E == 0 && *(u8*)0x0C81000C == 0) {
+	if (!fatInited && (sdStatus & SDMMC_STATUS_NODISK)) {
 		waitBeforeFade = false;
 
 		clearText();

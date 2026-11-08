@@ -41,14 +41,11 @@ static void beginBootLog(const char* path) {
 	diagnosticLogPath = path;
 	FILE* file = fopen(path, "wb");
 	if (!file) return;
-	fprintf(file, "TWiLight boot diagnostics (Power/navigation r4)\nARM9 mode: %s\nSCFG_EXT: %08lX\nDLDI: %.48s\n",
+	fprintf(file, "TWiLight boot diagnostics (native storage)\nARM9 mode: %s\nSCFG_EXT: %08lX\nDLDI: %.48s\n",
 		isDSiMode() ? "DSi" : "DS", (unsigned long)REG_SCFG_EXT, io_dldi_data->friendlyName);
 	fclose(file);
 }
 
-extern "C" void bootDisableDiskLog(void) { diagnosticLogPath = nullptr; }
-extern "C" void bootLogSdIo(void);
-extern "C" bool bootSdIpcTimedOut(void);
 
 extern "C" void bootStage(const char* stage) {
 	printf("%s\n", stage);
@@ -110,17 +107,10 @@ int main(int argc, char **argv) {
 	bootStage(flashcardFound ? "Flashcard mounted" : "Flashcard unavailable");
 	bool sdFound = false;
 	if (isDSiMode() || (!isRegularDS && REG_SCFG_EXT != 0)) {
-		extern const DISC_INTERFACE __my_io_dsisd;
-		//iprintf("Initing SD...\n");
 		bootStage("Mounting internal SD");
-		sdFound = twlmMountStorage("sd", &__my_io_dsisd);
+		sdFound = twlmMountStorage("sd", get_io_dsisd());
 #ifdef TWLM_BOOT_DIAGNOSTICS
 		if (sdFound && !flashcardFound) beginBootLog("sd:/_nds/TWiLightMenu/boot-diagnostic.log");
-        bootLogSdIo();
-        if (bootSdIpcTimedOut()) {
-            printf("Restart console to retry.\n");
-            while (1) swiWaitForVBlank();
-        }
 #endif
 		bootStage(sdFound ? "Internal SD mounted" : "Internal SD unavailable");
 	}

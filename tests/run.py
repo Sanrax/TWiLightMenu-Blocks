@@ -20,12 +20,6 @@ with tempfile.TemporaryDirectory(prefix='twlm-tests-') as temp:
     run(str(output/'bootfs'), str(output/'bootfs.nds'))
 
     run('cc', '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror',
-        '-Wno-pointer-to-int-cast', '-Wno-int-to-pointer-cast',
-        '-Itests/include/sdmmc', '-Itests/include', '-Iuniversal/sdmmc/arm7/include',
-        'tests/sdmmc.c', '-o', str(output/'sdmmc'))
-    run(str(output/'sdmmc'))
-
-    run('cc', '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror',
         '-Itests/include/sdmmc', '-Itests/include', '-Iuniversal/arm7/include',
         'tests/powerbutton.c', '-o', str(output/'powerbutton'))
     run(str(output/'powerbutton'))
@@ -53,6 +47,11 @@ with tempfile.TemporaryDirectory(prefix='twlm-tests-') as temp:
         '-Iuniversal/include', 'tests/inifile.cpp', 'universal/source/common/inifile.cpp',
         '-o', str(output/'inifile'))
     run(str(output/'inifile'), str(output/'settings.ini'))
+
+    run('c++', '-std=c++17', '-O2', '-Wall', '-Wextra', '-Werror',
+        '-Iuniversal/include', 'tests/inisave.cpp', 'universal/source/common/inifile.cpp',
+        '-Wl,--wrap=fwrite', '-Wl,--wrap=rename', '-o', str(output/'inisave'))
+    run(str(output/'inisave'), str(output/'save.ini'))
 
     run('c++', '-std=c++17', '-O2', '-Wall', '-Wextra', '-Werror',
         '-Iuniversal/include', 'tests/language.cpp', '-o', str(output/'language'))
