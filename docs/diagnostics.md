@@ -212,4 +212,39 @@ required the same earlier emulator-only command-start bypass in RAM; that
 change is absent from the packaged diagnostic. A separate host test of the
 same C capture function distinguishes intact code, a single changed word and
 an erased ARM9 code area, reporting the correct first mismatch and zero state.
-Hardware r18 results are pending; no production fix is claimed.
+The subsequent hardware result and production correction are recorded below.
+
+## Retail DSi console detection (r19)
+
+The supplied `NDSBTSRP_r18.LOG` confirms the erasure: stage 0 has state 1,
+zero code mismatches and hash `CF90DD6A`. Stages 1 and 2 have state zero,
+all 754 code words mismatching, zero entry/first words, and hash `24BD568D`,
+exactly the hash of an all-zero code area. The source in VRAM stays intact.
+See [the preserved log and fields](benchmarks/bootstrap-r18-hardware.json).
+
+The title's former write/read probe at `0x0DFFFE0C` assumes the old libnds
+32 MB mapping. In BlocksDS's 16 MB mode, the `0x0D000000` area mirrors main
+RAM. The probe can therefore label a retail DSi as `EDSiDebug` (1) and save
+`CONSOLE_MODEL=1` in both INIs. Bootstrap 2.17.0's `resetMemory_ARM7()` then
+clears `0x0D000000` for 16 MB when that model is nonzero, erasing its own
+reserved ARM9 area through the mirror. This explains the hardware-only
+failure before the first ARM9 display request. The pinned source is
+[`main.arm7.c`](https://github.com/DS-Homebrew/nds-bootstrap/blob/b9044ff2e66d5a522f9678c185f421a603f97d7a/retail/bootloaderi/source/arm7/main.arm7.c).
+
+The correction on `master` uses BlocksDS `isHwDebugger()` plus the existing
+3DS hardware check, removes the probe's custom MPU extension, and corrects
+both stored console models at normal title startup. No bootstrap code or SD
+routine changes. Full build and packaging checks passed; the obsolete probe
+address and custom MPU helper are absent from the rebuilt title module.
+
+Local limits: the SDK debugger flag reads zero in DSi startup. An isolated
+`CONSOLE_MODEL=1` bootstrap control does not erase ARM9 in melonDS 1.1: its
+[`DSi.cpp`](https://github.com/melonDS-emu/melonDS/blob/1.1/src/DSi.cpp)
+handles the `0x0C` RAM mirror but omits the `0x0D` mirror, including NDMA's
+ARM7 write path. This is not evidence against the hardware trace. A full
+title configuration-write check using DSi-mode DLDI stopped at `FAT init
+failed`; native storage has the earlier documented write limitation. Neither
+attempt is counted as a game-launch/configuration-write pass. Hardware r19
+confirmation remains pending. Start normal `BOOT.NDS` once to repair stored
+models before retrying Mario Kart; the direct handoff probe alone cannot
+repair the title's settings.
