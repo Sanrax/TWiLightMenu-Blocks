@@ -63,7 +63,8 @@ Legacy autoboot wrappers retain their card-specific formats and addresses.
 - User hardware checks: DSpico normal/ALT menu operation, nds-bootstrap and
   pico-loader gameplay inputs, and successful ALT power-button reboot in DSi mode.
   With r15, console-SD/Unlaunch menu loading and Settings changes/return also
-  work on the tested DSi.
+  work on the tested DSi. With r19, the user confirmed Mario Kart launches
+  successfully from console SD through Unlaunch using nds-bootstrap 2.17.0.
   Physical 3DS SCFG/widescreen, other flashcards, Slot-1/native GBA and remaining
   SD/NAND timing cases still need broader device coverage.
 
@@ -71,14 +72,11 @@ The DSi-mode flashcard Quit Game black screen is reported upstream in
 [nds-bootstrap #1925](https://github.com/DS-Homebrew/nds-bootstrap/issues/1925).
 This fork applies no menu-side workaround and does not modify bootstrap.
 
-The r18 console-SD/Unlaunch trace shows bootstrap's ARM9 loader intact before
-RAM clearing and completely zeroed afterwards. The title's old RAM probe can
-misclassify a retail DSi as a development unit under BlocksDS's 16 MB mapping,
-so bootstrap clears a mirror of main RAM as extra memory. Console detection
-now uses the SDK's hardware flag and repairs the stored model on normal boot.
-Hardware game-launch confirmation for this correction is pending; earlier
-menu/Settings passes do not establish SD integrity. Official nds-bootstrap
-binaries remain unchanged.
+The corrected SDK console detection resolves the console-SD game-launch
+white screen on the tested DSi. The r19 hardware log proceeds through
+successful game patching and ROM preloading, and the user confirms the game
+works. This validates that launch path; broader SD integrity and hardware
+coverage remain separate. Official nds-bootstrap binaries remain unchanged.
 
 A control built with BlocksDS 1.24.0's default ARM7 also stalls on its first SD
 write in the local melonDS 1.1 setup. The native-storage menu reaches the same
