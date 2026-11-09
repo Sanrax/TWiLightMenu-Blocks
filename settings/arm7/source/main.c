@@ -215,6 +215,7 @@ int main() {
 
 	installSoundFIFO();
 	installSystemFIFO();
+	bool sdWasInserted = twlmSdInserted();
 
 	irqSet(IRQ_VCOUNT, VcountHandler);
 	irqSet(IRQ_VBLANK, VblankHandler);
@@ -314,9 +315,9 @@ int main() {
 		}
 
 		if (isDSiMode()) {
-			const u32 sdStatus = (twlmSdInserted() ? 2u : 1u) << SD_OFF;
-			if ((status & SD_MASK) != sdStatus) {
-				status = (status & ~SD_MASK) | sdStatus;
+			const u32 sdChange = twlmSdChange(&sdWasInserted);
+			if (sdChange) {
+				status = (status & ~SD_MASK) | (sdChange << SD_OFF);
 				fifoSendValue32(FIFO_USER_03, status);
 			}
 		}

@@ -22,6 +22,16 @@ static inline bool twlmSdInserted(void) {
         && !(SDMMC_getDiskStatus(SDMMC_DEV_CARD) & SDMMC_STATUS_NODISK);
 }
 
+// SD status is a latched change event, not the current card-detect level.
+// Seed wasInserted once at startup so an already present card leaves SDOk (0).
+// Both removal and reinsertion require ARM9 to stop using the old filesystem.
+static inline unsigned twlmSdChange(bool *wasInserted) {
+    const bool inserted = twlmSdInserted();
+    if (inserted == *wasInserted) return 0;
+    *wasInserted = inserted;
+    return inserted ? 2u : 1u;
+}
+
 void twlmReadStorageCid(int device, u32 *cid);
 
 #endif
