@@ -3,6 +3,7 @@
 #include <limits.h>
 #include <sys/stat.h>
 #include "common/storage.h"
+#include "common/startupTrace.h"
 #include "fileBrowse.h"
 #include <algorithm>
 #include <dirent.h>
@@ -298,6 +299,7 @@ void getDirectoryContents(std::vector<DirEntry> &dirContents, const std::vector<
 	file_count = 0;
 	fileStartPos = 0;
 
+	startupTraceMark("directory index lookup");
 	if (access("dirInfo.twlm.ini", F_OK) == 0) {
 		dirInfoIniFound = true;
 
@@ -313,6 +315,7 @@ void getDirectoryContents(std::vector<DirEntry> &dirContents, const std::vector<
 		dirInfoIniFound = false;
 	}
 
+	startupTraceMark("directory open");
 	TWLDirectory *pdir = twlmOpenDirectory(".");
 
 	if (pdir == nullptr) {
@@ -321,9 +324,11 @@ void getDirectoryContents(std::vector<DirEntry> &dirContents, const std::vector<
 		backFound = false;
 		int backPos = 0;
 		while (1) {
+			startupTraceMark("directory background updates");
 			bgOperations(false);
 
 			uint8_t attrs = 0;
+			startupTraceMark("directory entry read");
 			const dirent *pent = twlmReadDirectory(pdir, &attrs);
 			if (pent == nullptr || file_count > ((dsiFeatures() || sys().dsDebugRam()) ? 1024 : 512)) {
 				logPrint("End of listing, Sorting: ");
@@ -389,6 +394,7 @@ void getDirectoryContents(std::vector<DirEntry> &dirContents, const std::vector<
 		}
 		recalculateBoxesCount();
 
+		startupTraceMark("directory sorting");
 		if (ms().sortMethod == TWLSettings::ESortAlphabetical) { // Alphabetical
 			std::sort(dirContents.begin(), dirContents.end(), dirEntryPredicate);
 			logPrint("Alphabetical");
@@ -3252,6 +3258,7 @@ bool setDefaultDirectory(std::string_view directory_path)
 }
 
 std::string browseForFile(const std::vector<std::string_view> &extensionList) {
+	startupTraceMark("browser icon transition");
 	beginMenuContentUpdate();
 	gameOrderIniPath = std::string(sys().isRunFromSD() ? "sd" : "fat") + ":/_nds/TWiLightMenu/extras/gameorder.ini";
 	recentlyPlayedIniPath = std::string(sys().isRunFromSD() ? "sd" : "fat") + ":/_nds/TWiLightMenu/extras/recentlyplayed.ini";

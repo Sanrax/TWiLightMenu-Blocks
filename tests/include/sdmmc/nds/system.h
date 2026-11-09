@@ -8,6 +8,7 @@ extern volatile u32 testScfg;
 #define REG_SCFG_EXT testScfg
 #define SCFG_EXT_SCFG_MBK_REG BIT(31)
 #define SCFG_EXT_SDMMC BIT(18)
+#define SCFG_EXT_NDMA BIT(16)
 #define SCFG_EXT_AES BIT(17)
 #define SCFG_EXT_INTERRUPT BIT(8)
 #define SCFG_EXT_DMA BIT(0)

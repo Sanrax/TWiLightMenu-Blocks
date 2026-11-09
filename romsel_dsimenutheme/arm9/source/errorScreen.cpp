@@ -5,6 +5,7 @@
 // #include "autoboot.h"
 #include "common/twlmenusettings.h"
 #include "common/systemdetails.h"
+#include "common/startupTrace.h"
 #include "common/flashcard.h"
 #include "common/tonccpy.h"
 #include "graphics/fontHandler.h"
@@ -40,6 +41,7 @@ void checkSdEject(void) {
 	}
 	
 	// Show "SD removed" screen
+	startupTraceMark("SD removal error screen");
 	boxArtColorDeband = false;
 	rocketVideo_playVideo = false;
 	

@@ -103,3 +103,25 @@ still remain white.
 check the actual watchdog display independently of storage.
 `tests/nand.c` tests the production readers with separate cached/uncached
 reply views, missing acknowledgements, bad MBR data and boundary reads.
+
+The r14 hardware result was `sound` without a pending I/O line. This milestone
+is after sound initialization, before directory listing. The r15 correction
+on `master` restores SD change events instead of reporting the initial card
+level as an insertion. `tests/sdstatus.c` checks inserted/absent startup,
+fresh module baselines, real removal/reinsertion, latched events and inaccessible
+hardware. The r15 trace adds directory/background subphases and an explicit
+`SD removal error screen` marker. It can be installed over normal r15, then
+restored with the production browser after collecting a result.
+
+## Emulator process ownership
+
+Do not close melonDS by injecting desktop-wide Ctrl+Q or Alt+F4. In the local
+Wayland/XWayland setup, Ctrl+Q intended for the emulator coincided with a clean
+VS Code shutdown at 19:15:50 on 2026-11-08, without a new crash dump. An X11
+focus request is not sufficient protection against directing input elsewhere.
+Desktop input injection in the local helper is disabled. Cleanup must verify
+the recorded PID, executable/arguments and process start time before signalling
+the owned emulator. Keep BIOS/NAND copies and SD fixtures isolated and remove
+them after the process has exited. GUI testing is suspended for this check;
+the r15 native-SD emulator attempt did not reach a verified menu and is not
+counted as a pass.

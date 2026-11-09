@@ -1435,6 +1435,7 @@ int dsiMenuTheme(void) {
 
 		// Extensions with a launcher config that can launch here. Added before the
 		// blocked-extension filter below, so BLOCKED_EXTENSIONS applies to these too.
+		startupProfileMark("launcher availability");
 		appendLauncherExtensions(extensionList, captureLaunchEnv(ms().secondaryDevice));
 
 		if(ms().blockedExtensions.size() > 0) {
@@ -1447,6 +1448,7 @@ int dsiMenuTheme(void) {
 		char path[256] = {0};
 		snprintf(path, sizeof(path), "%s", ms().romfolder[ms().secondaryDevice].c_str());
 		// Set directory
+		startupProfileMark("ROM directory change");
 		chdir(path);
 
 		// Navigates to the file to launch

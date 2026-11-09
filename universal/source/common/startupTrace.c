@@ -21,7 +21,7 @@ static void stopped(void) {
     REG_MASTER_BRIGHT = 0;
     REG_MASTER_BRIGHT_SUB = 0;
     // Direct console drawing avoids libc's thread-local stdio state in IRQs.
-    consolePrintString("TWiLight r14 startup trace\n\nStopped during:\n");
+    consolePrintString("TWiLight r15 startup trace\n\nStopped during:\n");
     consolePrintString(phase);
     consolePrintString("\n\n");
     if (operation) {
