@@ -61,6 +61,8 @@ Legacy autoboot wrappers retain their card-specific formats and addresses.
   Unlaunch SD boot and retail bootstrap in DS flashcard mode.
 - User hardware checks: DSpico normal/ALT menu operation, nds-bootstrap and
   pico-loader gameplay inputs, and successful ALT power-button reboot in DSi mode.
+  With r15, console-SD/Unlaunch menu loading and Settings changes/return also
+  work on the tested DSi.
   Physical 3DS SCFG/widescreen, other flashcards, Slot-1/native GBA and remaining
   SD/NAND timing cases still need broader device coverage.
 
@@ -68,23 +70,11 @@ The DSi-mode flashcard Quit Game black screen is reported upstream in
 [nds-bootstrap #1925](https://github.com/DS-Homebrew/nds-bootstrap/issues/1925).
 This fork applies no menu-side workaround and does not modify bootstrap.
 
-Console-SD/Unlaunch Mario Kart launching, intermittent Settings return and
-reported SD corruption remained unresolved in r12. The replacement with native
-SDK storage needs a new hardware check; earlier emulator passes do not establish
-that these regressions are fixed. Bootstrap's hardware log stopped after header
-validation. Official nds-bootstrap binaries remain unchanged.
-
-Hardware feedback on r13: holding SELECT opens Settings, but loading the browser
-after the title or Settings exit stays white. The additional NAND reply/cache
-corrections address concrete coherency hazards in that startup path; they still
-need a device retest and are not confirmation that game launching is fixed.
-
-The r14 hardware watchdog reached `sound` with no pending I/O. That marker is
-after sound initialization; the following directory loop calls the SD-ejection
-check. The r13 status polling incorrectly reported a card present at boot as
-`SDInserted`, entering the error loop while startup brightness was still white.
-The event correction in r15 addresses this specific browser-entry regression;
-it does not establish that the earlier bootstrap or SD-write issues are fixed.
+Console-SD/Unlaunch Mario Kart launching remains unresolved in r15 with the
+packaged nds-bootstrap 2.17.0: its hardware log still ends at
+`Header CRC is valid!`. The successful menu/Settings retest does not establish
+that game launching or the previously reported SD corruption is fixed.
+Official nds-bootstrap binaries remain unchanged.
 
 A control built with BlocksDS 1.24.0's default ARM7 also stalls on its first SD
 write in the local melonDS 1.1 setup. The native-storage menu reaches the same
