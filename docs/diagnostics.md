@@ -119,9 +119,39 @@ Do not close melonDS by injecting desktop-wide Ctrl+Q or Alt+F4. In the local
 Wayland/XWayland setup, Ctrl+Q intended for the emulator coincided with a clean
 VS Code shutdown at 19:15:50 on 2026-11-08, without a new crash dump. An X11
 focus request is not sufficient protection against directing input elsewhere.
-Desktop input injection in the local helper is disabled. Cleanup must verify
+The user subsequently authorized GUI testing, excluding quit keyboard commands.
+The local helper now accepts only individual DS gameplay/navigation keys and
+rejects modified shortcuts and save-state keys. Cleanup must verify
 the recorded PID, executable/arguments and process start time before signalling
 the owned emulator. Keep BIOS/NAND copies and SD fixtures isolated and remove
-them after the process has exited. GUI testing is suspended for this check;
-the r15 native-SD emulator attempt did not reach a verified menu and is not
-counted as a pass.
+them after the process has exited. The r15 native-SD emulator attempt did not
+reach a verified menu and is not counted as a pass.
+
+## Bootstrap handoff control (r16)
+
+The user confirmed that r15 loads the console-SD/Unlaunch menu and survives
+Settings changes/return. Mario Kart still white screens; a fresh hardware log
+ends at `Header CRC is valid!`. Keep that unresolved separately from the fixed
+startup SD-event regression.
+
+`make -C tests/bootstrap-handoff` builds a small default-SDK-ARM7 control using
+the production shared NDS loader. See its [instructions](../tests/bootstrap-handoff/README.md).
+It starts the existing release bootstrap/INI without menu UI, custom NAND
+discovery, settings writes or exit-bootstub installation. Compare it on the
+same console/card with the official bootstrap selected directly in Unlaunch.
+It is a launch control, not a Quit Game test or a production replacement.
+
+Local melonDS 1.1 observation with a disposable native-SD image: both the
+official bootstrap 2.17.0 launched directly and the minimal BlocksDS loader
+control stop before header validation in the same ARM7 SD command-start wait.
+Status is `0x000000A5`, with CMD_BUSY already clear; the driver's nonblocking
+NDMA routine waits to observe CMD_BUSY unless it detects no$gba. This emulator
+result does not reproduce the hardware's later stopping point.
+
+An additional debugger-only experiment replaced the conditional at
+`0x06020D4E` (`05 D1`) with a Thumb NOP (`C0 46`) in the already loaded
+`loadi0` image. That lets the routine check an already completed command on
+melonDS. It advanced through header validation, module parameters, decompression
+and patching to game entry; the in-game card engine later hit the same kind of
+wait. This is not a game-play pass. No bootstrap file or production source was
+patched, and the hardware control must use the unchanged official binary.
