@@ -1268,6 +1268,7 @@ int dsiMenuTheme(void) {
 		logPrint(useRumble ? "Rumble found\n" : "Rumble not found\n");
 	}
 
+	startupProfileMark("finding system applications");
 	// Before any texture is loaded, as the NAND key from ARM7 is kept in main RAM
 	findPictochatAndDownloadPlay();
 	startupProfileMark("system apps");

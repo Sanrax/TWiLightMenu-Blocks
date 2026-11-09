@@ -5,6 +5,11 @@
 void startupProfileBegin(const char *filename = nullptr);
 void startupProfileMark(const char *phase);
 void startupProfileEnd();
+#elif defined(TWLM_STARTUP_TRACE)
+#include "common/startupTrace.h"
+inline void startupProfileBegin(const char * = nullptr) { startupTraceBegin(); }
+inline void startupProfileMark(const char *phase) { startupTraceMark(phase); }
+inline void startupProfileEnd() { startupTraceEnd(); }
 #else
 inline void startupProfileBegin(const char * = nullptr) {}
 inline void startupProfileMark(const char *) {}

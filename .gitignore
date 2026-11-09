@@ -106,3 +106,6 @@ quickmenu/nitrofiles/graphics/*/*.pht
 booter_fc/arm9/build-diagnostic/
 romsel_dsimenutheme/nitrofiles/languages/*/photo_default.pht
 romsel_dsimenutheme/nitrofiles/themes/*/*/*/*.pht
+
+# Explicit startup trace build outputs
+romsel_dsimenutheme/arm9/build-trace/

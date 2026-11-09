@@ -85,3 +85,21 @@ actual INI implementation, checking original preservation, rollback and backup
 recovery. `tests/check_build.py` checks linked native storage ownership and the
 copied white-screen handoff routines. Set `TWLM_BUILD_ROOT` to a separately built
 production checkout to audit its outputs without rebuilding instrumentation.
+
+## Browser white-screen trace (r14)
+
+`make -C romsel_dsimenutheme trace-startup` produces
+`romsel_dsimenutheme-trace.nds`. Install it as
+`_nds/TWiLightMenu/dsimenu.srldr` over an r14 test installation.
+After 10 seconds in a pending SDK sector transfer, or 20 seconds without
+a startup milestone, a terminal screen shows the phase and pending I/O.
+It draws directly through the console API without libc stdio/TLS in the IRQ,
+and writes no SD log. Normal builds do not enable it. Keep the production
+`dsimenu.srldr` to restore after collecting the result. The watchdog needs
+ARM9 VBlank interrupts to keep running; an earlier loader or IRQ stall may
+still remain white.
+
+`make -C tests/startup-trace-selftest` builds a simulated SD-wait control to
+check the actual watchdog display independently of storage.
+`tests/nand.c` tests the production readers with separate cached/uncached
+reply views, missing acknowledgements, bad MBR data and boundary reads.

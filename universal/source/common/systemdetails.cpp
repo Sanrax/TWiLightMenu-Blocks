@@ -1,4 +1,5 @@
 #include "common/storage.h"
+#include "common/startupTrace.h"
 #include "common/nitroFile.h"
 #include "common/systemdetails.h"
 #include "common/flashcard.h"
@@ -133,13 +134,16 @@ void SystemDetails::initFilesystem(const char *runningPath)
 
 	vu32 *const arm7Command = (vu32*)memUncached((void*)0x02FFFD0C);
 	*arm7Command = 0x54494D52;	// Run reboot timer
+	startupTraceMark("mounting native SD");
 	if (!sys().isRegularDS()) twlmMountStorage("sd", get_io_dsisd());
+	startupTraceMark("mounting DLDI");
 	twlmMountStorage("fat", dldiGetInternal());
 	_fatInitOk = (sdFound() || flashcardFound());
 	*arm7Command = 0;
 	_isRunFromSD = (runningPath && strncmp(runningPath, "sd:/", 4) == 0);
 	chdir(_isRunFromSD ? "sd:/" : "fat:/");
 
+	startupTraceMark("mounting NitroFS");
 	if (!_nitroFsInitOk && runningPath != NULL) {
 		twlm::clearNitroFileCache();
 		_nitroFsInitOk = nitroFSInit(runningPath) == 1;

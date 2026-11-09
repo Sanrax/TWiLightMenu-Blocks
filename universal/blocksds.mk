@@ -54,3 +54,9 @@ define bin2o
 $(BLOCKSDS)/tools/bin2c/bin2c $< .
 $(CC) $(CPPFLAGS) $(CFLAGS) -c $(notdir $(subst .,_,$<)).c -o $@
 endef
+
+# Explicit agent-only trace builds. Never enabled by normal builds or CI.
+ifneq ($(filter 1,$(STARTUP_TRACE)),)
+CPPFLAGS += -DTWLM_STARTUP_TRACE
+BLOCKSDS_LDFLAGS += $(if $(filter -lnds9,$(LIBS)),-Wl$(comma)--defsym=__irq_stack_size=4096 $(foreach fn,irqSet fifoSendDatamsg fifoSendValue32 fifoGetValue32,-Wl$(comma)--wrap=$(fn)))
+endif

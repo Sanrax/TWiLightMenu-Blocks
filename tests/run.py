@@ -19,6 +19,14 @@ with tempfile.TemporaryDirectory(prefix='twlm-tests-') as temp:
         '-D__BLOCKSDS__', '-Itests/include', 'tests/bootfs.c', '-o', str(output/'bootfs'))
     run(str(output/'bootfs'), str(output/'bootfs.nds'))
 
+    for app in ('title', 'quickmenu', 'romsel_dsimenutheme'):
+        run('cc', '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror',
+            '-Wno-pointer-to-int-cast', '-Wno-unused-parameter', '-no-pie', '-Itests/include/nand',
+            '-Itests/include', '-Iuniversal/include',
+            f'-DNAND_SOURCE="../{app}/arm9/source/nand/nandio.c"',
+            'tests/nand.c', '-o', str(output/'nand'))
+        run(str(output/'nand'))
+
     run('cc', '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror',
         '-Itests/include/sdmmc', '-Itests/include', '-Iuniversal/arm7/include',
         'tests/powerbutton.c', '-o', str(output/'powerbutton'))

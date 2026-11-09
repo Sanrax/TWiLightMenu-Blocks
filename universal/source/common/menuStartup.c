@@ -22,6 +22,7 @@
 #include <nds/timers.h>
 
 #include "blocksds/libnds_internal.h"
+#include "common/startupTrace.h"
 #include <blocksds_version.h>
 #if !BLOCKSDS_VERSION_EQUALS(1, 24, 0)
 #error Recheck menu startup against the native initSystem implementation
@@ -119,6 +120,8 @@ void initSystem(void)
     }
 
     irqInit();
+    startupTraceBegin();
+    startupTraceMark("SDK FIFO initialization");
     fifoInit();
 
     fifoSetValue32Handler(FIFO_SYSTEM, systemValueHandler, 0);

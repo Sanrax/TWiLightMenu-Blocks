@@ -9,6 +9,7 @@
 #include "sector0.h"
 #include "common/tonccpy.h"
 #include "common/nandShared.h"
+#include "common/startupTrace.h"
 #include "f_xy.h"
 
 //#define SECTOR_SIZE 512
@@ -64,11 +65,14 @@ bool my_nand_ReadSectors(sec_t sector, sec_t numSectors, void* buffer) {
 bool nandio_startup() {
 	nandSectors = 0;
 	fat_sig_fix_offset = 0;
+	startupTraceMark("NAND startup");
 	if (!nand_Startup()) return false;
 
+	startupTraceMark("NAND sector zero");
 	if (!my_nand_ReadSectors(0, 1, sector_buf)) return false;
 	is3DS = parse_ncsd(sector_buf, 0) == 0;
 
+	startupTraceMark("NAND CID reply");
 	u32 cid[4];
 	if (!twlmNandReadCid(cid)) return false;
 	const sec_t totalSectors = nand_GetSectors();
@@ -77,6 +81,7 @@ bool nandio_startup() {
 	u8 consoleID[8];
 	u8 consoleIDfixed[8];
 
+	startupTraceMark("NAND console key reply");
 	// Get ConsoleID
 	if (!twlmGetConsoleKey(consoleID)) return false;
 	for (int i = 0; i < 8; i++) {
@@ -84,6 +89,7 @@ bool nandio_startup() {
 	}
 
 	// iprintf("sector 0 is %s\n", is3DS ? "3DS" : "DSi");
+	startupTraceMark("NAND software decryption");
 	dsi_crypt_init((const u8*)consoleIDfixed, (const u8*)cid, is3DS);
 	dsi_nand_crypt(sector_buf, sector_buf, 0, SECTOR_SIZE / AES_BLOCK_SIZE);
 
