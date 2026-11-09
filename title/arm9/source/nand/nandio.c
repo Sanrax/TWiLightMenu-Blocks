@@ -8,6 +8,7 @@
 #include "crypto.h"
 #include "sector0.h"
 #include "common/tonccpy.h"
+#include "common/nandShared.h"
 #include "f_xy.h"
 
 //#define SECTOR_SIZE 512
@@ -15,6 +16,7 @@
 
 
 static bool is3DS;
+static sec_t nandSectors;
 
 extern bool nand_Startup();
 
@@ -29,14 +31,12 @@ void nandio_set_fat_sig_fix(u32 offset) {
 	fat_sig_fix_offset = offset;
 }
 
-void twlmGetConsoleKey(u8 *consoleID){
-	u8 *fifo=(u8*)crypt_buf; //shared mem address that has our computed key3 stuff
-	DC_InvalidateRange(fifo, 0x400);
-	*(u32*)(0xCFFFD08) = (u32)fifo;
-	*(u32*)(0xCFFFD0C) = 0x44494347; // 'GCID'
-	while (*(u32*)(0xCFFFD0C) != 0) {
-		swiDelay(100);
-	}
+static bool twlmGetConsoleKey(u8 *consoleID) {
+	// ARM7 writes this dedicated buffer and scratch space. Publish any old dirty
+	// lines first, then read the reply through the uncached mirror after its ACK.
+	DC_FlushRange(crypt_buf, 0x400);
+	if (!twlmNandRequest(0x44494347, (u32)crypt_buf)) return false; // 'GCID'
+	const u8 *fifo = (const u8*)memUncached(crypt_buf);
 
 	u8 key[16]; //key3 normalkey - keyslot 3 is used for DSi/twln NAND crypto
 	u8 key_xy[16]; //key3_y ^ key3_x
@@ -53,6 +53,7 @@ void twlmGetConsoleKey(u8 *consoleID){
 
 	tonccpy(&consoleID[0], &key_x[0], 4);             
 	tonccpy(&consoleID[4], &key_x[0xC], 4);
+	return true;
 }
 
 //---------------------------------------------------------------------------------
@@ -61,34 +62,40 @@ bool my_nand_ReadSectors(sec_t sector, sec_t numSectors, void* buffer) {
 }
 
 bool nandio_startup() {
+	nandSectors = 0;
+	fat_sig_fix_offset = 0;
 	if (!nand_Startup()) return false;
 
 	if (!my_nand_ReadSectors(0, 1, sector_buf)) return false;
 	is3DS = parse_ncsd(sector_buf, 0) == 0;
 
-	if (*(u32*)(0x2FFD7BC) == 0) {
-		// Get eMMC CID
-		*(u32*)(0xCFFFD0C) = 0x454D4D43;
-		while (*(u32*)(0xCFFFD0C) != 0) {
-			swiDelay(100);
-		}
-	}
+	u32 cid[4];
+	if (!twlmNandReadCid(cid)) return false;
+	const sec_t totalSectors = nand_GetSectors();
+	if (!totalSectors) return false;
 
 	u8 consoleID[8];
 	u8 consoleIDfixed[8];
 
 	// Get ConsoleID
-	twlmGetConsoleKey(consoleID);
+	if (!twlmGetConsoleKey(consoleID)) return false;
 	for (int i = 0; i < 8; i++) {
 		consoleIDfixed[i] = consoleID[7-i];
 	}
 
 	// iprintf("sector 0 is %s\n", is3DS ? "3DS" : "DSi");
-	dsi_crypt_init((const u8*)consoleIDfixed, (const u8*)0x2FFD7BC, is3DS);
+	dsi_crypt_init((const u8*)consoleIDfixed, (const u8*)cid, is3DS);
 	dsi_nand_crypt(sector_buf, sector_buf, 0, SECTOR_SIZE / AES_BLOCK_SIZE);
-	parse_mbr(sector_buf, is3DS, 0);
 
-	mbr_t *mbr = (mbr_t*)sector_buf;
+	const mbr_t *mbr = (const mbr_t*)sector_buf;
+	const mbr_partition_t *partition = &mbr->partitions[0];
+	// Bad key/CID data must not turn a mount into reads at arbitrary LBAs.
+	// Accept valid alternative layouts rather than requiring the sample MBR.
+	if (mbr->boot_signature_0 != 0x55 || mbr->boot_signature_1 != 0xAA
+	 || !partition->offset || !partition->length
+	 || partition->offset >= totalSectors
+	 || partition->length > totalSectors - partition->offset) return false;
+	nandSectors = totalSectors;
 	nandio_set_fat_sig_fix(is3DS ? 0 : mbr->partitions[0].offset);
 
 	return true;
@@ -119,6 +126,7 @@ static bool read_sectors(sec_t start, sec_t len, void *buffer) {
 }
 
 bool nandio_read_sectors(sec_t offset, sec_t len, void *buffer) {
+	if (offset > nandSectors || len > nandSectors - offset) return false;
 	// iprintf("R: %u(0x%08x), %u\n", (unsigned)offset, (unsigned)offset, (unsigned)len);
 	while (len >= CRYPT_BUF_LEN) {
 		if (!read_sectors(offset, CRYPT_BUF_LEN, buffer)) {
