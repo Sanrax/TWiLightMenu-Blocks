@@ -26,3 +26,38 @@ boot but the full menu fails, investigate menu state, bootstub installation and
 configuration writes. Preserve the corresponding `NDSBTSRP.LOG` for each run.
 Neither an emulator stall nor success after a debugger intervention establishes
 a hardware pass.
+
+## r17 controlled experiments
+
+The user confirmed that r16 also stops at `Header CRC is valid!` on hardware,
+with a fresh log and a clean `_nds` installation. This reproduces the failure
+without the menu UI, NAND discovery, settings writes or exit bootstub.
+
+Generate **diagnostic copies**, never replacements for the release bootstrap:
+
+```
+python3 tests/bootstrap-handoff/variants.py /path/to/official/nds-bootstrap-release.nds output
+```
+
+The script accepts only official 2.17.0's pinned SHA-256. It changes `loadi0`
+only, checks each original instruction, compresses/round-trips the result and
+appends it as a replacement NitroFS entry. The frontend and DSi segments are
+byte-identical to upstream. Manifests list every loader change; the original
+input and production binaries remain intact. Keep these copies off release CI.
+
+Copy both output NDS files under `sd:/_nds/twlm-diag/`, alongside the existing
+release installation, and use the rebuilt control:
+
+- **X / CPU** selects bootstrap's existing CPU SD-read path instead of NDMA
+  during game-binary/header loading. One Thumb immediate changes from 0 to 4.
+  It can attempt to launch the game; it is not a production workaround.
+- **Y / state** keeps normal SD reads. After reading the patch-cache header,
+  it logs ARM9's state as eight hex digits (repeated) and stops forever.
+  `00000001` means ARM9 started, `00000002` means its memory clear completed,
+  and `00000003` means it reached its display/request loop. No new digits means
+  this checkpoint was not reached (or its log write did not finish).
+
+Use Mario Kart and preserve a separate fresh `NDSBTSRP.LOG` after each attempt.
+The state probe never boots a game, even on working hardware. Its checkpoint
+is unconditional, so no cache rename is necessary. No Quit Game changes are
+included. Restore normal operation by launching the existing `BOOT.NDS`.

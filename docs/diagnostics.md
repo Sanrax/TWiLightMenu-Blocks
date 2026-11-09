@@ -155,3 +155,36 @@ melonDS. It advanced through header validation, module parameters, decompression
 and patching to game entry; the in-game card engine later hit the same kind of
 wait. This is not a game-play pass. No bootstrap file or production source was
 patched, and the hardware control must use the unchanged official binary.
+
+
+## Bootstrap phase controls (r17)
+
+Hardware: the user confirmed that r16's minimal control also produces a fresh
+log ending at `Header CRC is valid!`, and that `_nds` is wiped for each build.
+This reproduces the failure without menu UI, NAND discovery, settings writes
+or exit-bootstub installation; an inherited cache is not the explanation.
+
+`tests/bootstrap-handoff/variants.py` makes two explicitly modified diagnostic
+copies from the pinned official 2.17.0 binary. It patches only `loadi0` and
+refuses other inputs. Original instructions, LZ10 round-trips, frontend/DSi
+segments, NDS header CRC and permitted metadata changes are checked. Per-copy
+JSON manifests describe the exact changes. This tool is never invoked by
+production builds, packaging or CI; release bootstrap binaries stay unchanged.
+
+The rebuilt selector uses X for CPU SD reads during game/header loading and
+Y for an unconditional terminal checkpoint after the patch-cache header read.
+Y logs one ARM9 state twice as eight hex digits and never boots a game.
+See the [probe README](../tests/bootstrap-handoff/README.md) for interpretation.
+The checkpoint does not depend on whether the patch cache already exists.
+
+Local CPU-copy test: it advanced past header validation, module parameters,
+decompression and game patching without debugger changes, then stalled in a
+later NDMA read during additional ROM loading. This validates the selected
+CPU path but is not a hardware fix or a gameplay pass. Keep hardware results
+separate from the earlier emulator command-start timing issue.
+
+State-copy validation: after bypassing the previously identified emulator
+command-start wait in RAM only, ARM7 stops at `0x06008512`, ARM9's state word
+is 3, and the SD log gains `00000003`. The state is logged twice so an emulator's
+buffered final image write cannot hide its only copy on forced process cleanup.
+This validates the checkpoint, not the hardware state or a game launch.
