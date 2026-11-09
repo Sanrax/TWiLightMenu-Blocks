@@ -244,7 +244,15 @@ handles the `0x0C` RAM mirror but omits the `0x0D` mirror, including NDMA's
 ARM7 write path. This is not evidence against the hardware trace. A full
 title configuration-write check using DSi-mode DLDI stopped at `FAT init
 failed`; native storage has the earlier documented write limitation. Neither
-attempt is counted as a game-launch/configuration-write pass. Hardware r19
-confirmation remains pending. Start normal `BOOT.NDS` once to repair stored
-models before retrying Mario Kart; the direct handoff probe alone cannot
-repair the title's settings.
+attempt is counted as a game-launch/configuration-write pass. The subsequent
+hardware result is recorded below. Start normal `BOOT.NDS` once to repair
+stored models; the direct handoff probe alone cannot repair the title's settings.
+
+Hardware r19 confirmation: the user reports nds-bootstrap now works. The
+supplied [NDSBTSRP_r19.LOG](benchmarks/bootstrap-r19-hardware.json) contains
+`Card patch successful`, successful ARM7/ARM9 hooks, ROM/Nitro-file-info
+preloading and a final chip ID. This confirms Mario Kart launching on the
+previously failing DSi LL / console-SD / Unlaunch path with the unchanged
+official bootstrap 2.17.0 and production fix `df6f36c13`. The log's original
+size and SHA-256 are preserved alongside its trimmed content. This is a
+hardware launch pass, not a separate SD stress, other-console or Quit Game test.
