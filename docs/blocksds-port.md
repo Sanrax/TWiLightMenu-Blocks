@@ -41,6 +41,7 @@ reference; the commands above apply to this fork.
 | Stand-alone handoff reads | The small loaders run with IRQs disabled and retain their own polling reader. Wait for every FIFO byte, even when DATAEND arrives early, and reject stalled reads. This is separate from runtime SDK storage. | `source/sdmmc.c` in `booter/bootloader`, `title/bootloader`, `settings/bootloader`, `universal/bootloader_app` and `universal/bootloader_menu`. |
 | Menu handoff display | Hold master brightness white while loading internal `.srldr` modules and through the SDK startup hook, so cleared VRAM is hidden until the UI is prepared. External programs keep the usual brightness reset. | [menuStartup.c](../universal/source/common/menuStartup.c), [pinned SDK layout](../universal/include/blocksds/libnds_internal.h), shared loader and four `arm9clear.arm.c` routines. |
 | Settings persistence | Write and close a temporary INI before replacing the original. Keep a backup, restore it if publishing fails, and read it if the original is missing after an interrupted rename. | [inifile.cpp](../universal/source/common/inifile.cpp). |
+| NAND reply coherency | Use uncached ARM7 mailbox/CID replies and publish the key buffer before ARM7 writes it. Keep the filesystem reboot timer on the same uncached mailbox mapping. Bound optional reply waits and reject invalid decrypted partition bounds before filesystem reads. | [nandShared.h](../universal/include/common/nandShared.h), systemdetails.cpp and the three ARM9 `nand/nandio.c` readers. |
 | Power/sleep | Queue power requests for the main loop; reboot through firmware and serialize I2C transactions. Read real backlight state and restore Settings screens on lid reopening. Keep filesystem, formatting and allocation work outside graphics IRQs. | [powerButton.h](../universal/arm7/include/common/powerButton.h), [ARM7 I2C](../universal/arm7/source/my_i2c.c), [Settings ARM7](../settings/arm7/source/main.c), [graphics.cpp](../romsel_dsimenutheme/arm9/source/graphics/graphics.cpp). |
 | Launch compatibility | Preserve bootstrap/pico-loader selection, configured emulators, NDZ, RAM disks, argument order and FAT aliases. Fix duplicated device prefixes in absolute `.argv` paths and provide fallback `argv[0]`. Detect flashcard/internal-SD installations explicitly. | [launcherArgs.cpp](../universal/source/common/launcherArgs.cpp), [launch executor](../universal/source/launch/launchExecutor.cpp), [nds_loader_arm9.c](../universal/source/nds_loader/nds_loader_arm9.c), [bootpath.h](../universal/include/common/bootpath.h), [flashcard entry](../booter_fc/arm9/source/main.cpp). |
 | CPU reset coherency | Clean and disable ARM9 caches before changing RAM mappings or publishing shared reset addresses. BlocksDS caches the header at `0x02FFFE00`; its soft reset otherwise discards dirty reset addresses and can restart stale code. Preserve the SDK reset routine's `r8` clobber. | [ndsReset.h](../universal/include/common/ndsReset.h), shared NDS/homebrew-bootstrap loaders, flashcard entry, Slot-1 launcher and GBA patcher. |
@@ -71,6 +72,11 @@ reported SD corruption remained unresolved in r12. The replacement with native
 SDK storage needs a new hardware check; earlier emulator passes do not establish
 that these regressions are fixed. Bootstrap's hardware log stopped after header
 validation. Official nds-bootstrap binaries remain unchanged.
+
+Hardware feedback on r13: holding SELECT opens Settings, but loading the browser
+after the title or Settings exit stays white. The additional NAND reply/cache
+corrections address concrete coherency hazards in that startup path; they still
+need a device retest and are not confirmation that game launching is fixed.
 
 A control built with BlocksDS 1.24.0's default ARM7 also stalls on its first SD
 write in the local melonDS 1.1 setup. The native-storage menu reaches the same

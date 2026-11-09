@@ -131,11 +131,12 @@ void SystemDetails::initFilesystem(const char *runningPath)
 		return;
 	}
 
-	*(u32*)(0x2FFFD0C) = 0x54494D52;	// Run reboot timer
+	vu32 *const arm7Command = (vu32*)memUncached((void*)0x02FFFD0C);
+	*arm7Command = 0x54494D52;	// Run reboot timer
 	if (!sys().isRegularDS()) twlmMountStorage("sd", get_io_dsisd());
 	twlmMountStorage("fat", dldiGetInternal());
 	_fatInitOk = (sdFound() || flashcardFound());
-	*(u32*)(0x2FFFD0C) = 0;
+	*arm7Command = 0;
 	_isRunFromSD = (runningPath && strncmp(runningPath, "sd:/", 4) == 0);
 	chdir(_isRunFromSD ? "sd:/" : "fat:/");
 
