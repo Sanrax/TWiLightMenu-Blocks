@@ -46,8 +46,9 @@ reference; the commands above apply to this fork.
 | Power/sleep | Queue power requests for the main loop; reboot through firmware and serialize I2C transactions. Read real backlight state and restore Settings screens on lid reopening. Keep filesystem, formatting and allocation work outside graphics IRQs. | [powerButton.h](../universal/arm7/include/common/powerButton.h), [ARM7 I2C](../universal/arm7/source/my_i2c.c), [Settings ARM7](../settings/arm7/source/main.c), [graphics.cpp](../romsel_dsimenutheme/arm9/source/graphics/graphics.cpp). |
 | Launch compatibility | Preserve bootstrap/pico-loader selection, configured emulators, NDZ, RAM disks, argument order and FAT aliases. Fix duplicated device prefixes in absolute `.argv` paths and provide fallback `argv[0]`. Detect flashcard/internal-SD installations explicitly. | [launcherArgs.cpp](../universal/source/common/launcherArgs.cpp), [launch executor](../universal/source/launch/launchExecutor.cpp), [nds_loader_arm9.c](../universal/source/nds_loader/nds_loader_arm9.c), [bootpath.h](../universal/include/common/bootpath.h), [flashcard entry](../booter_fc/arm9/source/main.cpp). |
 | CPU reset coherency | Clean and disable ARM9 caches before changing RAM mappings or publishing shared reset addresses. BlocksDS caches the header at `0x02FFFE00`; its soft reset otherwise discards dirty reset addresses and can restart stale code. Preserve the SDK reset routine's `r8` clobber. | [ndsReset.h](../universal/include/common/ndsReset.h), shared NDS/homebrew-bootstrap loaders, flashcard entry, Slot-1 launcher and GBA patcher. |
+| Console detection | Use BlocksDS `isHwDebugger()` and the existing 3DS hardware check. The old write probe mistakes a retail DSi's 16 MB RAM mirror for extra development-unit RAM, causing bootstrap to erase its ARM9 loader. Correct both menu and bootstrap console-model settings on normal startup; remove the probe's custom MPU extension. | Console detection in [title main](../title/arm9/source/main.cpp). |
 | SDK file-ID compatibility | BlocksDS 1.24.0 omits device bits from direct NitroFS descriptors; add the NitroFS tag only for that version, with correct `fdopen` failure cleanup. The directory index itself is an optimization. | [nitroFile.cpp](../universal/source/common/nitroFile.cpp). |
-| Supporting fixes | Handle absent/truncated soft-reset state, avoid null file closes, restore the card's default drive after NitroFS, use explicit bootstrap-version paths, and extend uncached MPU region 5 without replacing executable region 6. | [title main](../title/arm9/source/main.cpp), [cp15.s](../title/arm9/source/cp15.s), [Settings main](../settings/arm9/source/main.cpp), common launch/filesystem helpers. |
+| Supporting fixes | Handle absent/truncated soft-reset state, avoid null file closes, restore the card's default drive after NitroFS, and use explicit bootstrap-version paths. | [title main](../title/arm9/source/main.cpp), [Settings main](../settings/arm9/source/main.cpp), common launch/filesystem helpers. |
 
 Normal `BOOT.NDS` retains its DS-compatible header; `BOOT_ALT.NDS` retains a
 hybrid header and relocating ARM7 startup for DSi-mode flashcards. Runtime
@@ -70,11 +71,14 @@ The DSi-mode flashcard Quit Game black screen is reported upstream in
 [nds-bootstrap #1925](https://github.com/DS-Homebrew/nds-bootstrap/issues/1925).
 This fork applies no menu-side workaround and does not modify bootstrap.
 
-Console-SD/Unlaunch Mario Kart launching remains unresolved in r15 with the
-packaged nds-bootstrap 2.17.0: its hardware log still ends at
-`Header CRC is valid!`. The successful menu/Settings retest does not establish
-that game launching or the previously reported SD corruption is fixed.
-Official nds-bootstrap binaries remain unchanged.
+The r18 console-SD/Unlaunch trace shows bootstrap's ARM9 loader intact before
+RAM clearing and completely zeroed afterwards. The title's old RAM probe can
+misclassify a retail DSi as a development unit under BlocksDS's 16 MB mapping,
+so bootstrap clears a mirror of main RAM as extra memory. Console detection
+now uses the SDK's hardware flag and repairs the stored model on normal boot.
+Hardware game-launch confirmation for this correction is pending; earlier
+menu/Settings passes do not establish SD integrity. Official nds-bootstrap
+binaries remain unchanged.
 
 A control built with BlocksDS 1.24.0's default ARM7 also stalls on its first SD
 write in the local melonDS 1.1 setup. The native-storage menu reaches the same
