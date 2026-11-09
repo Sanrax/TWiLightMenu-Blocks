@@ -46,7 +46,7 @@ byte-identical to upstream. Manifests list every loader change; the original
 input and production binaries remain intact. Keep these copies off release CI.
 
 Copy both output NDS files under `sd:/_nds/twlm-diag/`, alongside the existing
-release installation, and use the rebuilt control:
+release installation, and use the r17 control from commit `ef26f781a`:
 
 - **X / CPU** selects bootstrap's existing CPU SD-read path instead of NDMA
   during game-binary/header loading. One Thumb immediate changes from 0 to 4.
@@ -61,3 +61,41 @@ Use Mario Kart and preserve a separate fresh `NDSBTSRP.LOG` after each attempt.
 The state probe never boots a game, even on working hardware. Its checkpoint
 is unconditional, so no cache rename is necessary. No Quit Game changes are
 included. Restore normal operation by launching the existing `BOOT.NDS`.
+
+## r18 ARM9 memory snapshots
+
+The hardware X log still ends at header validation. Y reaches its checkpoint
+and records state zero twice. This does not prove ARM9 never started: ARM7
+has already passed a wait for state >= 1. Check for later clearing, mapping or
+loss of the state/code before changing SD routines or bootstrap behavior.
+
+Build with `variants.py --memory INPUT OUTPUT` and rebuild the selector. The
+r18 selector uses **Y** for `sd:/_nds/twlm-diag/bootstrap-memory.nds` and **A**
+for the unchanged release. Y still stops forever and never starts a game.
+Use the existing Mario Kart INI with Logging enabled and collect the full log.
+No settings, SD driver, ARM9 instruction or release bootstrap is changed.
+
+The appended ARM7 probe fits between the original loader BSS end and stacks.
+It samples state, hardware registers and ARM9 code integrity at three stages:
+0 after the START wait, 1 after ARM7's RAM clear, 2 after patch-cache header
+reading. Hooks replay overwritten instructions and retain the original SD
+paths. Sampling adds timing overhead; a changed outcome is not a release fix.
+
+Each stage prints hexadecimal field IDs and values:
+
+| ID | Meaning |
+| --- | --- |
+| 00, 0D | ARM9 state before/after the code comparison |
+| 01 | ARM7 SCFG_EXT |
+| 02, 03 | SCFG_CLK, SCFG_ROM |
+| 04 | Mismatched ARM9 code words (normally zero) |
+| 05, 06, 07 | First mismatch address, expected word, actual word |
+| 08, 09 | Original VRAM code hash, loaded ARM9 code hash |
+| 0A, 0B | ARM9 entry word at 023BFB20, read-only sample at 027BFB20 |
+| 0C | ARM7 NDMA global control |
+
+The comparison excludes mutable ARM9 BSS. Hashes use 32-bit FNV word steps
+over 0xBC8 bytes at source 06000240 and destination 023BF000. The manifest
+records the expected hash and payload locations. The entire source ARM9 code
+remains byte-identical to official 2.17.0. All logs and patches stay on
+`diagnostics`, outside production builds and CI.

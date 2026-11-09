@@ -1,0 +1,16 @@
+[
+  {
+    "button": "X",
+    "filename": "NDSBTSRP_X.LOG",
+    "bytes": 139013,
+    "sha256": "6cec5b2bf7120dfcb1461d971b049378f6e79decb73ff524bdca40fb0c1fb55d",
+    "log": "nds-bootstrap v2.17.0\n\nLoading the NDS file...\nHeader CRC is valid!"
+  },
+  {
+    "button": "Y",
+    "filename": "NDSBTSRP_Y.LOG",
+    "bytes": 139013,
+    "sha256": "6324f9f494f725c269bfcccde09cdd61f6565feb2ef890ede3a96507db436d22",
+    "log": "nds-bootstrap v2.17.0\n\nLoading the NDS file...\nHeader CRC is valid!\n0000000000000000"
+  }
+]

@@ -188,3 +188,28 @@ command-start wait in RAM only, ARM7 stops at `0x06008512`, ARM9's state word
 is 3, and the SD log gains `00000003`. The state is logged twice so an emulator's
 buffered final image write cannot hide its only copy on forced process cleanup.
 This validates the checkpoint, not the hardware state or a game launch.
+
+Hardware r17 result (2026-11-09): attached `NDSBTSRP_X.LOG` still ends at
+`Header CRC is valid!`; `NDSBTSRP_Y.LOG` adds `0000000000000000` (one captured
+zero state, twice). Each file is 139013 bytes including unused preallocated
+space. Y proves the checkpoint after follow-up header reads, FAT cache builds
+and the patch-cache header read was reached. X's CPU read path does not fix
+the hardware launch failure. Do not conflate the emulator's earlier NDMA wait
+with this hardware result. State zero needs investigation because ARM7 has
+already waited for state >= 1; it is not evidence by itself that ARM9 never ran.
+
+The r18 [memory probe](../tests/bootstrap-handoff/README.md#r18-arm9-memory-snapshots)
+compares ARM9 code/state before and after ARM7 RAM clearing and at the same
+terminal checkpoint. It retains official SD and ARM9 code and logs three
+snapshots through the existing log writer. This is a diagnostic copy only.
+
+Local r18 validation: linked ARM7 hooks preserve/replay their replaced
+instructions, and the ARM9 source stays byte-identical. The native-SD emulator
+records state 1 before RAM clear and state 3 afterwards/at the terminal
+checkpoint, with zero code mismatches and expected hash `CF90DD6A` throughout.
+The saved log contains all three stages. Reaching the terminal checkpoint
+required the same earlier emulator-only command-start bypass in RAM; that
+change is absent from the packaged diagnostic. A separate host test of the
+same C capture function distinguishes intact code, a single changed word and
+an erased ARM9 code area, reporting the correct first mismatch and zero state.
+Hardware r18 results are pending; no production fix is claimed.

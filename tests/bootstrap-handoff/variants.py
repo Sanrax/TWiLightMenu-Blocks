@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build two disposable diagnostic copies of the pinned official bootstrap.
+"""Build disposable diagnostic copies of the pinned official bootstrap.
 
 Nothing in production builds calls this script. The input is never overwritten.
 Only loadi0 (DS games on DSi) changes; the bootstrap frontend is kept byte exact.
@@ -10,6 +10,7 @@ import hashlib
 import json
 from pathlib import Path
 import struct
+import subprocess
 
 OFFICIAL_SHA256 = '39a3a5e62ea8d1f700c3735199424b1acdd0ccfcfcd31d61bc69984cb2e10b4c'
 LOADER_SHA256 = '6410a844c9d18ee5de66a4d2da04dd6700777e6095b38465cb242acb8fd080e2'
@@ -130,7 +131,32 @@ def crc16(data):
     return value
 
 
-def patched_loader(original, mode):
+def memory_payload(directory):
+    """Build the opt-in ARM7 probe outside bootstrap's original BSS/stack."""
+    source = Path(__file__).resolve().parent / 'memory-probe'
+    prefix = '/opt/wonderful/toolchain/gcc-arm-none-eabi/bin/arm-none-eabi-'
+    directory.mkdir(parents=True, exist_ok=True)
+    elf, binary = directory / 'memory.elf', directory / 'memory.bin'
+    subprocess.run([prefix + 'gcc', '-mcpu=arm7tdmi', '-mthumb', '-Os',
+                    '-ffreestanding', '-fno-builtin', '-fno-unwind-tables',
+                    '-fno-asynchronous-unwind-tables', '-nostdlib',
+                    '-Wl,--build-id=none', '-T', str(source / 'link.ld'),
+                    str(source / 'hooks.s'), str(source / 'probe.c'),
+                    '-o', str(elf)], check=True)
+    subprocess.run([prefix + 'objcopy', '-O', 'binary', str(elf), str(binary)], check=True)
+    symbols = {}
+    output = subprocess.check_output([prefix + 'nm', '-n', str(elf)], text=True)
+    for line in output.splitlines():
+        parts = line.split()
+        if len(parts) == 3:
+            symbols[parts[2]] = int(parts[0], 16)
+    assert all(0x06036200 <= symbols[name] < 0x06037000
+               for name in ('before_clear', 'after_clear', 'finish'))
+    assert symbols['payload_end'] == 0x06036200 + len(binary.read_bytes())
+    return binary.read_bytes(), symbols
+
+
+def patched_loader(original, mode, payload=None):
     assert sha(original) == LOADER_SHA256
     changes = []
     image = bytearray(original)
@@ -166,19 +192,41 @@ def patched_loader(original, mode):
                  + bytes.fromhex('fee7') + struct.pack('<I', 0x023bfbd0))
         patch(0x8500, before, after,
               'Log one ARM9 state twice as eight hex digits, then stop; normal SD reads retained')
+    elif mode == 'memory':
+        assert payload is not None
+        code, symbols = payload
+        # Original BSS ends at 0x06036178; ARM7 stacks start at 0x0603FDA0.
+        # The new code/records fit wholly in this unused interval. No ARM9
+        # instructions, native SD routines or original globals change.
+        assert len(original) == 0x33ecc and len(code) <= 0xe00
+        image.extend(bytes(0x37000 + 3 * 14 * 4 - len(image)))
+        image[0x36200:0x36200 + len(code)] = code
+        changes.append(dict(offset='0x33ecc', before='', after=bytes(image[0x33ecc:]).hex(),
+                            reason='Append ARM7 snapshot code and zero records beyond original BSS'))
+        patch(0x928a, bytes.fromhex('e64bd14a'),
+              thumb_bl(0x0600928a, symbols['before_clear'] & ~1),
+              'Snapshot after ARM9 START wait, before ARM7 RAM clear; replay both instructions')
+        patch(0x94f2, bytes.fromhex('0023704a'),
+              thumb_bl(0x060094f2, symbols['after_clear'] & ~1),
+              'Snapshot after ARM7 RAM clear; replay both instructions')
+        assert original[0x9a76:0x9a7a] == thumb_bl(0x9a76, 0x1fd3c)
+        patch(0x9a7a, bytes.fromhex('3368792b'),
+              thumb_bl(0x06009a7a, symbols['finish'] & ~1),
+              'Final snapshot/log after patch-cache header read, then stop')
+        assert image[0x240:0xe2c] == original[0x240:0xe2c]
     else:
         raise ValueError(mode)
-    assert len(image) == len(original)
+    assert len(image) == len(original) or mode == 'memory'
     allowed = {i for c in changes for i in range(int(c['offset'], 16), int(c['offset'], 16) + len(bytes.fromhex(c['before'])))}
     assert all(a == b or i in allowed for i, (a, b) in enumerate(zip(original, image)))
     return bytes(image), changes
 
 
-def build_variant(official, mode):
+def build_variant(official, mode, payload=None):
     if sha(official) != OFFICIAL_SHA256:
         raise ValueError('Input must be the exact official nds-bootstrap 2.17.0 release binary')
     entry, start, end = loader_entry(official)
-    image, changes = patched_loader(decompress(official[start:end]), mode)
+    image, changes = patched_loader(decompress(official[start:end]), mode, payload)
     compressed = compress(image)
     # Frontend fread uses a 0x30000-byte compressed-image buffer.
     assert len(compressed) <= 0x30000
@@ -201,21 +249,34 @@ def build_variant(official, mode):
         assert result[offset:offset + length] == official[offset:offset + length]
     changed_metadata = set(range(entry, entry + 8)) | set(range(0x80, 0x84)) | set(range(0x210, 0x214)) | {0x14, 0x15e, 0x15f}
     assert all(a == b or i in changed_metadata for i, (a, b) in enumerate(zip(official, result)))
-    return bytes(result), dict(mode=mode, upstream_source=SOURCE, input_sha256=sha(official),
-                              output_sha256=sha(result), loader_sha256=sha(image),
-                              compressed_loader_bytes=len(compressed), changes=changes)
+    info = dict(mode=mode, upstream_source=SOURCE, input_sha256=sha(official),
+                output_sha256=sha(result), loader_sha256=sha(image),
+                compressed_loader_bytes=len(compressed), changes=changes)
+    if mode == 'memory':
+        expected_hash = 2166136261
+        for (word,) in struct.iter_unpack('<I', image[0x240:0x240 + 0xbc8]):
+            expected_hash = ((expected_hash ^ word) * 16777619) & 0xffffffff
+        info['memory_probe'] = dict(code_base='0x06036200', records_base='0x06037000',
+                                    arm9_bss='0x023bfbc8', code_bytes=0xbc8,
+                                    expected_code_hash=f'{expected_hash:08X}',
+                                    symbols={name: hex(payload[1][name]) for name in
+                                             ('before_clear', 'after_clear', 'capture', 'finish')})
+    return bytes(result), info
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('official', type=Path)
     parser.add_argument('output', type=Path)
+    parser.add_argument('--memory', action='store_true', help='Also build the r18 ARM9 memory snapshots')
     args = parser.parse_args()
     if args.official.resolve().is_relative_to(args.output.resolve()):
         parser.error('Keep the official input outside the output directory')
     official = args.official.read_bytes()
     # Validate both copies before publishing anything.
     variants = {mode: build_variant(official, mode) for mode in ('cpu', 'state')}
+    if args.memory:
+        variants['memory'] = build_variant(official, 'memory', memory_payload(args.output / 'probe-build'))
     args.output.mkdir(parents=True, exist_ok=True)
     for mode, (image, info) in variants.items():
         name = f'bootstrap-{mode}.nds'
