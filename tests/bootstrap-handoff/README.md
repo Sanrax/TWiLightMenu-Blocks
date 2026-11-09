@@ -16,8 +16,12 @@ The probe omits installation of TWiLight's exit bootstub, so it tests launch
 only, not Quit Game. If bootstrap returns a loader error it stays on the
 console screen. It deliberately makes no attempt to recover or rewrite caches.
 
-Compare with the same official bootstrap selected directly in Unlaunch. If
-that boots but the probe fails, investigate the SDK/loader handoff. If both
+An optional comparison is the same official bootstrap selected directly in
+Unlaunch. For this comparison, check which binary supplies NitroFS: 2.17.0
+falls back to `/_nds/nds-bootstrap-nightly.nds` when its launch argument lacks
+a recognized `sd:/` or `fat:/` prefix. A different nightly binary makes the
+comparison inconclusive. If direct launch boots but the probe fails,
+investigate the SDK/loader handoff. If both
 boot but the full menu fails, investigate menu state, bootstub installation and
 configuration writes. Preserve the corresponding `NDSBTSRP.LOG` for each run.
 Neither an emulator stall nor success after a debugger intervention establishes
