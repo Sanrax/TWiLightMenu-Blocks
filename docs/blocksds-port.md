@@ -38,6 +38,7 @@ reference; the commands above apply to this fork.
 | Embedded filesystems | Use native `nitro:` for menu assets and an independent read-only `boot:` for nds-bootstrap templates/loaders, with bounded paths, file tables and independent streams. | [systemdetails.cpp](../universal/source/common/systemdetails.cpp), [bootfs.c](../universal/source/common/bootfs.c), [legacy fallback](../universal/source/common/nitrofs.c). |
 | ARM7/SDK interfaces | Adapt input, touch, clock, FIFO, Maxmod, AES/NAND types and GL uploads to native SDK interfaces while retaining custom ARM7 cores and launch engines. Correct OAM palette-bank sizes and pad short GL palettes to avoid missing colors. | Component `arm7/source/main.c`, `arm9/source/nand/`, [ARM7 helpers](../universal/arm7/), [splash palettes](../title/arm9/Makefile), [Classic cursor](../quickmenu/gfx/cursor.grit), [Texture.cpp](../romsel_dsimenutheme/arm9/source/graphics/Texture.cpp). |
 | DSi SD/NAND | Remove the legacy IPC Sync storage driver and custom system FIFO. Enable accessible hardware before SDK IRQ initialization; the SDK owns TMIO interrupts, DMA and FIFO storage requests. Retain read-only software NAND decryption over native raw-sector reads and the raw CID required by its crypto. | [storage7.h](../universal/arm7/include/common/storage7.h), [storage.c](../universal/sdmmc/arm7/source/storage.c), component ARM7 mains and ARM9 `nand/nandio.c`. |
+| SD removal events | Snapshot card presence at startup and send removal/reinsertion events only when it changes. A card already inserted must leave the ARM9 status at `SDOk`; treating its presence as an insertion event sent the browser into its terminal SD-error loop before its first frame. | `twlmSdChange()` in [storage7.h](../universal/arm7/include/common/storage7.h) and the nine live ARM7 status loops. |
 | Stand-alone handoff reads | The small loaders run with IRQs disabled and retain their own polling reader. Wait for every FIFO byte, even when DATAEND arrives early, and reject stalled reads. This is separate from runtime SDK storage. | `source/sdmmc.c` in `booter/bootloader`, `title/bootloader`, `settings/bootloader`, `universal/bootloader_app` and `universal/bootloader_menu`. |
 | Menu handoff display | Hold master brightness white while loading internal `.srldr` modules and through the SDK startup hook, so cleared VRAM is hidden until the UI is prepared. External programs keep the usual brightness reset. | [menuStartup.c](../universal/source/common/menuStartup.c), [pinned SDK layout](../universal/include/blocksds/libnds_internal.h), shared loader and four `arm9clear.arm.c` routines. |
 | Settings persistence | Write and close a temporary INI before replacing the original. Keep a backup, restore it if publishing fails, and read it if the original is missing after an interrupted rename. | [inifile.cpp](../universal/source/common/inifile.cpp). |
@@ -77,6 +78,13 @@ Hardware feedback on r13: holding SELECT opens Settings, but loading the browser
 after the title or Settings exit stays white. The additional NAND reply/cache
 corrections address concrete coherency hazards in that startup path; they still
 need a device retest and are not confirmation that game launching is fixed.
+
+The r14 hardware watchdog reached `sound` with no pending I/O. That marker is
+after sound initialization; the following directory loop calls the SD-ejection
+check. The r13 status polling incorrectly reported a card present at boot as
+`SDInserted`, entering the error loop while startup brightness was still white.
+The event correction in r15 addresses this specific browser-entry regression;
+it does not establish that the earlier bootstrap or SD-write issues are fixed.
 
 A control built with BlocksDS 1.24.0's default ARM7 also stalls on its first SD
 write in the local melonDS 1.1 setup. The native-storage menu reaches the same
