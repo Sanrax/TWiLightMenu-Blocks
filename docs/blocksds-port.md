@@ -36,6 +36,7 @@ reference; the commands above apply to this fork.
 | Toolchain/build | BlocksDS/Wonderful tools, native library paths, dependency rules, ARM-state rules for copied loader routines, custom memory layouts and 32 KiB DLDI space. All live subprojects build; archived projects are untouched. | [blocksds.mk](../universal/blocksds.mk), ARM7/ARM9 component Makefiles, [ARM9 layout](../universal/arm9/ds_arm9_twlm.mem), Dockerfile and workflows. |
 | FAT storage | Mount native BlocksDS DLDI/SD interfaces; retain late mounts/remounts and prevent NitroFS from replacing these mounts. Replace private libfat aliases/attributes with SDK APIs. iEvolution uses the SDK's ARM7 DLDI mode. | [blocksds_storage.c](../universal/sdmmc/arm9/source/blocksds_storage.c), [pinned FatFS headers](../universal/include/blocksds/fatfs/), [fat_ext.h](../universal/arm9/include/fat_ext.h). |
 | Slot-1 driver installation | Replace the duplicated relocator with SDK relocation. Validate driver bounds, retire the sector cache before overwriting its shared DLDI space, clean data/instruction caches and reselect the SDK's ARM7/ARM9 interface. Retain compressed NRIO handoffs and iEvolution's ARM7 requirement. | [dldi.cpp](../universal/source/common/dldi.cpp), blocksds_storage.c, title/Settings `twlFlashcard.cpp`. |
+| Slot-1 initialization | Queue the ARM7 card-initialization request for its main loop. KEY1 setup calls `rand()`, whose thread-local storage is forbidden in BlocksDS interrupt handlers; running it in the FIFO callback stops before authentication. Preserve the existing card protocol and ARM9 reply. | [Title ARM7](../title/arm7/source/main.c), [Settings ARM7](../settings/arm7/source/main.c). |
 | Wood scrolling | Copy colors into existing palettes instead of allocating/freeing palette metadata in VBlank. Suspend GL rendering/palette updates while the main thread replaces icon banks; keep interrupts enabled for native SD requests. | [Wood iconTitle.cpp](../romsel_aktheme/arm9/source/iconTitle.cpp), [graphics.cpp](../romsel_aktheme/arm9/source/graphics/graphics.cpp), [fileBrowse.cpp](../romsel_aktheme/arm9/source/fileBrowse.cpp). |
 | Embedded filesystems | Use native `nitro:` for menu assets and an independent read-only `boot:` for nds-bootstrap templates/loaders, with bounded paths, file tables and independent streams. | [systemdetails.cpp](../universal/source/common/systemdetails.cpp), [bootfs.c](../universal/source/common/bootfs.c), [legacy fallback](../universal/source/common/nitrofs.c). |
 | ARM7/SDK interfaces | Adapt input, touch, clock, FIFO, Maxmod, AES/NAND types and GL uploads to native SDK interfaces while retaining custom ARM7 cores and launch engines. Correct OAM palette-bank sizes and pad short GL palettes to avoid missing colors. | Component `arm7/source/main.c`, `arm9/source/nand/`, [ARM7 helpers](../universal/arm7/), [splash palettes](../title/arm9/Makefile), [Classic cursor](../quickmenu/gfx/cursor.grit), [Texture.cpp](../romsel_dsimenutheme/arm9/source/graphics/Texture.cpp). |
@@ -90,6 +91,12 @@ scrolling with static/animated banners, and SDK relocation of every bundled
 DLDI driver. DSpico Slot-1 mounting and extended Wood browsing on console SD
 still need hardware confirmation; DS/DLDI emulator tests do not reproduce
 their native SD timing.
+
+The r21 hardware trace stops at ARM7 KEY1 setup before DLDI starts. The r22
+regression reproduces `Using TLS from IRQ` in both original ARM7 cores;
+queuing initialization for the main loop lets each complete eight requests
+with simulated card I/O. This verifies the interrupt-context correction;
+physical DSpico mounting still needs a hardware retest.
 
 ## Packaging
 

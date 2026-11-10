@@ -82,6 +82,7 @@ void ReturntoDSiMenu() {
 typedef void (*pico_loader_7_func_t)(void);
 
 volatile bool reset_pico = false;
+static volatile bool cardInitPending = false;
 
 static void resetDSPico() {
 	memset((void*)0x40000B0, 0, 0x30);
@@ -98,7 +99,8 @@ static void resetDSPico() {
 static void menuValue32Handler(u32 value, void* data) {
 	switch (value) {
 		case 0x54494E49: // 'INIT'
-			fifoSendValue32(FIFO_USER_02, initFlashcardArm7());
+			// Card setup uses libc TLS (rand), which cannot run in a FIFO IRQ.
+			cardInitPending = true;
 			break;
 		case 0x4F434950: // 'PICO'
 			reset_pico = true;
@@ -330,6 +332,10 @@ int main() {
 	// Keep the ARM7 mostly idle
 	while (!exitflag) {
 		processPowerButtonReboot(ReturntoDSiMenu);
+		if (cardInitPending) {
+			cardInitPending = false;
+			fifoSendValue32(FIFO_USER_02, initFlashcardArm7());
+		}
 		if ((REG_KEYINPUT & (KEY_SELECT | KEY_START | KEY_L | KEY_R)) == 0) {
 			exitflag = true;
 		}

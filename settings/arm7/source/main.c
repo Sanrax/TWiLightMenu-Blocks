@@ -87,10 +87,13 @@ void ReturntoDSiMenu() {
 	}
 }
 
+static volatile bool cardInitPending = false;
+
 static void menuValue32Handler(u32 value, void* data) {
 	switch (value) {
 		case 0x54494E49: // 'INIT'
-			fifoSendValue32(FIFO_USER_02, initFlashcardArm7());
+			// Card setup uses libc TLS (rand), which cannot run in a FIFO IRQ.
+			cardInitPending = true;
 			break;
 		default:
 			ReturntoDSiMenu();
@@ -273,6 +276,10 @@ int main() {
 	// Keep the ARM7 mostly idle
 	while (!exitflag) {
 		processPowerButtonReboot(ReturntoDSiMenu);
+		if (cardInitPending) {
+			cardInitPending = false;
+			fifoSendValue32(FIFO_USER_02, initFlashcardArm7());
+		}
 		if ((REG_KEYINPUT & (KEY_SELECT | KEY_START | KEY_L | KEY_R)) == 0) {
 			exitflag = true;
 		}
