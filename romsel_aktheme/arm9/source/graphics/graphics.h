@@ -18,6 +18,10 @@
 
 ------------------------------------------------------------------*/
 #pragma once
+
+// Keep VBlank's GL rendering and palette updates out of icon-bank replacement.
+void beginIconUpdate();
+void endIconUpdate();
 #define REFRESH_EVERY_VBLANKS 60
 
 extern u16* colorTable;

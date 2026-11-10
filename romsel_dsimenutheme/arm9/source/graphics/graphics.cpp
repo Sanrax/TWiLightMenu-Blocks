@@ -766,9 +766,21 @@ void beginMenuContentUpdate() {
 	displayGameIcons = false;
 }
 
-void endMenuContentUpdate() {
+void endMenuContentUpdate(bool startup) {
+	const int irqState = enterCriticalSection();
+	if (startup) {
+		// Brightness saturates at 16. Starting at 31 hides the first 45 frames
+		// of the DSi icon drop behind an already fully white screen.
+		screenBrightness = 16;
+		fadeDelay = 0;
+		fadeSpeed = ms().theme != TWLSettings::EThemeDSi || ms().fastMenuFades;
+		controlTopBright = true;
+		fadeType = true;
+		if (ms().theme == TWLSettings::EThemeDSi) dropDown = true;
+	}
 	displayGameIcons = true;
 	menuContentState = 2;
+	leaveCriticalSection(irqState);
 	if (menuIconsAnimating) {
 		// Publish the new title and background with the icons hidden, then
 		// reveal only the icon row. Nine frames total, excluding metadata I/O.

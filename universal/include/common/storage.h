@@ -3,6 +3,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <stddef.h>
 #include <dirent.h>
 #include <nds/disc_io.h>
 
@@ -12,6 +13,10 @@ extern "C" {
 
 // Unlike fatInit(), this supports late flashcard discovery and failed-mount retries.
 bool twlmMountStorage(const char *name, const DISC_INTERFACE *interface);
+
+// Install a late-discovered flashcard driver before its filesystem is mounted.
+bool twlmInstallDldi(const void *image, size_t size);
+bool twlmLoadDldi(const char *path);
 
 // A single directory pass returns both names and FAT attributes.
 typedef struct TWLDirectory TWLDirectory;

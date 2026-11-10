@@ -3305,7 +3305,6 @@ std::string browseForFile(const std::vector<std::string_view> &extensionList) {
 			musicplaying = true;
 		}
 
-		fadeSpeed = !revealStartup || ms().fastMenuFades;
 		bool gameTapped = false;
 		bool dsiBinariesChecked = false;
 		bool hasDsiBinaries = true;
@@ -3426,13 +3425,7 @@ std::string browseForFile(const std::vector<std::string_view> &extensionList) {
 				}
 				updateText(false);
 				if (pageNeedsPublish) {
-					if (revealStartup) {
-						// Reveal a complete first page directly, without a loading overlay.
-						controlTopBright = true;
-						fadeType = true;
-						if (ms().theme == TWLSettings::EThemeDSi) dropDown = true;
-					}
-					endMenuContentUpdate();
+					endMenuContentUpdate(revealStartup);
 					pageNeedsPublish = false;
 					if (revealStartup) {
 						do { bgOperations(true); } while (!screenFadedIn() || !iconDropFinished());
