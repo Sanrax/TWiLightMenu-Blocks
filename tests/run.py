@@ -13,6 +13,8 @@ ROOT = Path(__file__).resolve().parents[1]
 def run(*args):
     subprocess.run(args, cwd=ROOT, check=True)
 
+run('python3', 'tests/menu_compatibility.py')
+
 with tempfile.TemporaryDirectory(prefix='twlm-tests-') as temp:
     output = Path(temp)
     run('cc', '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror', '-no-pie',

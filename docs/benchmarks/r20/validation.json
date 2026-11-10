@@ -1,0 +1,29 @@
+{
+  "source_commit": "d7bad0cb0b7ac92261cc37abba4728d0256acc56",
+  "build": "make -j2 all; refresh Settings version header; make package; rebuild CIA",
+  "host_checks": "driver layouts/bounds/publication order, bounded NRIO decode, theme fade publication, allocation-free Wood palettes",
+  "linked_checks": "18 NDS images; 7 ARM9 handoff loaders; native SDK storage; SDK console detection; Wood palette IRQ call sites",
+  "emulator": {
+    "version": "melonDS 1.1",
+    "mode": "DS / DLDI",
+    "themes": [
+      "DSi",
+      "3DS",
+      "Wood",
+      "Saturn",
+      "HBL"
+    ],
+    "fade_setting": "Fast Menu Fades disabled; entry policy also tested with setting enabled in host checks",
+    "wood": "four 72-directional-input sweeps with alternating static/animated banner-only fixtures; responsive clock/input afterward",
+    "sdk_driver_probe": "all bundled driver relocations, relocated function addresses, zeroed BSS, repeated executable code installation: ALL PASSED",
+    "scope": "Driver protocol startup/mounting is not exercised by the standalone installation probe."
+  },
+  "hardware_pending": [
+    "DSpico secondary Slot-1 microSD mount from console-SD boot",
+    "Extended Wood browsing on native DSi SD",
+    "Visual confirmation of DSi entry fade against OG DSi Menu"
+  ],
+  "bootstrap": "Official nds-bootstrap 2.17.0, unchanged",
+  "diagnostics_branch": "Manual regression tests and SDK installation probe only; no diagnostic code on master",
+  "fixtures": "Disposable emulator images and copied BIOS/firmware removed; original user assets untouched"
+}
