@@ -60,3 +60,8 @@ ifneq ($(filter 1,$(STARTUP_TRACE)),)
 CPPFLAGS += -DTWLM_STARTUP_TRACE
 BLOCKSDS_LDFLAGS += $(if $(filter -lnds9,$(LIBS)),-Wl$(comma)--defsym=__irq_stack_size=4096 $(foreach fn,irqSet fifoSendDatamsg fifoSendValue32 fifoGetValue32,-Wl$(comma)--wrap=$(fn)))
 endif
+
+# Opt-in physical Slot-1 trace, never part of production builds.
+ifeq ($(SLOT1_TRACE),1)
+CPPFLAGS += -DTWLM_SLOT1_TRACE
+endif

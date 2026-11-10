@@ -17,6 +17,7 @@
 */
 
 #include "read_card.h"
+#include "common/startupTrace.h"
 
 #include <nds.h>
 #include <nds/arm9/cache.h>
@@ -206,6 +207,7 @@ static void createEncryptedCommand (u8 command, u8* cmdData, u32 block)
 }
 
 static void cardDelay (u16 readTimeout) {
+	startupTraceMark("Slot-1 ARM9: TIMER0 delay");
 	/* Using a while loop to check the timeout,
 	   so we have to wait until one before overflow.
 	   This also requires an extra 1 for the timer data.
@@ -259,17 +261,20 @@ static int cardInitInternal (bool resetSlot)
 	REG_AUXSPICNT=CARD_CR1_ENABLE|CARD_CR1_IRQ;
 	REG_ROMCTRL=CARD_nRESET|CARD_SEC_SEED;
 	while(REG_ROMCTRL&CARD_BUSY) ;
+	startupTraceMark("Slot-1 ARM9: card reset");
 	cardReset();
 	while(REG_ROMCTRL&CARD_BUSY) ;
 
 	toncset(&ndsCardHeader, 0, sizeof(sNDSHeaderExt));
 
+	startupTraceMark("Slot-1 ARM9: read chip ID");
 	iCardId=cardReadID(CARD_CLK_SLOW);
 	while(REG_ROMCTRL & CARD_BUSY);
 
 	normalChip = (iCardId & BIT(31)) != 0; // ROM chip ID MSB
 	nandChip = (iCardId & BIT(27)) != 0; // Card has a NAND chip
 
+	startupTraceMark("Slot-1 ARM9: read header");
 	// Read the header
 	cardParamCommand (CARD_CMD_HEADER_READ, 0,
 		CARD_ACTIVATE | CARD_nRESET | CARD_CLK_SLOW | CARD_BLK_SIZE(1) | CARD_DELAY1(0x1FFF) | CARD_DELAY2(0x3F),
@@ -303,10 +308,12 @@ static int cardInitInternal (bool resetSlot)
 	}
 
 	// 3Ciiijjj xkkkkkxx - Activate KEY1 Encryption Mode
+	startupTraceMark("Slot-1 ARM9: activate KEY1");
 	initKey1Encryption (cmdData, 0);
 	cardPolledTransfer((ndsCardHeader.cardControl13 & (CARD_WR|CARD_nRESET|CARD_CLK_SLOW)) | CARD_ACTIVATE, NULL, 0, cmdData);
 
 	// 4llllmmm nnnkkkkk - Activate KEY2 Encryption Mode
+	startupTraceMark("Slot-1 ARM9: activate KEY2");
 	createEncryptedCommand (CARD_CMD_ACTIVATE_SEC, cmdData, 0);
 
 	if (normalChip) {
@@ -327,6 +334,7 @@ static int cardInitInternal (bool resetSlot)
 	portFlagsKey1 |= CARD_SEC_EN | CARD_SEC_DAT;
 
 	// 1lllliii jjjkkkkk - 2nd Get ROM Chip ID / Get KEY2 Stream
+	startupTraceMark("Slot-1 ARM9: secure ID");
 	createEncryptedCommand (CARD_CMD_SECURE_CHIPID, cmdData, 0);
 
 	if (normalChip) {
@@ -341,6 +349,7 @@ static int cardInitInternal (bool resetSlot)
 
     int secureAreaOffset = 0;
 	for (secureBlockNumber = 4; secureBlockNumber < 8; secureBlockNumber++) {
+		startupTraceMark("Slot-1 ARM9: secure area");
 		createEncryptedCommand (CARD_CMD_SECURE_READ, cmdData, secureBlockNumber);
 
 		if (normalChip) {
@@ -357,6 +366,7 @@ static int cardInitInternal (bool resetSlot)
 	}
 
 	// Alllliii jjjkkkkk - Enter Main Data Mode
+	startupTraceMark("Slot-1 ARM9: data mode");
 	createEncryptedCommand (CARD_CMD_DATA_MODE, cmdData, 0);
 
 	if (normalChip) {

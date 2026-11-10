@@ -281,3 +281,43 @@ SDK relocation/function pointers/BSS clearing for every bundled driver, then
 installs and executes two different return-value routines in the same stub.
 It never starts those hardware drivers or mounts a flashcard. The r20 probe
 reported ALL PASSED in melonDS; this does not validate DSpico protocol timing.
+
+## Physical Slot-1 initialization trace (r21)
+
+The user reports that r20 still hangs with DSpico Slot-1 microSD access enabled,
+both on a fresh Unlaunch boot and on Settings exit. The r20 driver-install
+probe did not exercise the physical initialization/authentication sequence.
+Keep this investigation on diagnostics until the stalled stage is identified.
+
+```sh
+make -j2 shared-loaders
+make -C title -j2 trace-slot1
+make -C settings -j2 trace-slot1
+```
+
+Install `title/title-slot1-trace.nds` as `_nds/TWiLightMenu/main.srldr` and
+`settings/settings-slot1-trace.nds` as `_nds/TWiLightMenu/settings.srldr` on the
+console SD. Boot normally with secondary access enabled; wait up to 30 seconds
+for the terminal report. To exercise Settings exit independently, hold SELECT
+while launching, then press B to leave Settings. Record the context and every
+line below “Stopped during,” including ARM7 progress, pending DLDI operations,
+and register/error values. The trace itself performs no filesystem I/O.
+Restore those two modules from r20 after testing.
+
+The watchdog now observes DLDI FIFO startup/reads as well as native SD traffic.
+A reserved user FIFO carries the last ARM7 authentication stage, card register
+and TIMER0 snapshot; ARM9 records each initialization step and distinguishes
+returned errors from blocked calls. Code is in `slot1Trace.h`, `startupTrace.c`,
+title/Settings `twlFlashcard.cpp` and `card_init.c`, and shared `read_card.c`.
+Only `trace-slot1` enables `TWLM_SLOT1_TRACE`; regular builds and CI do not.
+
+If the report reaches an ARM7-driver mount/DLDI read, holding X through the
+next normal boot selects an ARM9-driver control. The report states whether
+that override was selected. This is an explicit diagnostic comparison, not
+a production workaround. Steps before mounting are identical in both modes.
+
+`make -C tests/slot1-trace-selftest` checks the full terminal report. After
+building the traced title ARM7, add `NAME=slot1_ipc_trace_check IPC_TEST=1` to
+exercise its real initialization request and ARM7-to-ARM9 progress channel
+against an emulated homebrew cartridge. Neither self-test accesses a real
+DSpico, and neither proves a hardware fix.

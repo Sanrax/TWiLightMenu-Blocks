@@ -18,6 +18,7 @@
 */
 
 #include "card_init.h"
+#include "common/slot1Trace.h"
 #include "encryption.h"
 #include <stdlib.h>
 #include <string.h>
@@ -67,11 +68,13 @@ static void encryptedCommand(u8 code, u8* command, u32 block) {
 }
 
 static void cardDelay(u16 timeout) {
+	slot1TraceArm7(S1_DELAY, timeout);
 	TIMER_DATA(0) = 0 - ((timeout & 0x3FFF) + 3);
 	TIMER_CR(0) = TIMER_DIV_256 | TIMER_ENABLE;
 	while (TIMER_DATA(0) != 0xFFFF);
 	TIMER_CR(0) = 0;
 	TIMER_DATA(0) = 0;
+	slot1TraceArm7(S1_DELAY_DONE, timeout);
 }
 
 u32 initFlashcardArm7(void) {
@@ -80,10 +83,12 @@ u32 initFlashcardArm7(void) {
 	tNDSHeader* header = (tNDSHeader*)headerData;
 	u8 command[8] __attribute__((aligned(4)));
 
+	slot1TraceArm7(S1_HEADER, 0);
 	cardReadHeader((u8*)headerData);
 	if (header->headerCRC16 != swiCRC16(0xFFFF, headerData, 0x15E))
 		return 0x16;
 
+	slot1TraceArm7(S1_CHIP_ID, 0);
 	u32 chipId = cardReadID(CARD_CLK_SLOW);
 	while (REG_ROMCTRL & CARD_BUSY);
 	bool normalChip = (chipId & BIT(31)) != 0;
@@ -98,9 +103,11 @@ u32 initFlashcardArm7(void) {
 	if (!normalChip)
 		key1Flags |= CARD_SEC_LARGE;
 
+	slot1TraceArm7(S1_KEY1, chipId);
 	initKey1Command(command);
 	cardPolledTransfer((header->cardControl13 & (CARD_WR | CARD_nRESET | CARD_CLK_SLOW)) |
 		CARD_ACTIVATE, NULL, 0, command);
+	slot1TraceArm7(S1_KEY2_COMMAND, 0);
 	encryptedCommand(CARD_CMD_ACTIVATE_SEC, command, 0);
 	if (normalChip) {
 		cardPolledTransfer(key1Flags, NULL, 0, command);
@@ -108,6 +115,7 @@ u32 initFlashcardArm7(void) {
 	}
 	cardPolledTransfer(key1Flags, NULL, 0, command);
 
+	slot1TraceArm7(S1_KEY2_SEED, 0);
 	REG_ROMCTRL = 0;
 	REG_CARD_1B0 = seedBytes[header->deviceType & 7] |
 		(key1data.nnn << 15) | (key1data.mmm << 27) | 0x6000;
@@ -117,6 +125,7 @@ u32 initFlashcardArm7(void) {
 	REG_ROMCTRL = CARD_nRESET | CARD_SEC_SEED | CARD_SEC_EN | CARD_SEC_DAT;
 	key1Flags |= CARD_SEC_EN | CARD_SEC_DAT;
 
+	slot1TraceArm7(S1_SECURE_ID, 0);
 	encryptedCommand(CARD_CMD_SECURE_CHIPID, command, 0);
 	if (normalChip) {
 		cardPolledTransfer(key1Flags, NULL, 0, command);
@@ -128,6 +137,7 @@ u32 initFlashcardArm7(void) {
 		(CARD_CLK_SLOW | CARD_DELAY1(0x1FFF) | CARD_DELAY2(0x3F))) |
 		CARD_ACTIVATE | CARD_nRESET | CARD_SEC_EN | CARD_SEC_DAT;
 	for (int block = 4; block < 8; block++) {
+		slot1TraceArm7(S1_SECURE_AREA, block);
 		encryptedCommand(CARD_CMD_SECURE_READ, command, block);
 		if (normalChip) {
 			cardPolledTransfer(secureFlags, NULL, 0, command);
@@ -140,11 +150,13 @@ u32 initFlashcardArm7(void) {
 		}
 	}
 
+	slot1TraceArm7(S1_DATA_MODE, 0);
 	encryptedCommand(CARD_CMD_DATA_MODE, command, 0);
 	if (normalChip) {
 		cardPolledTransfer(key1Flags, NULL, 0, command);
 		cardDelay(header->readTimeout);
 	}
 	cardPolledTransfer(key1Flags, NULL, 0, command);
+	slot1TraceArm7(S1_COMPLETE, 0);
 	return 0;
 }

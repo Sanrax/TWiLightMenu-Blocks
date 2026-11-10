@@ -1,0 +1,16 @@
+{
+  "production_base": "d7bad0cb0",
+  "purpose": "Locate DSpico secondary Slot-1 microSD initialization hang; reported on cold Unlaunch boot and Settings exit.",
+  "builds": [
+    "title trace-slot1",
+    "settings trace-slot1"
+  ],
+  "emulator": "melonDS 1.1, DS mode, built-in BIOS, no card images",
+  "checks": {
+    "terminal_report": "Readable ARM9 phase, ARM7 phase, extra/ROMCTRL/TIMER0, driver selection, SCFG_MC/EXMEM; tested with simulated stall.",
+    "real_arm7_reporting": "Traced title ARM7 receives INIT, sends progress over user FIFO 06 and replies with header CRC error 0x16 for the emulated homebrew cartridge; ARM9 receives progress and the terminal report shows it.",
+    "physical_card": "Not tested. An emulator homebrew cartridge is not a DSpico."
+  },
+  "production_fix": "Pending hardware stage report. No production changes applied.",
+  "trace_storage": "No filesystem I/O for trace recording."
+}

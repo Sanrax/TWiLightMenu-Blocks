@@ -1,9 +1,12 @@
 #include "common/storage.h"
+#include "common/startupTrace.h"
+#include "common/slot1Trace.h"
 #include <nds.h>
 #include <nds/arm9/dldi.h>
 #include <fat.h>
 #include <sys/stat.h>
 #include <stdio.h>
+#include <errno.h>
 
 #include "common/flashcard.h"
 #include "common/bootstrappaths.h"
@@ -25,7 +28,26 @@ TWL_CODE bool UpdateCardInfo(char* gameid, char* gamename) {
 	printf("Game id: %s\nName:    %s", gameid, gamename);
 }*/
 
+#ifdef TWLM_SLOT1_TRACE
+struct Slot1TraceScope {
+    Slot1TraceScope() { slot1TraceBegin(); }
+    ~Slot1TraceScope() { slot1TraceEnd(); }
+};
+#endif
+
+static bool loadSlot1Driver(const char *path) {
+    const bool ok = twlmLoadDldi(path);
+#ifdef TWLM_SLOT1_TRACE
+    if (!ok) slot1TraceFailure("Slot-1: driver load failed", errno);
+#endif
+    return ok;
+}
+
 TWL_CODE void twl_flashcardInit(void) {
+#ifdef TWLM_SLOT1_TRACE
+    Slot1TraceScope trace;
+#endif
+    startupTraceMark("Slot-1: check hardware");
 	if (REG_SCFG_MC == 0x11 || sys().arm7SCFGLocked()) {
 		return;
 	}
@@ -33,8 +55,10 @@ TWL_CODE void twl_flashcardInit(void) {
 	sysSetCardOwner (BUS_OWNER_ARM9);
 
 	// Reset Slot-1 to allow reading title name and ID
+	startupTraceMark("Slot-1: power off request");
 	disableSlot1();
 	{
+		startupTraceMark("Slot-1: read settings");
 		CIniFile settingsini( DSIMENUPP_INI );
 
 		if (settingsini.GetInt("SRLOADER", "SECONDARY_ACCESS", 0) == false) {
@@ -48,6 +72,7 @@ TWL_CODE void twl_flashcardInit(void) {
 		return;
 	}
 
+	startupTraceMark("Slot-1: power on request");
 	enableSlot1();
 	for(int i = 0; i < 15; i++) { swiWaitForVBlank(); }
 
@@ -55,6 +80,7 @@ TWL_CODE void twl_flashcardInit(void) {
 	// https://github.com/ApacheThunder/ntr-hb-menu/blob/deluxe/arm7/source/main.c
 	// https://github.com/ApacheThunder/ntr-hb-menu/blob/deluxe/arm9/include/read_card.c
 	{
+		startupTraceMark("Slot-1: ARM7 card init");
 		sysSetCardOwner(BUS_OWNER_ARM7);
 		if (!fifoSendValue32(FIFO_USER_02, 0x54494E49)) {
 			sysSetCardOwner(BUS_OWNER_ARM9);
@@ -65,6 +91,9 @@ TWL_CODE void twl_flashcardInit(void) {
 		u32 cardInitResult = fifoGetValue32(FIFO_USER_02);
 		sysSetCardOwner(BUS_OWNER_ARM9);
 		if (cardInitResult != 0) {
+#ifdef TWLM_SLOT1_TRACE
+            slot1TraceFailure("Slot-1: ARM7 init error", cardInitResult);
+#endif
 			// printf("ARM7 card initialization failed: %lu\n", (unsigned long)cardInitResult);
 			return;
 		}
@@ -73,6 +102,7 @@ TWL_CODE void twl_flashcardInit(void) {
 	char gamename[13];
 	char gameid[5];
 
+	startupTraceMark("Slot-1: ARM9 header read");
 	UpdateCardInfo(&gameid[0], &gamename[0]);
 
 	/*consoleDemoInit();
@@ -89,6 +119,7 @@ TWL_CODE void twl_flashcardInit(void) {
 		return;
 	}
 
+	startupTraceMark("Slot-1: load DLDI driver");
 	bool doCardInit = false;
 	bool isDSPico = false;
 
@@ -96,42 +127,61 @@ TWL_CODE void twl_flashcardInit(void) {
 	if (!memcmp(gameid, "DSPI", 4) || !memcmp(gameid, "NTRJ", 4)) { // DSpico
 		doCardInit = true;
 		isDSPico = true;
-		if (!twlmLoadDldi("nitro:/dldi/pico.dldi")) return;
+		if (!loadSlot1Driver("nitro:/dldi/pico.dldi")) return;
 	} else if (!memcmp(gamename, "QMATETRIAL", 9) || !memcmp(gamename, "R4DSULTRA", 9) // R4iDSN/R4 Ultra
 	 || !memcmp(gameid, "ACEK", 4) || !memcmp(gameid, "YCEP", 4) || !memcmp(gameid, "AHZH", 4) || !memcmp(gameid, "CHPJ", 4) || !memcmp(gameid, "ADLP", 4)) { // Acekard 2(i)
-		if (!twlmLoadDldi("nitro:/dldi/ak2.dldi")) return;
+		if (!loadSlot1Driver("nitro:/dldi/ak2.dldi")) return;
 	} else if (!memcmp(gameid, "ASMA", 4)) {
 		doCardInit = true;
-		if (!twlmLoadDldi((!memcmp(gamename, "MEDIAPLAYER", 11)) ? "nitro:/dldi/gmtf.dldi" : "nitro:/dldi/r4tf.dldi")) return;
+		if (!loadSlot1Driver((!memcmp(gamename, "MEDIAPLAYER", 11)) ? "nitro:/dldi/gmtf.dldi" : "nitro:/dldi/r4tf.dldi")) return;
 	} else if (!memcmp(gameid, "ASME", 4)) {
 		doCardInit = true;
-		if (!twlmLoadDldi("nitro:/dldi/CycloEvo.dldi")) return;
+		if (!loadSlot1Driver("nitro:/dldi/CycloEvo.dldi")) return;
 	} else if (!memcmp(gameid, "ABJJ", 4)) {
 		doCardInit = true;
-		if (!twlmLoadDldi("nitro:/dldi/ez5n.dldi")) return;
+		if (!loadSlot1Driver("nitro:/dldi/ez5n.dldi")) return;
 	} else if (!memcmp(gameid, "TTDS", 4)) {
-		if (!twlmLoadDldi("nitro:/dldi/ttio.dldi")) return;
+		if (!loadSlot1Driver("nitro:/dldi/ttio.dldi")) return;
 	} else if (!memcmp(gamename, "20130628ver", 11)) { // Some DSTTi clones report 0x0 of their flashrom instead of their rom title with certain homebrew header reads.... lol
 		doCardInit = true; // Demon clones require card init else they hang on DLDI init.
-		if (!twlmLoadDldi("nitro:/dldi/ttio.dldi")) return;
+		if (!loadSlot1Driver("nitro:/dldi/ttio.dldi")) return;
 	} else if (!memcmp(gameid, "DSGB", 4)) {
-		if (!twlmLoadDldi("nitro:/dldi/nrio.lz77")) return;
+		if (!loadSlot1Driver("nitro:/dldi/nrio.lz77")) return;
 	} /*else if (!memcmp(gameid, "ALXX", 4)) { // SuperCard DSTWO
-		if (!twlmLoadDldi("nitro:/dldi/dstwo.dldi")) return;
+		if (!loadSlot1Driver("nitro:/dldi/dstwo.dldi")) return;
 	}*/
 
 	if (doCardInit) { // Certain flashcarts require card init before DLDI will work.
+		startupTraceMark("Slot-1: ARM9 card init");
 		int result = cardInitWithoutSlotReset();
 		if (result != 0) {
+#ifdef TWLM_SLOT1_TRACE
+            slot1TraceFailure("Slot-1: ARM9 init error", result);
+#endif
 			// printf("ARM9 card initialization failed: %d\n", result);
 			return;
 		}
 		for (int i = 0; i < 30; i++) swiWaitForVBlank();
-		if (isDSPico) picoInit(false);
+		if (isDSPico) {
+			startupTraceMark("Slot-1: DSpico command FC");
+			picoInit(false);
+		}
 	}
 
-	twlmMountStorage("fat", dldiGetInternal());
+#ifdef TWLM_SLOT1_TRACE
+    if (isDSPico && slot1TraceForceArm9()) dldiSetMode(DLDI_MODE_ARM9);
+#endif
+    startupTraceMark("Slot-1: select driver CPU");
+    const DISC_INTERFACE *driver = dldiGetInternal();
+    startupTraceMark(dldiGetMode() == DLDI_MODE_ARM7 ? "Slot-1: mount (ARM7 driver)" : "Slot-1: mount (ARM9 driver)");
+    const bool mounted = twlmMountStorage("fat", driver);
+#ifdef TWLM_SLOT1_TRACE
+    if (!mounted) slot1TraceFailure("Slot-1: mount returned error", errno);
+#else
+    (void)mounted;
+#endif
 
+	startupTraceMark("Slot-1: check mounted card");
 	flashcardFoundReset();
 	if (!flashcardFound()) {
 		disableSlot1();

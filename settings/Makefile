@@ -62,3 +62,9 @@ bootloader: data
 
 bootstub: data
 	@$(MAKE) -C $(PROJECT)/universal/bootstub BOOTSTUB=$(CURDIR)/data/bootstub.bin
+
+.PHONY: trace-slot1
+trace-slot1: bootloader bootstub
+	$(MAKE) -C arm7 BUILD=build-slot1-trace TARGET=$(TARGET)-slot1-trace STARTUP_TRACE=1 SLOT1_TRACE=1
+	$(MAKE) -C arm9 BUILD=build-slot1-trace TARGET=$(TARGET)-slot1-trace STARTUP_TRACE=1 SLOT1_TRACE=1
+	ndstool -u 00030004 -g SRLA 01 "TWLMENUPP" -c $(TARGET)-slot1-trace.nds -7 arm7/$(TARGET)-slot1-trace.elf -9 arm9/$(TARGET)-slot1-trace.elf -d $(NITRODATA) -b icon.bmp "Slot-1 trace;TWiLight Menu++;Diagnostics"
