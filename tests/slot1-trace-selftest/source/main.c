@@ -15,6 +15,7 @@ int main(void) {
     slot1Error = result;
     startupTraceMark("IPC self-test: ARM7 replied");
 #else
+    arm7Command = S1_KEY2_COMMAND;
     arm7Phase = S1_DELAY; arm7Extra = 0xD7E; arm7Romctrl = 0xA0186000; arm7Timer = 0x0082FF00;
 #endif
     frames = 60 * 20 - 2;

@@ -111,3 +111,6 @@ romsel_dsimenutheme/nitrofiles/themes/*/*/*/*.pht
 romsel_dsimenutheme/arm9/build-trace/
 
 /tests/dldi-install/source/drivers.h
+
+# Opt-in physical Slot-1 trace builds
+build-slot1-trace/

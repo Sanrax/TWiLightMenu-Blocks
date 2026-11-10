@@ -15,6 +15,7 @@ static volatile bool active;
 #ifdef TWLM_SLOT1_TRACE
 static volatile bool slot1Active, slot1Arm9;
 static volatile u32 arm7Phase, arm7Extra, arm7Romctrl, arm7Timer, slot1Error;
+static volatile u32 arm7Command, arm7CommandExtra;
 
 static const char *arm7PhaseName(u32 value) {
     switch (value) {
@@ -42,12 +43,15 @@ static void slot1Arm7Report(int bytes, void *unused) {
     }
     fifoGetDatamsg(FIFO_USER_06, sizeof(packet), (u8*)packet);
     arm7Phase = packet[0]; arm7Extra = packet[1];
+    if (arm7Phase != S1_DELAY && arm7Phase != S1_DELAY_DONE) {
+        arm7Command = arm7Phase; arm7CommandExtra = arm7Extra;
+    }
     arm7Romctrl = packet[2]; arm7Timer = packet[3];
     frames = 0;
 }
 
 void slot1TraceBegin(void) {
-    arm7Phase = arm7Extra = arm7Romctrl = arm7Timer = 0;
+    arm7Phase = arm7Extra = arm7Romctrl = arm7Timer = arm7Command = arm7CommandExtra = 0;
     scanKeys();
     slot1Arm9 = (keysHeld() & KEY_X) != 0;
     slot1Error = 0;
@@ -90,6 +94,10 @@ static void stopped(void) {
     if (slot1Active) {
         if (slot1Error) { consolePrintString("Error "); consolePrintUnsigned(slot1Error, 16); consolePrintString("\n"); }
         consolePrintString("ARM7: "); consolePrintString(arm7PhaseName(arm7Phase));
+        if (arm7Phase == S1_DELAY || arm7Phase == S1_DELAY_DONE) {
+            consolePrintString("\nduring "); consolePrintString(arm7PhaseName(arm7Command));
+            consolePrintString(" "); consolePrintUnsigned(arm7CommandExtra, 16);
+        }
         consolePrintString("\nextra "); consolePrintUnsigned(arm7Extra, 16);
         consolePrintString(" / ROMCTRL "); consolePrintUnsigned(arm7Romctrl, 16);
         consolePrintString("\nTIMER0 ctl/data "); consolePrintUnsigned(arm7Timer, 16);

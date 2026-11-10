@@ -43,6 +43,7 @@ $(TARGET).nds:	makearm7 makearm9
 			-b icon.bmp "Settings;TWiLight Menu++;Rocket Robz"
 
 clean:
+	@rm -fr arm7/build-slot1-trace arm9/build-slot1-trace arm7/$(TARGET)-slot1-trace.elf arm9/$(TARGET)-slot1-trace.elf $(TARGET)-slot1-trace.nds
 	@echo clean ...
 	@rm -fr data
 	@rm -fr $(BUILD) $(TARGET).elf $(TARGET).nds
