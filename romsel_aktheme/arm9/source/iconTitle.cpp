@@ -668,20 +668,15 @@ void loadHBIcon(int num)
  * the palette cache.
  */
 void glReloadIconPalette(int num) {
-
-	int textureID;
-	const u16 *cachedPalette;
-	switch (num) {
-	default:
-		if (BAD_ICON_IDX(num))
-			return;
-		textureID = iconTexID[num];
-		cachedPalette = _paletteCache[num];
-		break;
-	}
-	
-	glBindTexture(0, textureID);
-	glColorTableEXT(0, 0, 16, 0, 0, cachedPalette);
+	if (BAD_ICON_IDX(num)) return;
+	void *palette = glGetColorTablePointer(iconTexID[num]);
+	if (!palette) return;
+	// glColorTableEXT frees and allocates palette metadata. VBlank must only
+	// update the existing colors: an interrupted main-thread allocation is not
+	// reentrant, and scrolling native SD files makes that race frequent.
+	const u32 banks = vramSetBanks_EFG(VRAM_E_LCD, VRAM_F_LCD, VRAM_G_LCD);
+	tonccpy(palette, _paletteCache[num], sizeof(_paletteCache[num]));
+	vramRestoreBanks_EFG(banks);
 }
 
 void glLoadPalette(int num, const u16 *_palette) {

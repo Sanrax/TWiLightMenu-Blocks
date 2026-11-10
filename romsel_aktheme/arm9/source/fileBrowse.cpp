@@ -111,14 +111,6 @@ extern touchPosition touch;
 
 extern void bgOperations(bool waitFrame);
 
-static inline void doFrameUpdate(void) {
-	extern bool updateFrame;
-	while (updateFrame) {
-		swiWaitForVBlank();
-	}
-	updateFrame = true;
-}
-
 int file_count = 0;
 static int fileStartPos = 0; // The position of the first thing that is not a directory.
 
@@ -377,7 +369,8 @@ void getGameInfo0(const int fileOffset, std::vector<DirEntry> dirContents) {
 // static bool scrollUpByOne = false;
 // static bool scrollDownByOne = false;
 
-void loadIcons(const int screenOffset, std::vector<DirEntry> dirContents) {
+void loadIcons(const int screenOffset, const std::vector<DirEntry>& dirContents) {
+	beginIconUpdate();
 	clearText(false);
 
 	printSmall(false, startTextX, startTextY, startText, Alignment::left, FontPalette::startText);
@@ -419,8 +412,8 @@ void loadIcons(const int screenOffset, std::vector<DirEntry> dirContents) {
 	}
 	displayDiskIcon(false);
 
-	doFrameUpdate();
 	updateText(false);
+	endIconUpdate();
 }
 
 /* extern bool stopDSiAnim;

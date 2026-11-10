@@ -40,7 +40,7 @@ void resumeRotatingCubesVideo();
 void graphicsInit();
 // Fade the icon row around an update, keeping the surrounding interface steady.
 void beginMenuContentUpdate();
-void endMenuContentUpdate();
+void endMenuContentUpdate(bool startup = false);
 bool menuContentUpdating();
 extern u16* colorTable;
 

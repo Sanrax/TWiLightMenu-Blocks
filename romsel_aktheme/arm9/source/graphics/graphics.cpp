@@ -60,7 +60,22 @@ int screenBrightness = 0;
 bool lcdSwapped = false;
 static bool secondBuffer = false;
 bool doubleBuffer = true;
-bool updateFrame = true;
+volatile bool updateFrame = true;
+static volatile bool iconsUpdating = false;
+
+void beginIconUpdate() {
+	iconsUpdating = true;
+	// Let the previous frame finish using the texture banks before replacing
+	// them. Keep interrupts enabled while native SD requests are outstanding.
+	swiWaitForVBlank();
+}
+
+void endIconUpdate() {
+	const int irqState = enterCriticalSection();
+	updateFrame = true;
+	iconsUpdating = false;
+	leaveCriticalSection(irqState);
+}
 
 static int colonTimer = 0;
 static bool showColon = true;
@@ -1843,6 +1858,14 @@ void updateBoxArt(const char* filename, const char* tid) {
 	}
 }
 
+static void updateScreenBuffers() {
+	if (doubleBuffer) {
+		dmaCopyHalfWordsAsynch(0, topImageWithText[secondBuffer], BG_GFX_SUB, 0x18000);
+		dmaCopyHalfWordsAsynch(1, bottomImageWithBar[secondBuffer], BG_GFX, 0x18000);
+		secondBuffer = !secondBuffer;
+	}
+}
+
 void vBlankHandler()
 {
 	vblankCount++;
@@ -1862,6 +1885,12 @@ void vBlankHandler()
 		if (controlTopBright) SetBrightness(1, screenBrightness);
 	}
 
+	// The main thread may be reading banners or changing GL texture/palette
+	// allocations. Continue brightness and DMA, but publish only complete banks.
+	if (iconsUpdating) {
+		updateScreenBuffers();
+		return;
+	}
 	loadDeferredIconPalettes();
 
 	static bool showdialogboxPrev = showdialogbox;
@@ -1990,11 +2019,7 @@ void vBlankHandler()
 		vblankRefreshCounter++;
 	}
 
-	if (doubleBuffer) {
-		dmaCopyHalfWordsAsynch(0, topImageWithText[secondBuffer], BG_GFX_SUB, 0x18000);
-		dmaCopyHalfWordsAsynch(1, bottomImageWithBar[secondBuffer], BG_GFX, 0x18000);
-		secondBuffer = !secondBuffer;
-	}
+	updateScreenBuffers();
 }
 
 void graphicsInit()
