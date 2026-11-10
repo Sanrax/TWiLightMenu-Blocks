@@ -321,3 +321,26 @@ building the traced title ARM7, add `NAME=slot1_ipc_trace_check IPC_TEST=1` to
 exercise its real initialization request and ARM7-to-ARM9 progress channel
 against an emulated homebrew cartridge. Neither self-test accesses a real
 DSpico, and neither proves a hardware fix.
+
+## Slot-1 initialization interrupt context (r22)
+
+The r21 hardware report stops during `Slot-1 ARM7 card init`, at `activate
+KEY1`, with chip ID `C00000C2`, ROMCTRL `2F000000`, TIMER0 `0000D4B0`,
+SCFG_MC `00000018`, EXMEM `0000E800`, ARM9 ROMCTRL zero and automatic SDK
+driver selection. This snapshot precedes `initKey1Command()`, including its
+`rand()` calls; it is not a live register sample from a hung transfer.
+
+In the actual linked ARM7 ELF, `rand()` calls `random()`, which calls
+`__aeabi_read_tp()`. BlocksDS 1.24.0 rejects TLS access while
+`irq_nesting_level` is nonzero. Both menu cores were invoking initialization
+from their FIFO callback. Master now queues INIT for the main loop, preserving
+the protocol, its result and the FIFO request/reply channel.
+
+The [context regression](../tests/slot1-init-context/README.md) reproduces
+`Using TLS from IRQ` in both pre-fix cores. Both corrected cores complete eight
+requests and all 43 expected transfers per request with no IRQ nesting at the
+sampled checkpoints. Card I/O is simulated; encryption, rand/TLS, timer waits,
+the real ARM7 main and SDK FIFO are retained. Screenshots and the supplied
+hardware fields are under `benchmarks/r22/`. Physical mounting remains untested
+locally. The optional r22 trace overlay includes the correction and retains
+the r21 watchdog for any later hardware stall.

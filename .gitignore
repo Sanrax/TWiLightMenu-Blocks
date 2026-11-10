@@ -33,6 +33,7 @@ settings/arm9/include/version.h
 
 # Build Directory
 build/
+*/arm7/build-slot1_context_*/
 data/
 __pycache__/
 /universal/bootloader_menu/load.bin

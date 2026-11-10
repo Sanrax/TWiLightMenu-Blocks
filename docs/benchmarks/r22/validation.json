@@ -1,0 +1,27 @@
+{
+  "production_fix": "fa6901f99",
+  "hardware_r21_report": {
+    "phase": "Slot-1 ARM7 card init",
+    "arm7": "activate KEY1",
+    "extra": "C00000C2",
+    "romctrl": "2F000000",
+    "timer0": "0000D4B0",
+    "driver": "SDK automatic",
+    "scfg_mc": "00000018",
+    "exmem": "0000E800",
+    "arm9_romctrl": "00000000"
+  },
+  "emulator": "melonDS 1.1 / DS mode / built-in BIOS / no SD images",
+  "negative": {
+    "title": "Using TLS from IRQ; entry IRQ nesting 1; no KEY1 transfer",
+    "settings": "Using TLS from IRQ; entry IRQ nesting 1; no KEY1 transfer"
+  },
+  "positive": {
+    "title": "8 successful replies, 43 simulated transfers per reply, IRQ nesting 0 at entry/first/last",
+    "settings": "8 successful replies, 43 simulated transfers per reply, IRQ nesting 0 at entry/first/last"
+  },
+  "real_code": "Component ARM7 main, card initializer, encryption, timers, rand/TLS and SDK FIFO",
+  "simulated": "Cartridge header, chip ID and command transfers; SDK crash message relayed by test wrapper",
+  "production_build": "make -j2 all passed",
+  "physical_dspico_mount": "Pending hardware retest; no physical protocol emulation or hardware access locally"
+}
