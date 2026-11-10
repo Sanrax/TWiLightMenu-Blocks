@@ -53,12 +53,12 @@ toolchain = Path(os.environ.get('WONDERFUL_TOOLCHAIN', '/opt/wonderful'))
 readelf = toolchain/'toolchain/gcc-arm-none-eabi/bin/arm-none-eabi-readelf'
 objdump = toolchain/'toolchain/gcc-arm-none-eabi/bin/arm-none-eabi-objdump'
 
-# The old SDK's region 6 is executable RAM in BlocksDS. Overwriting it
-# removes code access and causes a prefetch abort on every DSi cold boot.
-mpu = subprocess.check_output([str(objdump), '-d',
-    '--disassemble=CP15_ExtendUncachedRam', str(ROOT/'title/arm9/title.elf')], text=True)
-assert re.search(r'\bmcr\s+15,\s*0,\s*r0,\s*cr6,\s*cr5,\s*\{0\}', mpu), 'Extend uncached MPU region 5'
-assert '.word\t0x0c000031' in mpu, 'Map the 32 MiB uncached RAM mirror'
+# Retail DSi mirrors its 16 MiB RAM. Console detection must not restore the
+# old writable-RAM probe or the custom MPU extension used to reach it.
+title_symbols = subprocess.check_output([str(toolchain/'toolchain/gcc-arm-none-eabi/bin/arm-none-eabi-nm'),
+    str(ROOT/'title/arm9/title.elf')], text=True)
+assert 'CP15_ExtendUncachedRam' not in title_symbols
+assert struct.pack('<I', 0x0DFFFE0C) not in (ROOT/'title/title.arm9.elf').read_bytes()
 vblank = subprocess.check_output([str(objdump), '-d',
     '--disassemble=_Z13vBlankHandlerv', str(ROOT/'romsel_dsimenutheme/arm9/romsel_dsimenutheme.elf')], text=True)
 assert '<_Z13vBlankHandlerv>:' in vblank
@@ -80,7 +80,7 @@ for loader in loaders:
             assert int(fields[2]) > 0, path
             found.add(fields[-1])
     assert required <= found, (path, found)
-print(f'{len(images)} NDS headers, DLDI allocations, title MPU mapping and {len(loaders)} ARM9 loader images passed')
+print(f'{len(images)} NDS headers, DLDI allocations, SDK console detection and {len(loaders)} ARM9 loader images passed')
 
 # Runtime SD/NAND traffic must use the SDK service; polling belongs only to
 # the stand-alone handoff loaders, whose IRQs are disabled.
@@ -104,3 +104,11 @@ for loader in ('settings/bootloader', 'title/bootloader',
     assert addresses and max(addresses) - min(addresses) < 0x80, loader
     assert not re.search(r'\bblx?\s', body), (loader, 'copied routine calls outside its image')
 print('Native SDK storage ownership, menu startup hooks and copied brightness routines passed')
+
+# Wood VBlank must copy existing palette colors without allocator calls.
+wood = subprocess.check_output([str(objdump), '-d', str(ROOT/'romsel_aktheme/arm9/romsel_aktheme.elf')], text=True)
+functions = re.findall(r'^([0-9a-f]+) <([^>]+)>:\n(.*?)(?=^\S|\Z)', wood, re.M | re.S)
+palette_bodies = [body for _, name, body in functions if name.startswith('_Z19glReloadIconPalettei')]
+assert palette_bodies
+assert all(not re.search(r'<(?:glColorTable\w*|malloc|free)>', body) for body in palette_bodies)
+print('Wood IRQ palette refresh has no GL allocation/free calls')

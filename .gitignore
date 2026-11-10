@@ -109,3 +109,5 @@ romsel_dsimenutheme/nitrofiles/themes/*/*/*/*.pht
 
 # Explicit startup trace build outputs
 romsel_dsimenutheme/arm9/build-trace/
+
+/tests/dldi-install/source/drivers.h

@@ -256,3 +256,28 @@ previously failing DSi LL / console-SD / Unlaunch path with the unchanged
 official bootstrap 2.17.0 and production fix `df6f36c13`. The log's original
 size and SHA-256 are preserved alongside its trimmed content. This is a
 hardware launch pass, not a separate SD stress, other-console or Quit Game test.
+
+## Theme fades, Wood scrolling and late DLDI installation (r20)
+
+`python3 tests/menu_compatibility.py --source /path/to/production/checkout`
+compiles the production startup-publication, DLDI-installation, NRIO-decoding
+and Wood palette-copy functions with small hardware shims. It checks all bundled
+driver layouts, rejects truncated/oversized sections without modifying the stub,
+checks cache retirement/relocation/publication order, validates bounded NRIO
+decoding, and verifies DSi-only slow fades and allocation-free palette copies.
+`TWLM_BUILD_ROOT=/path/to/built/checkout python3 tests/check_build.py` additionally
+checks linked Wood palette refreshes and prevents restoring the old RAM probe.
+These are explicit agent checks; production build routines do not invoke them.
+
+The r20 emulator fixtures use DS-mode DLDI with small banner-only browse entries,
+alternating static and animated banners. Wood remained responsive through four
+72-input scrolling sweeps and continued refreshing its clock and accepting input.
+DSi, 3DS, Saturn and HBL UIs reached their menus and responded to navigation with slow fades
+selected. These checks do not reproduce native DSi SD timing or DSpico hardware;
+Slot-1 mounting and extended Wood browsing on console SD need hardware retesting.
+
+`make -C tests/dldi-install` builds a separate SDK/ARM probe. It checks actual
+SDK relocation/function pointers/BSS clearing for every bundled driver, then
+installs and executes two different return-value routines in the same stub.
+It never starts those hardware drivers or mounts a flashcard. The r20 probe
+reported ALL PASSED in melonDS; this does not validate DSpico protocol timing.
