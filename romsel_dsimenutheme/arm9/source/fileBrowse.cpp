@@ -3286,6 +3286,7 @@ std::string browseForFile(const std::vector<std::string_view> &extensionList) {
 			controlTopBright = false;
 		}
 		clearText(false);
+		bannerTextShown = false; // The replacement page needs its own selection title.
 		updateText(false);
 		bool pageNeedsPublish = true;
 		browserHasDisplayed = true;
