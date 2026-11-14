@@ -344,3 +344,43 @@ the real ARM7 main and SDK FIFO are retained. Screenshots and the supplied
 hardware fields are under `benchmarks/r22/`. Physical mounting remains untested
 locally. The optional r22 trace overlay includes the correction and retains
 the r21 watchdog for any later hardware stall.
+
+## Static homebrew icon corruption (r25)
+
+The user confirmed that r24 did not fix the hardware corruption. Its production
+changes and added tests were reverted on both branches. Do not reapply r24 as
+the resolution. The issue persists after folder transitions on console SD;
+it has not reproduced in melonDS. Flashcard behavior is not confirmed.
+
+The supplied DS Battery Timer v3.1 has a version-1 static banner at `0x35F800`.
+Its SHA-256 is `f912b97ae1ba093ccb9ba4152aec73a933e9936249373ed7a191f31a575060c5`.
+Banner CRC-16 is `9F58`, icon CRC-16 is `59E5`, and palette CRC-16 is `4F3D`.
+The photo shows altered blocks in the icon's lower section. Neither the photo
+nor correct emulator rendering establishes the cause.
+
+```sh
+python3 tests/icon_trace.py
+make -C romsel_dsimenutheme -j2 trace-icons
+```
+
+Install `romsel_dsimenutheme-icon-trace.nds` as
+`_nds/TWiLightMenu/dsimenu.srldr`. Keep the name `DS Battery Timer` (matching
+is by `Battery Timer` in the filename), then enter/leave its folder until the
+corruption appears. Collect `_nds/TWiLightMenu/icon-diagnostic.log` before
+rebooting; the first recorded page of a new session replaces the old log.
+Restore the normal browser afterward. No ROM, BIOS, NAND or user screenshot
+is bundled with this test.
+
+The recorder logs the raw banner checksum before palette conversion (`R`),
+converted pixels (`C`), skipped duplicate uploads (`S`), and source/VRAM bytes
+at an actual upload (`U`). IRQ hooks copy at most 512-byte pixel snapshots to
+a fixed eight-event buffer; checksums, formatting and writes run on the main
+thread after page publication. Logs stop growing after about 64 KiB. A read
+checksum failure points to data already wrong before conversion; an upload
+mismatch points to the copy. If both pass, later writes and rendering remain
+to investigate. Trace overhead can affect timing; lack of corruption in a
+trace session is not proof of a fix.
+
+`TWLM_ICON_TRACE` and the recorder live only here, without any new workaround
+on `master`. The host test injects bad banner/pixel data, tests duplicate/queue
+records and bounded logs, and rejects filesystem calls from simulated IRQs.

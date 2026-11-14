@@ -40,6 +40,7 @@ CFLAGS	:=	-g -Wall -O2 \
 CFLAGS		+=	$(INCLUDE) -DARM9 -DSTANDALONE -DCURRENT_SCREEN_MODE=$(CURRENT_SCREEN_MODE)
 CXXFLAGS	:= $(CFLAGS) -fno-rtti -fno-exceptions -std=gnu++17
 CPPFLAGS += $(if $(filter 1,$(PROFILE_STARTUP)),-DTWLM_PROFILE_STARTUP)
+CPPFLAGS += $(if $(filter 1,$(ICON_TRACE)),-DTWLM_ICON_TRACE)
 
 ASFLAGS	:=	-g $(ARCH) $(INCLUDE)
 LDFLAGS	=	-specs=../$(UNIVERSAL)/arm9/ds_arm9_twlm.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)

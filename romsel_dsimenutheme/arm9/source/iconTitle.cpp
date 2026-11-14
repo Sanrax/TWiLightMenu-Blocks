@@ -34,6 +34,7 @@
 #include "fileBrowse.h"
 #include "graphics/fontHandler.h"
 #include "graphics/iconHandler.h"
+#include "graphics/iconTrace.h"
 #include "common/lodepng.h"
 #include "common/logging.h"
 #include "graphics/paletteEffects.h"
@@ -156,8 +157,10 @@ static void stageConverted(int num, const u16 *palette, const u8 *tiles, int tex
 	// index that could go stale, so it cannot leave a wrong icon on screen.
 	if (bankLoaded[num] && pendingTwl[num] == twl
 			&& memcmp(pendingTiles[num], tiles, tileBytes) == 0
-			&& memcmp(pendingPalette[num], palette, sizeof(pendingPalette[num])) == 0)
+			&& memcmp(pendingPalette[num], palette, sizeof(pendingPalette[num])) == 0) {
+		iconTraceStage(num, tiles, palette, tileBytes, true);
 		return;
+	}
 
 	// Drop the slot before touching the buffer, so a vblank arriving mid-copy skips
 	// this bank rather than uploading half of it. It gets picked up next frame.
@@ -165,6 +168,7 @@ static void stageConverted(int num, const u16 *palette, const u8 *tiles, int tex
 	tonccpy(pendingTiles[num], tiles, tileBytes);
 	tonccpy(pendingPalette[num], palette, sizeof(pendingPalette[num]));
 	pendingTwl[num] = twl;
+	iconTraceStage(num, pendingTiles[num], pendingPalette[num], tileBytes, false);
 
 	if (currentBg == 1) {
 		pendingValid[num] = true;
@@ -739,6 +743,7 @@ void getGameInfo(bool isDir, const char *name, int num, bool fromArgv, bool chec
 		const size_t bannerBytes = ndsmetadata::readBanner(fp, bannerOffset, &ndsBanner,
 			sizeof(ndsBanner), ms().animateDsiIcons);
 		bool animationLoaded = bannerBytes == sizeof(ndsBanner);
+		iconTraceRead(name, num, &ndsBanner, bannerBytes);
 		if (bannerBytes < NDS_BANNER_SIZE_ORIGINAL) {
 			fclose(fp);
 
@@ -845,6 +850,7 @@ void iconUpdate(bool isDir, const char *name, int num) {
 	const int spriteIdx = (num == -1) ? ICON_MOVING_BANK : ICON_GRID_BANK(num);
 	if (num == -1)
 		num = 40;
+	iconTraceSelect(spriteIdx, num, name);
 
 	const bool isNds = (bnrRomType[num] == 0);
 

@@ -78,3 +78,8 @@ bootstub: data
 trace-startup: all
 	$(MAKE) -C arm9 BUILD=build-trace TARGET=$(TARGET)-trace STARTUP_TRACE=1
 	ndstool -u 00030004 -g SRLA 01 "TWLMENUPP" -c $(TARGET)-trace.nds -7 $(TARGET).arm7.elf -9 arm9/$(TARGET)-trace.elf -d $(NITRODATA) -b icon.bmp "Startup trace;TWiLight Menu++;Diagnostics"
+
+.PHONY: trace-icons
+trace-icons: all
+	$(MAKE) -C arm9 BUILD=build-icon-trace TARGET=$(TARGET)-icon-trace ICON_TRACE=1
+	ndstool -u 00030004 -g SRLA 01 "TWLMENUPP" -c $(TARGET)-icon-trace.nds -7 $(TARGET).arm7.elf -9 arm9/$(TARGET)-icon-trace.elf -d $(NITRODATA) -b icon.bmp "Icon trace;TWiLight Menu++;Diagnostics"

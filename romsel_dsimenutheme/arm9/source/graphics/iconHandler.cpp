@@ -1,4 +1,5 @@
 #include "iconHandler.h"
+#include "iconTrace.h"
 #include "ThemeTextures.h"
 #include "common/logging.h"
 #include "common/tonccpy.h"
@@ -42,6 +43,7 @@ void glLoadIcon(int num, const u16* palette, const u8* tiles, int texHeight) {
     // interrupt a main-thread allocation and corrupt the allocator's state.
     const u32 banks = vramSetPrimaryBanks(VRAM_A_LCD, VRAM_B_LCD, VRAM_C_LCD, VRAM_D_LCD);
     tonccpy(iconPixels[num], tiles, 32 * texHeight / 2);
+    iconTraceUpload(num, tiles, iconPixels[num], palette, 32 * texHeight / 2);
     vramRestorePrimaryBanks(banks);
     glLoadPalette(num, palette);
 }

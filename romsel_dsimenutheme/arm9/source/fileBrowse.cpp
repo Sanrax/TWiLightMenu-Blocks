@@ -57,6 +57,7 @@
 #include "sound.h"
 
 #include "graphics/queueControl.h"
+#include "graphics/iconTrace.h"
 
 #define SCREEN_COLS 32
 #define ENTRIES_PER_SCREEN 15
@@ -3438,6 +3439,7 @@ std::string browseForFile(const std::vector<std::string_view> &extensionList) {
 				if (pageNeedsPublish) {
 					endMenuContentUpdate(revealStartup);
 					pageNeedsPublish = false;
+					iconTraceFlush();
 					if (revealStartup) {
 						do { bgOperations(true); } while (!screenFadedIn() || !iconDropFinished());
 						controlTopBright = false;
