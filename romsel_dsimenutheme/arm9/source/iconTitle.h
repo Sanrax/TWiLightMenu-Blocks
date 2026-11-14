@@ -28,8 +28,9 @@ void getGameInfo(bool isDir, const char* name, int num, bool fromArgv = false, b
 void iconUpdate(bool isDir, const char* name, int num);
 void titleUpdate(bool isDir, std::string_view name, int num);
 void drawIcon(int Xpos, int Ypos, int num);
-void execDeferredIconUpdates();
-void loadDeferredIconPalettes();
+bool execDeferredIconUpdates();
+bool hasDeferredIconUpdates();
+bool loadDeferredIconPalettes();
 void writeBannerText(std::string_view name, std::string_view text);
 void writeBannerText(std::string_view name, std::u16string text);
 void writeBannerText(std::u16string name, std::u16string text);

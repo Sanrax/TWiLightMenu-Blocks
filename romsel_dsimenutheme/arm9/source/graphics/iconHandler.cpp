@@ -2,6 +2,7 @@
 #include "ThemeTextures.h"
 #include "common/logging.h"
 #include "common/tonccpy.h"
+#include <cstring>
 
 bool initialized;
 static int iconTexID[NDS_ICON_BANK_COUNT];
@@ -27,6 +28,11 @@ void glLoadPalette(int num, const u16* palette) {
     if (BAD_ICON_IDX(num)) return;
     tonccpy(paletteCache[num], palette, sizeof(paletteCache[num]));
     glReloadIconPalette(num);
+}
+
+bool iconPaletteMatches(int num, const u16* palette) {
+    return !BAD_ICON_IDX(num) && iconPalettes[num]
+        && std::memcmp(paletteCache[num], palette, sizeof(paletteCache[num])) == 0;
 }
 
 void reloadIconPalettes() {

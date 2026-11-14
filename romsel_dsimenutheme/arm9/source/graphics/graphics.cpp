@@ -767,6 +767,12 @@ void beginMenuContentUpdate() {
 }
 
 void endMenuContentUpdate(bool startup) {
+	// A late IRQ can defer an upload. Keep the row hidden until every bank in
+	// the replacement page is ready; continue feeding audio while waiting.
+	while (hasDeferredIconUpdates()) {
+		snd().updateStream();
+		swiWaitForVBlank();
+	}
 	const int irqState = enterCriticalSection();
 	if (startup) {
 		// Brightness saturates at 16. Starting at 31 hides the first 45 frames
@@ -803,9 +809,22 @@ static void drawMenuIcon(int x, int y, int num, unsigned polygonId) {
 }
 
 void vBlankHandler() {
+	static bool updateFrame = true;
 	execQueue();		   // Execute any actions queued during last vblank.
-	execDeferredIconUpdates(); // Update any icons queued during last vblank.
-	loadDeferredIconPalettes();
+	if (execDeferredIconUpdates()) updateFrame = true;
+
+	// Select this frame before uploading its palette, while still early in
+	// VBlank. Loading palettes before advancing the sequence leaves new frames
+	// using the previous frame's colors until the following VBlank.
+	// A delayed IRQ must retain the old frame as well as its palette.
+	if ((displayGameIcons || dbox_showIcon) && vramSafeToUnmap()) {
+		for (int i = 0; i < ((movingApp != -1) ? 41 : 40); i++) {
+			if (bnriconisDSi[i] && playBannerSequence(i) && !updateFrame) {
+				updateFrame = (displayGameIcons && (ms().theme != TWLSettings::EThemeSaturn)) ? ((i >= CURPOS-ICON_GRID_MAX_OFFSET && i <= CURPOS+ICON_GRID_MAX_OFFSET) || i == 40) : (i == CURPOS);
+			}
+		}
+	}
+	if ((displayGameIcons || dbox_showIcon) && loadDeferredIconPalettes()) updateFrame = true;
 
 	// Periodic palette repair. This has to sit up here with the other VRAM work:
 	// glColorTableEXT unmaps VRAM E/F/G (texture palettes and main sprite) while it
@@ -837,7 +856,6 @@ void vBlankHandler() {
 		needToPlayStopSound = false;
 	}
 
-	static bool updateFrame = true;
 	static bool whiteScreenPrev = whiteScreen;
 	static int currentBgPrev = currentBg;
 	static bool showSTARTborderPrev = showSTARTborder;
@@ -1177,15 +1195,6 @@ void vBlankHandler() {
 				progressAnimNum = 0;
 			progressAnimDelay = 0;
 			updateFrame = true;
-		}
-	}
-
-	if (displayGameIcons || dbox_showIcon) {
-		// Playback animated icons
-		for (int i = 0; i < ((movingApp != -1) ? 41 : 40); i++) {
-			if (bnriconisDSi[i] && playBannerSequence(i) && !updateFrame) {
-				updateFrame = (displayGameIcons && (ms().theme != TWLSettings::EThemeSaturn)) ? ((i >= CURPOS-ICON_GRID_MAX_OFFSET && i <= CURPOS+ICON_GRID_MAX_OFFSET) || i == 40) : (i == CURPOS);
-			}
 		}
 	}
 
