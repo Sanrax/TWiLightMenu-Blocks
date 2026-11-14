@@ -32,16 +32,21 @@
 #define TWL_ICON_FRAMES 8
 #define TWL_TEX_HEIGHT 256
 
-// The 3D renderer starts reading textures at line 214, during VBlank, 48 lines
-// before display resumes (GBATEK: DS 3D Rendering Engine). Remapping VRAM later
-// in VBlank can therefore corrupt icons even though the copy finishes before
-// visible scanout. Reserve time for a full 4 KiB upload, then the small palette
-// updates. Check each copy: storage can delay entry into the VBlank handler.
-#define VRAM_UNMAP_LAST_SAFE_LINE 200
-#define VRAM_PALETTE_LAST_SAFE_LINE 208
-static inline bool vramSafeToUnmap(bool paletteOnly = false) {
+// The blanking interval is the only time it is safe to upload to VRAM. Every GL
+// upload switches its bank to LCD mode for the length of the copy --
+// glTexImage2D takes VRAM A-D (the 3D textures and both backgrounds) and
+// glColorTableEXT takes E/F/G -- so one that runs during active display blanks
+// them mid-scanout and shows up as a horizontal stripe. The vblank handler does
+// not always start on line 192: an SD read on the main thread can hold the IRQ
+// off well past it, and SD reads are exactly what queues these uploads while
+// scrolling. So check this before each one rather than assuming.
+// The margin matters as much as the lower bound: blanking is lines 192..262, and
+// an upload started at 260 still finishes under the beam. Several banks can be
+// queued at once, so check this before each one rather than only on entry.
+#define VRAM_UNMAP_LAST_SAFE_LINE 250
+static inline bool vramSafeToUnmap() {
 	const int line = REG_VCOUNT;
-	return line >= 192 && line <= (paletteOnly ? VRAM_PALETTE_LAST_SAFE_LINE : VRAM_UNMAP_LAST_SAFE_LINE);
+	return line >= 192 && line <= VRAM_UNMAP_LAST_SAFE_LINE;
 }
 
 // Checks if the icon is a bad index
@@ -80,8 +85,6 @@ void glLoadIcon(int num, const u16 *palette, const u8 *tiles, int texHeight = 32
  */
 void glLoadPalette(int num, const u16 *palette);
 
-/** Whether the bank's last uploaded palette matches these colors. */
-bool iconPaletteMatches(int num, const u16 *palette);
 
 /**
  * Clears an icon in the bank.
