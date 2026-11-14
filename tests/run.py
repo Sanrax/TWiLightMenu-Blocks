@@ -14,6 +14,7 @@ def run(*args):
     subprocess.run(args, cwd=ROOT, check=True)
 
 run('python3', 'tests/menu_compatibility.py')
+run('python3', 'tests/icon_uploads.py')
 
 with tempfile.TemporaryDirectory(prefix='twlm-tests-') as temp:
     output = Path(temp)

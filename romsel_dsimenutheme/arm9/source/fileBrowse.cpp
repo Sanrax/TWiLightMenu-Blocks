@@ -2995,8 +2995,7 @@ static bool moveModePageFlip(bool forward, bool landAtEnd, SwitchState scrn,
 	whiteScreen = false;
 	displayGameIcons = true;
 	fadeType = true;
-	if (!vramSafeToUnmap()) swiWaitForVBlank(); // unmaps VRAM E/F/G while it copies
-	reloadIconPalettes();
+	vblankRefreshCounter = REFRESH_EVERY_VBLANKS; // Restore palettes in early VBlank.
 	clearText();
 	updateText(false);
 	endMenuContentUpdate();
@@ -3287,8 +3286,7 @@ std::string browseForFile(const std::vector<std::string_view> &extensionList) {
 		updateDirectoryContents(dirContents[scrn]);
 		getFileInfo(scrn, dirContents, true);
 		startupProfileMark("ROM metadata");
-		if (!vramSafeToUnmap()) swiWaitForVBlank(); // unmaps VRAM E/F/G while it copies
-			reloadIconPalettes();
+		vblankRefreshCounter = REFRESH_EVERY_VBLANKS;
 		const bool revealStartup = !browserHasDisplayed;
 		whiteScreen = false;
 		if (!revealStartup) {

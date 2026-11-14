@@ -1,0 +1,86 @@
+[
+  {
+    "bank": 0,
+    "pointer": "0x680fac0",
+    "bytes": 4096,
+    "loaded": true,
+    "pending": 0,
+    "mismatches": 0,
+    "first_mismatch": null
+  },
+  {
+    "bank": 1,
+    "pointer": "0x6810ac0",
+    "bytes": 512,
+    "loaded": true,
+    "pending": 0,
+    "mismatches": 0,
+    "first_mismatch": null
+  },
+  {
+    "bank": 2,
+    "pointer": "0x6811ac0",
+    "bytes": 4096,
+    "loaded": true,
+    "pending": 0,
+    "mismatches": 0,
+    "first_mismatch": null
+  },
+  {
+    "bank": 3,
+    "pointer": "0x6812ac0",
+    "bytes": 512,
+    "loaded": true,
+    "pending": 0,
+    "mismatches": 0,
+    "first_mismatch": null
+  },
+  {
+    "bank": 4,
+    "pointer": "0x6813ac0",
+    "bytes": 4096,
+    "loaded": true,
+    "pending": 0,
+    "mismatches": 0,
+    "first_mismatch": null
+  },
+  {
+    "bank": 5,
+    "pointer": "0x6814ac0",
+    "bytes": 512,
+    "loaded": true,
+    "pending": 0,
+    "mismatches": 0,
+    "first_mismatch": null
+  },
+  {
+    "bank": 6,
+    "pointer": "0x6815ac0",
+    "bytes": 512,
+    "loaded": true,
+    "pending": 0,
+    "mismatches": 0,
+    "first_mismatch": null
+  },
+  {
+    "bank": 7,
+    "pointer": "0x6816ac0",
+    "bytes": 512,
+    "loaded": false,
+    "pending": 0,
+    "mismatches": 0,
+    "first_mismatch": null
+  },
+  {
+    "animated_slot": 16,
+    "selected_palette": 1,
+    "loaded_flag": 3,
+    "palette_matches_frame": false
+  },
+  {
+    "animated_slot": 18,
+    "selected_palette": 0,
+    "loaded_flag": -1,
+    "palette_matches_frame": false
+  }
+]
