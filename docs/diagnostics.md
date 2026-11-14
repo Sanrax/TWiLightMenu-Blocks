@@ -344,13 +344,3 @@ the real ARM7 main and SDK FIFO are retained. Screenshots and the supplied
 hardware fields are under `benchmarks/r22/`. Physical mounting remains untested
 locally. The optional r22 trace overlay includes the correction and retains
 the r21 watchdog for any later hardware stall.
-
-## Homebrew icon upload timing (r24)
-
-Run `python3 tests/icon_uploads.py` for production scanline guards, staged
-buffers, delayed uploads and palette/frame synchronization. It is included
-in the manual host checks. The [runtime fixture](../tests/icon-runtime/README.md)
-creates a disposable 32 MiB DLDI image with static and one-tick animated
-homebrew banners; the inspector reads actual texture/palette VRAM from a
-halted emulator. [Retained evidence](benchmarks/r24/README.md) covers DSi,
-3DS, Saturn and HBL. The intermittent hardware tile report needs retesting.

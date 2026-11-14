@@ -54,11 +54,6 @@ unsigned menuContentState=1;bool menuIconsAnimating=false;int critical;
 int enterCriticalSection(){assert(!critical);critical=1;return 0;}
 void leaveCriticalSection(int){assert(critical);assert(menuContentState==2);assert(displayGameIcons);critical=0;}
 void menuTransitionFrame(unsigned){assert(false);}
-int pendingFrames,audioFeeds;
-bool hasDeferredIconUpdates(){return pendingFrames>0;}
-void swiWaitForVBlank(){assert(!critical&&menuContentState==1&&!displayGameIcons);pendingFrames--;}
-struct Sound { void updateStream(){audioFeeds++;} } sound;
-Sound& snd(){return sound;}
 #define BAD_ICON_IDX(n) ((n)<0||(n)>=8)
 u16 colors[8][16],_paletteCache[8][16];int iconTexID[]={1,2,3,4,5,6,7,8};int lookups,copies,bankSwitches;
 void*glGetColorTablePointer(int id){lookups++;return id?colors[id-1]:nullptr;}
@@ -98,9 +93,7 @@ int main(int argc,char**argv){
  u8 bad[]={0x10,3,0,0,0x80,0,0};assert(!unpackDldi(bad,sizeof bad,decoded.data(),decoded.size(),length));
  for(int theme:{0,1,4,5})for(bool fast:{false,true}){
   settings={theme,fast};screenBrightness=31;fadeDelay=2;dropDown=false;fadeType=false;controlTopBright=false;displayGameIcons=false;menuContentState=1;
-  pendingFrames=2;audioFeeds=0;
   endMenuContentUpdate(true);assert(screenBrightness==16&&fadeDelay==0&&fadeType&&controlTopBright);
-  assert(pendingFrames==0&&audioFeeds==2);
   assert(dropDown==(theme==0));assert(fadeSpeed==(theme!=0||fast));
  }
  for(int i=0;i<8;i++){for(int c=0;c<16;c++)_paletteCache[i][c]=i*16+c;glReloadIconPalette(i);}

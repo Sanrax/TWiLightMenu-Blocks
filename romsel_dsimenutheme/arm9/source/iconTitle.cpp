@@ -57,7 +57,6 @@
 extern bool showdialogbox;
 extern bool dbox_showIcon;
 extern bool startMenu;
-extern bool displayGameIcons;
 
 extern int currentBg;
 
@@ -79,15 +78,14 @@ static const char16_t *blankTitle = u"";
 // to LCD mode for the duration of the copy. A and B/C/D are the 3D textures and
 // both backgrounds, so the screen loses them mid-scanout: horizontal stripes
 // through the icons while scrolling. Converting on the main thread leaves the
-// handler with just the block moves. Uploads that miss the early VBlank window
-// remain queued for the next frame.
+// handler with just the block moves, which do fit.
 //
 // Keying by bank rather than queueing also means repeated updates of the same
 // bank within one frame collapse into a single upload, and that no pointer into
 // bnriconTile[] is held across the IRQ boundary -- the previous queue stored the
 // source pointer and the main thread could overwrite it before the handler ran.
-alignas(4) static u8 pendingTiles[NDS_ICON_BANK_COUNT][(32 * 256) / 2] = {0};
-alignas(4) static u16 pendingPalette[NDS_ICON_BANK_COUNT][16] = {0};
+static u8 pendingTiles[NDS_ICON_BANK_COUNT][(32 * 256) / 2] = {0};
+static u16 pendingPalette[NDS_ICON_BANK_COUNT][16] = {0};
 static bool pendingTwl[NDS_ICON_BANK_COUNT] = {false};
 static volatile bool pendingValid[NDS_ICON_BANK_COUNT] = {false};
 
@@ -99,7 +97,7 @@ static bool bankLoaded[NDS_ICON_BANK_COUNT] = {false};
 
 // Main-thread scratch for the tile conversion, so the result can be compared
 // against the bank's current contents before deciding to upload at all.
-alignas(4) static u8 convertScratch[(32 * 256) / 2] = {0};
+static u8 convertScratch[(32 * 256) / 2] = {0};
 
 static void convertIconTilesToRaw(u8 *tilesSrc, u8 *tilesNew, bool twl) {
 	int PY = 32;
@@ -121,27 +119,18 @@ static void convertIconTilesToRaw(u8 *tilesSrc, u8 *tilesNew, bool twl) {
  * This is called in graphics/vblank handler to process
  * any deferred updates. Block moves only -- see pendingTiles above.
  */
-bool execDeferredIconUpdates() {
-	bool updated = false;
+void execDeferredIconUpdates() {
 	for (int i = 0; i < NDS_ICON_BANK_COUNT; i++) {
 		if (!pendingValid[i])
 			continue;
-		// Leave late uploads queued: the 3D renderer starts before VBlank ends.
+		// Out of blanking: leave the rest queued instead of unmapping VRAM under
+		// the beam. pendingValid keeps them, so they go out on the next vblank.
 		if (!vramSafeToUnmap())
-			return updated;
+			return;
 		pendingValid[i] = false;
 		glLoadIcon(i, pendingPalette[i], pendingTiles[i], pendingTwl[i] ? TWL_TEX_HEIGHT : 32);
 		bankLoaded[i] = true;
-		updated = true;
 	}
-	return updated;
-}
-
-bool hasDeferredIconUpdates() {
-	for (int i = 0; i < NDS_ICON_BANK_COUNT; i++) {
-		if (pendingValid[i]) return true;
-	}
-	return false;
 }
 
 /**
@@ -177,10 +166,17 @@ static void stageConverted(int num, const u16 *palette, const u8 *tiles, int tex
 	tonccpy(pendingPalette[num], palette, sizeof(pendingPalette[num]));
 	pendingTwl[num] = twl;
 
-	// Startup and page changes use the same guarded IRQ path as scrolling.
-	// Waiting once on the main thread is insufficient: the handler may return
-	// after the safe upload interval has already ended.
-	pendingValid[num] = true;
+	if (currentBg == 1) {
+		pendingValid[num] = true;
+	} else {
+		// Hack to prevent glitched icons on startup.
+		// Still has to land in blanking; the callers of this path already spend a
+		// frame per icon in bgOperations(true), so yielding here costs nothing.
+		if (!vramSafeToUnmap())
+			swiWaitForVBlank();
+		glLoadIcon(num, pendingPalette[num], pendingTiles[num], texHeight);
+		bankLoaded[num] = true;
+	}
 }
 
 //(u8(*tilesSrc)[(32 * 32) / 2], u16(*palSrc)[16])
@@ -248,27 +244,17 @@ void drawIcon(int Xpos, int Ypos, int num) {
 	}
 }
 
-bool loadDeferredIconPalettes() {
-	bool updated = false;
-	const int radius = displayGameIcons && ms().theme != TWLSettings::EThemeSaturn ? ICON_GRID_MAX_OFFSET : 0;
-	const int first = std::max(CURPOS - radius, 0);
-	const int last = std::min(CURPOS + radius, 39);
-	for (int i = first; i <= MOVING_APP_SLOT; i++) {
-		if (i > last && (i != MOVING_APP_SLOT || movingApp == -1 || !displayGameIcons)) continue;
-		if (!bnriconisDSi[i]) continue;
-		const int bank = i == MOVING_APP_SLOT ? ICON_MOVING_BANK : ICON_GRID_BANK(i);
-		const int line = bnriconPalLine[i];
-		const u16 *palette = bnriconTile[i].dsi_palette[line];
-		// An upload may have replaced the bank's palette after the main thread
-		// recorded bnriconPalLoaded. Compare against the colors actually uploaded.
-		if (!iconPaletteMatches(bank, palette)) {
-			if (!vramSafeToUnmap(true)) return updated;
-			glLoadPalette(bank, palette);
-			updated = true;
+void loadDeferredIconPalettes() {
+	for (int i = 0; i < 41; i++) {
+		if (bnriconPalLoaded[i] == -1) {
+			// As in execDeferredIconUpdates: the flag stays -1, so whatever is left
+			// is retried on the next vblank rather than tearing this frame.
+			if (!vramSafeToUnmap())
+				return;
+			glLoadPalette(i < 40 ? ICON_GRID_BANK(i) : ICON_MOVING_BANK, bnriconTile[i].dsi_palette[bnriconPalLine[i]]);
+			bnriconPalLoaded[i] = bnriconPalLine[i];
 		}
-		bnriconPalLoaded[i] = line;
 	}
-	return updated;
 }
 
 void clearTitle(int num) {

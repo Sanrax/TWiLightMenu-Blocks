@@ -97,11 +97,6 @@ queuing initialization for the main loop lets each complete eight requests
 with simulated card I/O. The user confirmed that r22 resolves the hang and
 DSpico flashcard storage access works on hardware.
 
-The r24 icon checks cover static and animated homebrew banners in the shared
-DSi/3DS/Saturn/HBL renderer, including one-frame palette changes and delayed
-uploads. Emulator readbacks and host checks are retained on `diagnostics`;
-confirmation of the reported intermittent tile glitch still needs hardware.
-
 ## Packaging
 
 The release workflow builds the platform/add-on archives and rebuilt CIA when
