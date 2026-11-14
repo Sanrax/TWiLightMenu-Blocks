@@ -88,15 +88,14 @@ and inspection tools belong on `diagnostics`.
 
 The r20 checks cover DSi/3DS/Saturn/HBL entry with slow fades selected, Wood
 scrolling with static/animated banners, and SDK relocation of every bundled
-DLDI driver. DSpico Slot-1 mounting and extended Wood browsing on console SD
-still need hardware confirmation; DS/DLDI emulator tests do not reproduce
-their native SD timing.
+DLDI driver. Extended Wood browsing on console SD still needs hardware
+confirmation; DS/DLDI emulator tests do not reproduce its native SD timing.
 
 The r21 hardware trace stops at ARM7 KEY1 setup before DLDI starts. The r22
 regression reproduces `Using TLS from IRQ` in both original ARM7 cores;
 queuing initialization for the main loop lets each complete eight requests
-with simulated card I/O. This verifies the interrupt-context correction;
-physical DSpico mounting still needs a hardware retest.
+with simulated card I/O. The user confirmed that r22 resolves the hang and
+DSpico flashcard storage access works on hardware.
 
 ## Packaging
 
