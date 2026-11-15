@@ -146,19 +146,13 @@ bool nameEndsWith(const std::string_view name, const std::vector<std::string_vie
 }
 
 bool dirEntryPredicate(const DirEntry &lhs, const DirEntry &rhs) {
-	if (lhs.isDirectory && !lhs.customPos && !rhs.isDirectory) {
-		return true;
-	}
-	if (!lhs.isDirectory && rhs.isDirectory && !rhs.customPos) {
-		return false;
-	}
-	if (lhs.customPos || rhs.customPos) {
-		if (!lhs.customPos)	return false;
-		else if (!rhs.customPos)	return true;
-
-		if (lhs.position < rhs.position)	return true;
-		else return false;
-	}
+	// New folders first, then saved positions, then unpositioned files. Mixing
+	// pairwise folder/position rules creates cycles when a new folder is added.
+	const bool lhsNewFolder = lhs.isDirectory && !lhs.customPos;
+	const bool rhsNewFolder = rhs.isDirectory && !rhs.customPos;
+	if (lhsNewFolder != rhsNewFolder) return lhsNewFolder;
+	if (lhs.customPos != rhs.customPos) return lhs.customPos;
+	if (lhs.customPos) return lhs.position < rhs.position;
 	return strcasecmp(lhs.name.c_str(), rhs.name.c_str()) < 0;
 }
 
