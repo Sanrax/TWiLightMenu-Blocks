@@ -1,0 +1,27 @@
+/usr/include/c++/16/debug/vector:808:
+In function:
+    std::debug::vector<_Tp, _Allocator>::iterator std::debug::vector<_Tp, 
+    _Allocator>::erase(const_iterator) [with _Tp = DirEntry; _Allocator = 
+    std::allocator<DirEntry>; iterator = std::
+    debug::vector<DirEntry>::iterator; const_iterator = std::
+    debug::vector<DirEntry>::const_iterator]
+
+Error: attempt to erase from container with a past-the-end iterator.
+
+Objects involved in the operation:
+    sequence "this" @ 0x7b540daf0860 {
+      type = std::debug::vector<DirEntry, std::allocator<DirEntry> >;
+    }
+    iterator "position" @ 0x7b540daf5670 {
+      type = gnu_cxx::normal_iterator<DirEntry const*, std::vector<DirEntry, std::allocator<DirEntry> > > (constant iterator);
+      state = past-the-end;
+      references sequence with type 'std::debug::vector<DirEntry, std::allocator<DirEntry> >' @ 0x7b540daf0860
+    }
+Traceback (most recent call last):
+  File "/tmp/twlm-browser-audit/tests/browser_containers.py", line 190, in <module>
+    subprocess.run([str(exe)],check=True,timeout=30,env=env)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.14/subprocess.py", line 578, in run
+    raise CalledProcessError(retcode, process.args,
+                             output=stdout, stderr=stderr)
+subprocess.CalledProcessError: Command '['/tmp/twlm-browser-siwa0ox3/cache']' died with <Signals.SIGABRT: 6>.

@@ -384,3 +384,14 @@ trace session is not proof of a fix.
 `TWLM_ICON_TRACE` and the recorder live only here, without any new workaround
 on `master`. The host test injects bad banner/pixel data, tests duplicate/queue
 records and bounded logs, and rejects filesystem calls from simulated IRQs.
+
+## Directory and container audit
+
+`python3 tests/browser_containers.py` checks the actual browser comparators,
+cached-directory vector updates and typed directory adapter with checked
+iterators, AddressSanitizer and UndefinedBehaviorSanitizer. Use `--source` to
+check another checkout. These are manual agent checks, separate from builds
+and GitHub Actions. The [audit record](benchmarks/browser-containers/README.md)
+documents two reproduced errors, the fixes, the SDK buffer-size compile check
+and the limits of the image-vector review. Neither fix is confirmed as the
+hardware icon corruption cause.
