@@ -242,19 +242,13 @@ void recalculateBoxesCount() {
 }
 
 bool dirEntryPredicate(const DirEntry &lhs, const DirEntry &rhs) {
-	if (lhs.isDirectory && !lhs.customPos && !rhs.isDirectory) {
-		return true;
-	}
-	if (!lhs.isDirectory && rhs.isDirectory && !rhs.customPos) {
-		return false;
-	}
-	if (lhs.customPos || rhs.customPos) {
-		if (!lhs.customPos)	return false;
-		else if (!rhs.customPos)	return true;
-
-		if (lhs.position < rhs.position)	return true;
-		else return false;
-	}
+	// New folders first, then saved positions, then unpositioned files. Mixing
+	// pairwise folder/position rules creates cycles when a new folder is added.
+	const bool lhsNewFolder = lhs.isDirectory && !lhs.customPos;
+	const bool rhsNewFolder = rhs.isDirectory && !rhs.customPos;
+	if (lhsNewFolder != rhsNewFolder) return lhsNewFolder;
+	if (lhs.customPos != rhs.customPos) return lhs.customPos;
+	if (lhs.customPos) return lhs.position < rhs.position;
 	return strcasecmp(lhs.name.c_str(), rhs.name.c_str()) < 0;
 }
 
@@ -302,7 +296,10 @@ void getDirectoryContents(std::vector<DirEntry> &dirContents, const std::vector<
 
 		for (int i = 0; i < (int)sizeof(pageLoaded); i++) {
 			pageLoaded[i] = false;
+			dirContentBlankFilled[i] = false;
 		}
+		// These flags describe placeholders in this directory's vector only.
+		lockOutDirContentBlankFilling = false;
 
 		CIniFile twlmDirInfo("dirInfo.twlm.ini");
 		file_count = twlmDirInfo.GetInt("INFO", "GAMES", 0);
