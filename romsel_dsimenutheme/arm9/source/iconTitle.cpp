@@ -559,6 +559,7 @@ void getGameInfo(bool isDir, const char *name, int num, bool fromArgv, bool chec
 			return;
 		}
 
+		IconTraceIoScope traceIo(name, num);
 		sNDSHeaderExt ndsHeader{};
 		u32 arm9StartSig[4] = {};
 

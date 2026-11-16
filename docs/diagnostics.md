@@ -395,3 +395,36 @@ and GitHub Actions. The [audit record](benchmarks/browser-containers/README.md)
 documents two reproduced errors, the fixes, the SDK buffer-size compile check
 and the limits of the image-vector review. Neither fix is confirmed as the
 hardware icon corruption cause.
+
+## Native SD read observation (r27)
+
+The supplied r25 log captures four Battery Timer pages. Reads 1 and 4 already
+contain altered icon bytes before conversion: stored banner CRC `9F58`, read
+CRCs `23C7`/`CEE0`. Reads 2 and 3 pass. All four VRAM uploads exactly match
+their source, and all palette checksums match the original. The altered words
+match ARM7 code at ROM offsets `0x35AA14` and `0x35AA64`, rather than the icon
+at `0x35F820`. This points toward stale read data; it does not identify the
+responsible layer. [Parsed evidence](benchmarks/r27/r25-hardware-analysis.json)
+records the source log hash and each event without bundling the ROM.
+
+`make -C romsel_dsimenutheme -j2 trace-icons` now produces the r27 observer.
+Install and reproduce exactly as for r25, then collect `icon-diagnostic.log`
+before rebooting. The SDK SD driver still performs every transfer. A traced
+interface compares its returned buffer with the uncached RAM view immediately
+after each read during Battery Timer metadata loading. It never retries,
+flushes, invalidates, modifies read data or changes a write callback.
+
+The `r27 page` header reports observed SD reads, cache/RAM mismatches and driver
+errors. A `D` record contains buffer address, sector/count, first difference,
+total differences and a 512-byte cached/RAM sample. Existing `R`/`C`/`U` records
+remain. A `D` mismatch locates incoherence at the driver boundary; bad `R` with
+no `D` requires investigation above that boundary (or of data already wrong
+in both views). A passing session cannot rule out a timing-sensitive error.
+IRQ masking covers the bounded memory comparison only, after the blocking
+transfer has returned. Snapshots use the existing eight-event queue and main
+thread log writer; overflow is counted.
+
+`python3 tests/icon_trace.py` injects distinct cached/RAM views and verifies
+read-result forwarding, unrelated callbacks, error counting, target scoping,
+unchanged data and the mismatch record, alongside the original r25 checks.
+This is diagnostic code only; no speculative storage fix is added to master.

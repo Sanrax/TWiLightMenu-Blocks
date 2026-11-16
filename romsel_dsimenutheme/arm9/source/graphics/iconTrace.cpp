@@ -12,6 +12,8 @@ struct Event {
     char type;
     int slot, bank, line;
     unsigned bytes;
+    uintptr_t address;
+    uint32_t sector, sectors, firstDifference, differences, sampleOffset;
     uint16_t storedCrc, readCrc, palette[16];
     alignas(4) uint8_t source[512], actual[512];
 };
@@ -19,6 +21,8 @@ Event events[8], snapshot[8];
 volatile unsigned count, dropped;
 int slots[8];
 bool tracked[8], started;
+int ioSlot = -1;
+unsigned ioReads, ioDifferent, ioErrors;
 
 bool target(const char *name) { return name && std::strstr(name, "Battery Timer"); }
 
@@ -45,6 +49,47 @@ uint16_t crc(const void *data, size_t bytes) {
     }
     return value;
 }
+}
+
+int iconTraceIoSelect(const char *name, int slot) {
+    const int previous = ioSlot;
+    ioSlot = target(name) ? slot : -1;
+    return previous;
+}
+
+void iconTraceIoRestore(int slot) { ioSlot = slot; }
+
+// Called immediately after the unmodified SDK read returns, before FatFS or
+// stdio consume its buffer. Observe only: never flush/invalidate or retry I/O.
+extern "C" void twlmIconTraceDiskRead(uint32_t sector, uint32_t sectors, void *buffer, bool ok) {
+    if (ioSlot < 0) return;
+    ++ioReads;
+    if (!ok) { ++ioErrors; return; }
+    if (!sectors || sectors > UINT32_MAX / 512 || !memBufferIsInMainRam(buffer, sectors * 512)) return;
+    const auto *cached = static_cast<volatile const uint8_t *>(buffer);
+    const auto *ram = static_cast<volatile const uint8_t *>(memUncached(buffer));
+    const int irq = enterCriticalSection();
+    uint32_t different = 0, first = 0;
+    for (uint32_t i = 0; i < sectors * 512; ++i) {
+        if (cached[i] != ram[i]) {
+            if (!different) first = i;
+            ++different;
+        }
+    }
+    if (different) {
+        ++ioDifferent;
+        if (Event *e = reserve('D', ioSlot, -1, 512)) {
+            e->address = reinterpret_cast<uintptr_t>(buffer);
+            e->sector = sector; e->sectors = sectors;
+            e->differences = different; e->firstDifference = first;
+            e->sampleOffset = first / 512 * 512;
+            for (unsigned i = 0; i < 512; ++i) {
+                e->source[i] = cached[e->sampleOffset + i];
+                e->actual[i] = ram[e->sampleOffset + i];
+            }
+        }
+    }
+    leaveCriticalSection(irq);
 }
 
 void iconTraceRead(const char *name, int slot, const void *banner, size_t bytes) {
@@ -85,10 +130,12 @@ void iconTraceUpload(int bank, const uint8_t *source, const void *vram, const ui
 void iconTraceFlush() {
     const int irq = enterCriticalSection();
     const unsigned n = count, lost = dropped;
+    const unsigned reads = ioReads, different = ioDifferent, errors = ioErrors;
     if (n) std::memcpy(snapshot, events, n * sizeof(Event));
     count = dropped = 0;
+    ioReads = ioDifferent = ioErrors = 0;
     leaveCriticalSection(irq);
-    if (!n) return;
+    if (!n && !reads) return;
     char path[96];
     std::snprintf(path, sizeof path, "%s:/_nds/TWiLightMenu/icon-diagnostic.log", sys().isRunFromSD() ? "sd" : "fat");
     FILE *file = std::fopen(path, started ? "ab" : "wb");
@@ -96,9 +143,21 @@ void iconTraceFlush() {
     started = true;
     std::fseek(file, 0, SEEK_END);
     if (std::ftell(file) > 65536) { std::fclose(file); return; }
-    std::fprintf(file, "r25 page: %u events, %u dropped\n", n, lost);
+    std::fprintf(file, "r27 page: %u events, %u dropped; SD reads=%u cache/RAM mismatches=%u errors=%u\n",
+        n, lost, reads, different, errors);
     for (unsigned i = 0; i < n; ++i) {
         const Event &e = snapshot[i];
+        if (e.type == 'D') {
+            std::fprintf(file, "D slot=%d line=%d buffer=%08lX sector=%lu count=%lu first=%lu differences=%lu sample=%lu cached=%04X ram=%04X\n",
+                e.slot, e.line, (unsigned long)e.address, (unsigned long)e.sector, (unsigned long)e.sectors,
+                (unsigned long)e.firstDifference, (unsigned long)e.differences, (unsigned long)e.sampleOffset,
+                crc(e.source, 512), crc(e.actual, 512));
+            for (uint8_t value : e.source) std::fprintf(file, "%02X", value);
+            std::fputc('\n', file);
+            for (uint8_t value : e.actual) std::fprintf(file, "%02X", value);
+            std::fputc('\n', file);
+            continue;
+        }
         std::fprintf(file, "%c slot=%d bank=%d line=%d bytes=%u source=%04X palette=%04X",
             e.type, e.slot, e.bank, e.line, e.bytes, crc(e.source, 512), crc(e.palette, 32));
         if (e.type == 'R')

@@ -1,0 +1,162 @@
+{
+  "log_sha256": "95adeff62d5601dffea6638781e433dc3c5ab3a32101ca3978f9f0abb2dfc866",
+  "rom_sha256": "f912b97ae1ba093ccb9ba4152aec73a933e9936249373ed7a191f31a575060c5",
+  "banner_offset": "0x35f800",
+  "events": [
+    {
+      "slot": "1",
+      "bank": "1",
+      "line": "181",
+      "bytes": "2112",
+      "source": "80E6",
+      "palette": "4F3D",
+      "banner-stored": "9F58",
+      "banner-read": "23C7",
+      "type": "R",
+      "log_line": 2,
+      "different_icon_bytes": 60,
+      "changed_word_range": [
+        "0x17c",
+        "0x1bc"
+      ],
+      "matching_rom_offsets": [
+        "0x35aa14"
+      ]
+    },
+    {
+      "slot": "1",
+      "bank": "1",
+      "line": "220",
+      "bytes": "512",
+      "source": "694B",
+      "palette": "4F3D",
+      "type": "C",
+      "log_line": 4
+    },
+    {
+      "slot": "1",
+      "bank": "1",
+      "line": "222",
+      "bytes": "512",
+      "source": "694B",
+      "palette": "4F3D",
+      "vram": "694B",
+      "differences": "0",
+      "type": "U",
+      "log_line": 6
+    },
+    {
+      "slot": "1",
+      "bank": "1",
+      "line": "79",
+      "bytes": "2112",
+      "source": "59E5",
+      "palette": "4F3D",
+      "banner-stored": "9F58",
+      "banner-read": "9F58",
+      "type": "R",
+      "log_line": 9,
+      "different_icon_bytes": 0
+    },
+    {
+      "slot": "1",
+      "bank": "1",
+      "line": "108",
+      "bytes": "512",
+      "source": "46CA",
+      "palette": "4F3D",
+      "type": "C",
+      "log_line": 11
+    },
+    {
+      "slot": "1",
+      "bank": "1",
+      "line": "193",
+      "bytes": "512",
+      "source": "46CA",
+      "palette": "4F3D",
+      "vram": "46CA",
+      "differences": "0",
+      "type": "U",
+      "log_line": 13
+    },
+    {
+      "slot": "1",
+      "bank": "1",
+      "line": "84",
+      "bytes": "2112",
+      "source": "59E5",
+      "palette": "4F3D",
+      "banner-stored": "9F58",
+      "banner-read": "9F58",
+      "type": "R",
+      "log_line": 16,
+      "different_icon_bytes": 0
+    },
+    {
+      "slot": "1",
+      "bank": "1",
+      "line": "111",
+      "bytes": "512",
+      "source": "46CA",
+      "palette": "4F3D",
+      "type": "C",
+      "log_line": 18
+    },
+    {
+      "slot": "1",
+      "bank": "1",
+      "line": "193",
+      "bytes": "512",
+      "source": "46CA",
+      "palette": "4F3D",
+      "vram": "46CA",
+      "differences": "0",
+      "type": "U",
+      "log_line": 20
+    },
+    {
+      "slot": "1",
+      "bank": "1",
+      "line": "92",
+      "bytes": "2112",
+      "source": "0522",
+      "palette": "4F3D",
+      "banner-stored": "9F58",
+      "banner-read": "CEE0",
+      "type": "R",
+      "log_line": 23,
+      "different_icon_bytes": 17,
+      "changed_word_range": [
+        "0x1cc",
+        "0x1e0"
+      ],
+      "matching_rom_offsets": [
+        "0x35aa64"
+      ]
+    },
+    {
+      "slot": "1",
+      "bank": "1",
+      "line": "120",
+      "bytes": "512",
+      "source": "9E34",
+      "palette": "4F3D",
+      "type": "C",
+      "log_line": 25
+    },
+    {
+      "slot": "1",
+      "bank": "1",
+      "line": "193",
+      "bytes": "512",
+      "source": "9E34",
+      "palette": "4F3D",
+      "vram": "9E34",
+      "differences": "0",
+      "type": "U",
+      "log_line": 27
+    }
+  ],
+  "conclusion": "Two raw banner reads already contain wrong icon pixels. All four recorded uploads match their staged data. Changed words match ARM7 code in the same ROM; the responsible buffering/storage layer is unconfirmed."
+}
