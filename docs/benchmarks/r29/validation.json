@@ -1,0 +1,28 @@
+{
+  "production_commit": "b690663d835b2e4ccac638a19f80f21cbfb9ec67",
+  "behavior": "Returning with B or the .. entry selects the folder just left in the already sorted parent list; page/cursor and the existing list viewport are set before drawing.",
+  "scope": [
+    "DSi",
+    "3DS",
+    "Saturn",
+    "Homebrew Launcher",
+    "Wood",
+    "R4",
+    "GBC"
+  ],
+  "runtime_state": "One reusable filename per running browser; no extra filesystem operations, history file, directory cache or per-frame lookup.",
+  "host_validation": [
+    "Actual shared header with AddressSanitizer and UndefinedBehaviorSanitizer (LeakSanitizer disabled under ptrace)",
+    "Nested paths, page-3 indices, changed ordering, FAT case matching, roots, missing/hidden/non-directory targets, overwritten input path, Unicode and 255-byte names",
+    "10000 repeated remember/restore cycles allocate no further filename storage"
+  ],
+  "component_builds": [
+    "romsel_dsimenutheme dist passed",
+    "romsel_aktheme dist passed",
+    "romsel_r4theme dist passed"
+  ],
+  "emulator": "melonDS 1.1 DS/DLDI, owned 32 MiB image with 90 parent folders and nested Inner folders. User interacted with the shared session, so scripted before/after screenshots are not used as a deterministic comparison. User confirms return selection works correctly.",
+  "hardware_test": "Not performed for this feature.",
+  "timing": "No end-to-end speedup or hardware timing claim; no added SD operations.",
+  "cleanup": "Owned emulator stopped by verified PID; its original configuration restored byte-for-byte."
+}

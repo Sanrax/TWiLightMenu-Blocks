@@ -465,3 +465,32 @@ records and the header's **pre-sync** mismatch count can therefore still be
 nonzero. The following `R` banner checksum should pass after synchronization,
 with unchanged `C`/`U` uploads. Collect `icon-diagnostic.log` before rebooting.
 The separate r27 getter wrapper has been removed to avoid nesting SD interfaces.
+
+## Returning to the parent selection (r29)
+
+All three browsers use `ParentDirectorySelection` to retain the departing
+folder's basename until the parent's normal list/sort completes. Restoring
+by name handles sort changes and saved starting paths without directory
+history or more filesystem operations. Both B and `..` request restoration;
+the page/cursor and existing list viewport are initialized before drawing.
+
+Run the actual shared helper's checks manually:
+
+```sh
+c++ -std=c++17 -O2 -g -Wall -Wextra -Werror -Wno-mismatched-new-delete \
+  -fsanitize=address,undefined -Iuniversal/include \
+  tests/parent_selection.cpp -o /tmp/twlm-parent-selection
+ASAN_OPTIONS=detect_leaks=0 /tmp/twlm-parent-selection
+```
+
+The checks cover nested and saved paths, later pages, reordered lists, roots,
+FAT case matching, missing/hidden folders, one-shot consumption, overwritten
+input storage, Unicode and 255-byte names. After allocating a filename once,
+10,000 repeated remember/restore cycles allocate no more storage. ASan/UBSan
+are enabled; LeakSanitizer is disabled under the ptrace sandbox.
+
+All three normal browser builds/distribution targets pass. The user confirmed
+the feature in the shared melonDS session; their concurrent input means the
+scripted captures are not a controlled before/after measurement. See the
+[validation record](benchmarks/r29/validation.json). No hardware timing or
+end-to-end navigation-speed claim is made.
