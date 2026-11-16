@@ -407,7 +407,7 @@ at `0x35F820`. This points toward stale read data; it does not identify the
 responsible layer. [Parsed evidence](benchmarks/r27/r25-hardware-analysis.json)
 records the source log hash and each event without bundling the ROM.
 
-`make -C romsel_dsimenutheme -j2 trace-icons` now produces the r27 observer.
+At commit `830e897f4`, `make -C romsel_dsimenutheme -j2 trace-icons` produces the r27 observer.
 Install and reproduce exactly as for r25, then collect `icon-diagnostic.log`
 before rebooting. The SDK SD driver still performs every transfer. A traced
 interface compares its returned buffer with the uncached RAM view immediately
@@ -428,3 +428,40 @@ thread log writer; overflow is counted.
 read-result forwarding, unrelated callbacks, error counting, target scoping,
 unchanged data and the mismatch record, alongside the original r25 checks.
 This is diagnostic code only; no speculative storage fix is added to master.
+
+## Native SD read completion coherency (r28)
+
+The r27 hardware log confirms stale ARM9 cache data after a successful SDK
+read. Three `D` records disagree with uncached RAM by 146, 127 and 60 bytes.
+Every RAM snapshot exactly matches the original ROM sector at `0x35F800`;
+two subsequent banner reads and their uploads contain the altered pixels.
+No read errors or dropped records were reported. The [parsed hardware record](benchmarks/r28/r27-hardware-analysis.json)
+retains addresses, differing cache lines and the input log hash. Small captured
+cache/RAM sectors are fixtures in `tests/fixtures/sd-cache-r27.json`.
+
+Master now forwards SDK SD reads through a completion-cache sync. Entire cache
+lines inside the buffer are invalidated. Partial first/last lines are refreshed
+from uncached RAM without invalidating dirty neighboring variables. A short
+critical section protects that boundary snapshot/copy; interrupts remain enabled
+throughout the SDK transfer. There is no bounce allocation or split transfer,
+and every non-read interface callback remains the SDK's callback.
+
+```sh
+python3 tests/sd_read_coherency.py --source /path/to/master
+python3 tests/icon_trace.py
+```
+
+The coherency test extracts the actual production functions, replays all three
+hardware sample pairs and models dirty adjacent bytes across all 32 buffer
+alignments and 1/2/17/257-sector reads. It checks errors, callback preservation,
+unchanged batched requests and no invalidation while the SDK transfer is active.
+ASan/UBSan are enabled; LeakSanitizer is disabled under the ptrace sandbox.
+The host models cache operations, not ARM cache timing. Hardware retesting is
+still required to confirm the visible icon fix.
+
+Current `trace-icons` builds label records `r28`. The raw SDK observer runs
+just before completion sync in the shared adapter, on diagnostics only. `D`
+records and the header's **pre-sync** mismatch count can therefore still be
+nonzero. The following `R` banner checksum should pass after synchronization,
+with unchanged `C`/`U` uploads. Collect `icon-diagnostic.log` before rebooting.
+The separate r27 getter wrapper has been removed to avoid nesting SD interfaces.

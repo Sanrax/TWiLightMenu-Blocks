@@ -9,7 +9,7 @@ import argparse, pathlib, subprocess, tempfile
 p=argparse.ArgumentParser();p.add_argument('--source',type=pathlib.Path,default=pathlib.Path(__file__).resolve().parents[1]);a=p.parse_args();root=a.source.resolve()
 def function(path,start,end):
  s=(root/path).read_text();return s[s.index(start):s.index(end,s.index(start))]
-install=function('universal/sdmmc/arm9/source/blocksds_storage.c','static bool dldiSectionValid','bool __real_fatInit')
+install=function('universal/sdmmc/arm9/source/blocksds_storage.c','static bool dldiSectionValid','static void syncNativeSdRead')
 unpack=function('universal/source/common/dldi.cpp','static bool unpackDldi','bool twlmLoadDldi')
 reveal=function('romsel_dsimenutheme/arm9/source/graphics/graphics.cpp','void endMenuContentUpdate','static void drawMenuIcon')
 palette=function('romsel_aktheme/arm9/source/iconTitle.cpp','void glReloadIconPalette(int num)','void glLoadPalette')

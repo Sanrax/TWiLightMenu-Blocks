@@ -92,7 +92,10 @@ for component, name in COMPONENTS.items():
     assert ' storageMsgHandler' in symbols and ' TMIO_init' in symbols, component
     assert not re.search(r'\b(?:my_sdmmc\w*|my_installSystemFIFO)\b', symbols), component
     symbols = subprocess.check_output([str(nm), str(ROOT/component/f'{name}.arm9.elf')], text=True)
-    assert not re.search(r'\b(?:__my_io_dsisd|__wrap_get_io_dsisd|__wrap_sdmmc_GetDiskStatus)\b', symbols), component
+    assert not re.search(r'\b(?:__my_io_dsisd|__wrap_sdmmc_GetDiskStatus)\b', symbols), component
+    # This interface forwards SDK reads, then synchronizes their ARM9 cache.
+    # It must coexist with the native SDK service, without a legacy IPC driver.
+    assert ' T __wrap_get_io_dsisd' in symbols and ' T get_io_dsisd' in symbols, component
     if component != 'booter_fc':
         assert re.search(r' T initSystem$', symbols, re.M), component
 

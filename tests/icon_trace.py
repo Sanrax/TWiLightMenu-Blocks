@@ -15,18 +15,6 @@ void leaveCriticalSection(int);
 void *memUncached(void *);
 bool memBufferIsInMainRam(const void *, unsigned);
 ''')
-    (work/'include/nds').mkdir()
-    (work/'include/nds/disc_io.h').write_text('''#pragma once
-#include <stdint.h>
-using sec_t=uint32_t;
-struct DISC_INTERFACE {
- unsigned long ioType,features;
- bool (*startup)(); bool (*isInserted)();
- bool (*readSectors)(sec_t,sec_t,void*);
- bool (*writeSectors)(sec_t,sec_t,const void*);
- bool (*clearStatus)(); bool (*shutdown)();
-};
-''')
     (work/'include/common/systemdetails.h').write_text('''#pragma once
 struct TestSystem { bool isRunFromSD() { return false; } };
 TestSystem& sys();
@@ -49,19 +37,6 @@ TestSystem& sys(){static TestSystem s;return s;}
 extern "C" FILE* __real_fopen(const char*,const char*);
 extern "C" FILE* __wrap_fopen(const char*p,const char*m){assert(!inIrq&&!critical);return __real_fopen(p,m);}
 #include "ICON_TRACE_SOURCE"
-#include "nds/disc_io.h"
-bool noDriver,readFails,stale;int nativeReads;
-bool nativeRead(sec_t sector,sec_t sectors,void*buffer){
- assert(sector==123&&sectors==3&&buffer==diskBuffer);nativeReads++;
- memset(diskBuffer,0x3C,sizeof diskBuffer);memset(ramBuffer,0x3C,sizeof ramBuffer);
- if(stale){diskBuffer[536]=0x55;diskBuffer[539]=0x66;}
- return !readFails;
-}
-bool nativeWrite(sec_t,sec_t,const void*){return true;}
-bool nativeStatus(){return true;}
-DISC_INTERFACE testDriver={0x12345678,3,nativeStatus,nativeStatus,nativeRead,nativeWrite,nativeStatus,nativeStatus};
-const DISC_INTERFACE*__real_get_io_dsisd(){return noDriver?nullptr:&testDriver;}
-#include "ICON_READ_TRACE_SOURCE"
 std::string log(){std::ifstream f("fat:/_nds/TWiLightMenu/icon-diagnostic.log");return std::string(std::istreambuf_iterator<char>(f),{});}
 int main(){
  assert(crc("123456789",9)==0x4B37);
@@ -86,35 +61,31 @@ int main(){
  for(int i=0;i<13;i++)iconTraceRead("DS Battery Timer.nds",1,banner,sizeof banner);
  assert(count==8&&dropped==5);iconTraceFlush();assert(log().find("8 events, 5 dropped")!=std::string::npos);
  iconTraceSelect(1,1,"Other.nds");iconTraceUpload(1,banner+32,vram,palette,512);assert(!count);
- // Read wrapper preserves driver identity, errors and every unrelated callback.
- noDriver=true;assert(!__wrap_get_io_dsisd());noDriver=false;
- const auto*driver=__wrap_get_io_dsisd();assert(driver&&driver!=&testDriver);
- assert(driver->ioType==testDriver.ioType&&driver->features==testDriver.features);
- assert(driver->startup==nativeStatus&&driver->isInserted==nativeStatus);
- assert(driver->writeSectors==nativeWrite&&driver->clearStatus==nativeStatus&&driver->shutdown==nativeStatus);
- assert(driver->readSectors(123,3,diskBuffer)&&nativeReads==1&&!ioReads&&!count);
+ // The observer records raw SDK results before production synchronizes them.
+ memset(diskBuffer,0x3C,sizeof diskBuffer);memset(ramBuffer,0x3C,sizeof ramBuffer);
+ twlmIconTraceDiskRead(123,3,diskBuffer,true);assert(!ioReads&&!count);
  {
   IconTraceIoScope io("DS Battery Timer.nds",1);
-  assert(driver->readSectors(123,3,diskBuffer));assert(ioReads==1&&!ioDifferent&&!count);
-  stale=true;assert(driver->readSectors(123,3,diskBuffer));assert(ioReads==2&&ioDifferent==1&&count==1);
+  twlmIconTraceDiskRead(123,3,diskBuffer,true);assert(ioReads==1&&!ioDifferent&&!count);
+  diskBuffer[536]=0x55;diskBuffer[539]=0x66;
+  twlmIconTraceDiskRead(123,3,diskBuffer,true);assert(ioReads==2&&ioDifferent==1&&count==1);
   const auto&e=events[0];assert(e.type=='D'&&e.firstDifference==536&&e.differences==2&&e.sampleOffset==512);
   assert(e.source[24]==0x55&&e.source[27]==0x66&&e.actual[24]==0x3C&&e.actual[27]==0x3C);
   assert(diskBuffer[536]==0x55&&ramBuffer[536]==0x3C); // The observer never repairs data.
-  readFails=true;assert(!driver->readSectors(123,3,diskBuffer));assert(ioErrors==1&&count==1);readFails=false;
+  twlmIconTraceDiskRead(123,3,diskBuffer,false);assert(ioErrors==1&&count==1);
   {IconTraceIoScope other("Other.nds",2);assert(ioSlot==-1);}assert(ioSlot==1);
  }
  assert(ioSlot==-1);iconTraceFlush();
- text=log();assert(text.find("SD reads=3 cache/RAM mismatches=1 errors=1")!=std::string::npos);
+ text=log();assert(text.find("SD reads=3 pre-sync cache/RAM mismatches=1 errors=1")!=std::string::npos);
  assert(text.find("first=536 differences=2 sample=512")!=std::string::npos);
  FILE*f=fopen("fat:/_nds/TWiLightMenu/icon-diagnostic.log","ab");
  while(ftell(f)<65537)fputc('x',f);long before=ftell(f);fclose(f);
  iconTraceRead("DS Battery Timer.nds",1,banner,sizeof banner);iconTraceFlush();
  f=fopen("fat:/_nds/TWiLightMenu/icon-diagnostic.log","rb");fseek(f,0,SEEK_END);assert(ftell(f)==before);fclose(f);
- puts("Icon recorder: banner/VRAM errors, bounded logs, no IRQ I/O and observational SD cache/RAM wrapper passed");
+ puts("Icon recorder: banner/VRAM errors, bounded logs, no IRQ I/O and pre-sync SD cache/RAM observation passed");
 }
 '''
     source = source.replace('ICON_TRACE_SOURCE',str(root/'romsel_dsimenutheme/arm9/source/graphics/iconTrace.cpp'))
-    source = source.replace('ICON_READ_TRACE_SOURCE',str(root/'romsel_dsimenutheme/arm9/source/graphics/iconReadTrace.c'))
     (work/'test.cpp').write_text(source)
     (work/'fat:/_nds/TWiLightMenu').mkdir(parents=True)
     exe = work/'test'

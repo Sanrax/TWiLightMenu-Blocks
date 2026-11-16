@@ -1,0 +1,69 @@
+{
+  "log_sha256": "bf4a9a5743a2f6090bdb8eb88600106e30a316531340f3e625438a03c1b309d0",
+  "events": [
+    {
+      "slot": "1",
+      "line": "244",
+      "buffer": "021D6D24",
+      "sector": "2296700",
+      "count": "1",
+      "first": "124",
+      "differences": "146",
+      "sample": "0",
+      "cached": "E6E3",
+      "ram": "E674",
+      "rom_matches": [
+        "0x35f800"
+      ],
+      "cache_lines": [
+        "0x21d6da0",
+        "0x21d6e20",
+        "0x21d6e40",
+        "0x21d6ee0",
+        "0x21d6f00"
+      ]
+    },
+    {
+      "slot": "1",
+      "line": "190",
+      "buffer": "021D6D24",
+      "sector": "2296700",
+      "count": "1",
+      "first": "252",
+      "differences": "127",
+      "sample": "0",
+      "cached": "C09C",
+      "ram": "E674",
+      "rom_matches": [
+        "0x35f800"
+      ],
+      "cache_lines": [
+        "0x21d6e20",
+        "0x21d6e60",
+        "0x21d6ea0",
+        "0x21d6f00",
+        "0x21d6f20"
+      ]
+    },
+    {
+      "slot": "1",
+      "line": "107",
+      "buffer": "021D6DF4",
+      "sector": "2296700",
+      "count": "1",
+      "first": "300",
+      "differences": "60",
+      "sample": "0",
+      "cached": "C145",
+      "ram": "E674",
+      "rom_matches": [
+        "0x35f800"
+      ],
+      "cache_lines": [
+        "0x21d6f20",
+        "0x21d6fc0"
+      ]
+    }
+  ],
+  "confirmed": "After the native SDK SD read returns successfully, cached bytes disagree with uncached RAM. All captured RAM sectors match the original ROM banner sector exactly."
+}

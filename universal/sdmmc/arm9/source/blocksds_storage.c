@@ -109,8 +109,15 @@ static void syncNativeSdRead(void *buffer, sec_t sectors) {
 
 static const DISC_INTERFACE *nativeSdInterface;
 
+#ifdef TWLM_ICON_TRACE
+extern void twlmIconTraceDiskRead(uint32_t sector, uint32_t sectors, void *buffer, bool ok);
+#endif
+
 static bool nativeSdReadSectors(sec_t sector, sec_t sectors, void *buffer) {
 	const bool ok = nativeSdInterface->readSectors(sector, sectors, buffer);
+#ifdef TWLM_ICON_TRACE
+	twlmIconTraceDiskRead(sector, sectors, buffer, ok);
+#endif
 	if (ok) syncNativeSdRead(buffer, sectors);
 	return ok;
 }

@@ -1,0 +1,3 @@
+18 NDS headers, DLDI allocations, SDK console detection and 7 ARM9 loader images passed
+Native SDK storage ownership, menu startup hooks and copied brightness routines passed
+Wood IRQ palette refresh has no GL allocation/free calls

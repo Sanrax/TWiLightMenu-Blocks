@@ -44,7 +44,6 @@ CPPFLAGS += $(if $(filter 1,$(ICON_TRACE)),-DTWLM_ICON_TRACE)
 
 ASFLAGS	:=	-g $(ARCH) $(INCLUDE)
 LDFLAGS	=	-specs=../$(UNIVERSAL)/arm9/ds_arm9_twlm.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)
-LDFLAGS += $(if $(filter 1,$(ICON_TRACE)),-Wl$(comma)--wrap=get_io_dsisd)
 
 #---------------------------------------------------------------------------------
 # any extra libraries we wish to link with the project (order is important)

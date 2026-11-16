@@ -143,7 +143,7 @@ void iconTraceFlush() {
     started = true;
     std::fseek(file, 0, SEEK_END);
     if (std::ftell(file) > 65536) { std::fclose(file); return; }
-    std::fprintf(file, "r27 page: %u events, %u dropped; SD reads=%u cache/RAM mismatches=%u errors=%u\n",
+    std::fprintf(file, "r28 page: %u events, %u dropped; raw SDK SD reads=%u pre-sync cache/RAM mismatches=%u errors=%u\n",
         n, lost, reads, different, errors);
     for (unsigned i = 0; i < n; ++i) {
         const Event &e = snapshot[i];
