@@ -98,6 +98,10 @@ queuing initialization for the main loop lets each complete eight requests
 with simulated card I/O. The user confirmed that r22 resolves the hang and
 DSpico flashcard storage access works on hardware.
 
+The r27 trace captured correct SD data in RAM while ARM9 cached reads returned
+stale banner pixels. The user confirmed that the r28 read-completion cache
+correction fixes the reported homebrew icon corruption on console SD.
+
 ## Packaging
 
 The release workflow builds the platform/add-on archives and rebuilt CIA when

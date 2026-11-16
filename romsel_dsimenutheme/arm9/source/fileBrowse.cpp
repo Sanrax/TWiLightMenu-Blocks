@@ -36,6 +36,7 @@
 #include "gbaswitch.h"
 
 #include "common/twlmenusettings.h"
+#include "common/parentDirectorySelection.h"
 #include "common/bootstrapsettings.h"
 #include "common/customLaunchers.h"
 #include "common/dlplayPatch.h"
@@ -469,6 +470,7 @@ void getDirectoryContents(std::vector<DirEntry> &dirContents, const std::vector<
 }
 
 static bool browserHasDisplayed = false;
+static twlm::ParentDirectorySelection parentSelection;
 
 // Refreshes every icon bank the grid can sample this frame.
 //
@@ -3261,7 +3263,16 @@ std::string browseForFile(const std::vector<std::string_view> &extensionList) {
 	vector<vector<DirEntry>> dirContents(scrn.SIZE);
 
 	getDirectoryContents(dirContents[scrn], extensionList);
-	
+	const int parentPosition = parentSelection.restore(dirContents[scrn]);
+	if (parentPosition >= 0) {
+		PAGENUM = parentPosition / 40;
+		CURPOS = parentPosition % 40;
+		recalculateBoxesCount();
+		settingsChanged = true;
+		titleboxXpos[ms().secondaryDevice] = titleboxXdest[ms().secondaryDevice] = CURPOS * titleboxXspacing;
+		titlewindowXpos[ms().secondaryDevice] = titlewindowXdest[ms().secondaryDevice] = CURPOS * 5;
+	}
+
 	if (CURPOS > last_used_box)
 	{
 		CURPOS = last_used_box;
@@ -3888,6 +3899,11 @@ std::string browseForFile(const std::vector<std::string_view> &extensionList) {
 				DirEntry *entry = &dirContents[scrn].at(CURPOS + PAGENUM * 40);
 				if (entry->isDirectory) {
 					// Enter selected directory
+					if (chdir(entry->name.c_str()) != 0) {
+						snd().playWrong();
+						continue;
+					}
+					if (entry->name == "..") parentSelection.remember(ms().romfolder[ms().secondaryDevice]);
 					(ms().theme == TWLSettings::EThemeSaturn) ? snd().playLaunch() : snd().playSelect();
 					beginMenuContentUpdate();
 					ms().pagenum[ms().secondaryDevice] = 0;
@@ -3902,7 +3918,6 @@ std::string browseForFile(const std::vector<std::string_view> &extensionList) {
 					shouldersRendered = false;
 					showSTARTborder = false;
 					stopSoundPlayed = false;
-					chdir(entry->name.c_str());
 					char buf[256];
 					ms().romfolder[ms().secondaryDevice] = std::string(getcwd(buf, 256));
 					ms().saveSettings();
@@ -4371,6 +4386,11 @@ std::string browseForFile(const std::vector<std::string_view> &extensionList) {
 
 			if ((pressed & KEY_B) && ms().showDirectories) {
 				// Go up a directory
+				if (chdir("..") != 0) {
+					snd().playWrong();
+					continue;
+				}
+				parentSelection.remember(ms().romfolder[ms().secondaryDevice]);
 				snd().playBack();
 				beginMenuContentUpdate();
 				PAGENUM = 0;
@@ -4387,7 +4407,6 @@ std::string browseForFile(const std::vector<std::string_view> &extensionList) {
 				shouldersRendered = false;
 				showSTARTborder = false;
 				stopSoundPlayed = false;
-				chdir("..");
 				char buf[256];
 
 				ms().romfolder[ms().secondaryDevice] = std::string(getcwd(buf, 256));

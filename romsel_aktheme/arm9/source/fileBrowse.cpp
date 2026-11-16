@@ -43,6 +43,7 @@
 
 #include "ndsheaderbanner.h"
 #include "common/twlmenusettings.h"
+#include "common/parentDirectorySelection.h"
 #include "common/bootstrapsettings.h"
 #include "common/customLaunchers.h"
 #include "launch/launchExecutor.h"
@@ -1323,6 +1324,8 @@ bool dsiWareCompatibleB4DS(void) {
 	return res;
 }
 
+static twlm::ParentDirectorySelection parentSelection;
+
 std::string browseForFile(const std::vector<std::string_view> &extensionList) {
 	gameOrderIniPath = std::string(sys().isRunFromSD() ? "sd" : "fat") + ":/_nds/TWiLightMenu/extras/gameorder.ini";
 	recentlyPlayedIniPath = std::string(sys().isRunFromSD() ? "sd" : "fat") + ":/_nds/TWiLightMenu/extras/recentlyplayed.ini";
@@ -1340,6 +1343,11 @@ std::string browseForFile(const std::vector<std::string_view> &extensionList) {
 	displayDiskIcon(ms().secondaryDevice);
 	getDirectoryContents (dirContents, extensionList);
 	displayDiskIcon(false);
+	const int parentPosition = parentSelection.restore(dirContents);
+	if (parentPosition >= 0) {
+		PAGENUM = parentPosition / 40;
+		CURPOS = parentPosition % 40;
+	}
 
 	int entriesPerScreen = (ms().ak_viewMode == TWLSettings::EViewList) ? ENTRIES_PER_SCREEN_LIST : ENTRIES_PER_SCREEN;
 	if (ms().ak_viewMode == TWLSettings::EViewSmallIcon) {
@@ -1624,7 +1632,8 @@ std::string browseForFile(const std::vector<std::string_view> &extensionList) {
 			DirEntry* entry = &dirContents.at(fileOffset);
 			if (entry->isDirectory) {
 				// Enter selected directory
-				chdir (entry->name.c_str());
+				if (chdir(entry->name.c_str()) != 0) continue;
+				if (entry->name == "..") parentSelection.remember(ms().romfolder[ms().secondaryDevice]);
 				char buf[256];
 				ms().romfolder[ms().secondaryDevice] = getcwd(buf, 256);
 				CURPOS = 0;
@@ -1989,7 +1998,8 @@ std::string browseForFile(const std::vector<std::string_view> &extensionList) {
 		|| ((pressed & KEY_TOUCH) && touch.px >= folderUpX && touch.px < folderUpX+folderUpW && touch.py >= folderUpY && touch.py < folderUpY+folderUpH)) && ms().showDirectories) {
 			resetIconScale();
 			// Go up a directory
-			chdir ("..");
+			if (chdir("..") != 0) continue;
+			parentSelection.remember(ms().romfolder[ms().secondaryDevice]);
 			char buf[256];
 			ms().romfolder[ms().secondaryDevice] = getcwd(buf, 256);
 			CURPOS = 0;
