@@ -3,6 +3,7 @@
 #include <nds/arm9/cache.h>
 #include <nds/arm9/dldi.h>
 #include <nds/arm9/sdmmc.h>
+#include <nds/interrupts.h>
 #include <nds/disc_io.h>
 #include <nds/system.h>
 #include <string.h>
@@ -82,6 +83,47 @@ bool twlmInstallDldi(const void *image, size_t size) {
 	// again for this driver, including SDK ARM7 FIFO support where available.
 	dldiSetMode(DLDI_MODE_AUTODETECT);
 	return true;
+}
+
+// The SDK cleans/invalidates before ARM7 reads, but cache lines can be filled
+// again while it waits. Discard stale lines after completion. Partial boundary
+// lines may contain dirty neighboring objects: refresh only their buffer bytes
+// from uncached RAM instead of invalidating those unrelated writes.
+static void syncNativeSdRead(void *buffer, sec_t sectors) {
+	if (!sectors || sectors > UINT32_MAX / 512) return;
+	const size_t bytes = sectors * 512;
+	if (!memBufferIsInMainRam(buffer, bytes)) return;
+	uint8_t *dest = buffer;
+	const volatile uint8_t *ram = memUncached(buffer);
+	const size_t head = (32 - ((uintptr_t)buffer & 31)) & 31;
+	const size_t tail = ((uintptr_t)buffer + bytes) & 31;
+	uint8_t edges[64];
+	const int irq = enterCriticalSection();
+	for (size_t i = 0; i < head; ++i) edges[i] = ram[i];
+	for (size_t i = 0; i < tail; ++i) edges[32 + i] = ram[bytes - tail + i];
+	if (head) memcpy(dest, edges, head);
+	if (tail) memcpy(dest + bytes - tail, edges + 32, tail);
+	DC_InvalidateRange(dest + head, bytes - head - tail);
+	leaveCriticalSection(irq);
+}
+
+static const DISC_INTERFACE *nativeSdInterface;
+
+static bool nativeSdReadSectors(sec_t sector, sec_t sectors, void *buffer) {
+	const bool ok = nativeSdInterface->readSectors(sector, sectors, buffer);
+	if (ok) syncNativeSdRead(buffer, sectors);
+	return ok;
+}
+
+const DISC_INTERFACE *__real_get_io_dsisd(void);
+const DISC_INTERFACE *__wrap_get_io_dsisd(void) {
+	const DISC_INTERFACE *native = __real_get_io_dsisd();
+	if (!native) return NULL;
+	static DISC_INTERFACE coherent;
+	nativeSdInterface = native;
+	coherent = *native;
+	coherent.readSectors = nativeSdReadSectors;
+	return &coherent;
 }
 
 bool __real_fatInit(int32_t cacheSize, bool setDefault);
