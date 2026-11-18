@@ -1,8 +1,8 @@
 # BlocksDS port
 
 This fork diverged from upstream at [`e3afe19ca`](https://github.com/DS-Homebrew/TWiLightMenu/commit/e3afe19ca).
-Existing upstream fixes through `22979a2b8` are also merged;
-`git diff 22979a2b8..master` shows the remaining fork changes.
+Existing upstream fixes through `5d7ec54d4` are also merged;
+`git diff 5d7ec54d4..master` shows the remaining fork changes.
 It retains all live themes and launch methods. Wood and R4 have separate
 binaries, so including them does not initialize them when using the DSi/3DS UI.
 See [optimizations](optimizations.md) for performance work, its source files and measurements.

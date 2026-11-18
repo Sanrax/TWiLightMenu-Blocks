@@ -1467,7 +1467,7 @@ void exitToSystemMenu(void) {
 	for (int i = 0; i < 60; i++) {
 		bgOperations(true);
 	}
-	
+
 	snd().stopStream();
 
 	if (settingsChanged) {
@@ -1494,6 +1494,7 @@ void switchDevice(void) {
 		if (!rocketVideo_topVisible || ms().showBoxArt)
 			clearBoxArt(); // Clear box art
 		boxArtLoaded = false;
+		bannerTextShown = false;
 		resumeRotatingCubesVideo();
 		shouldersRendered = false;
 		showSTARTborder = false;
@@ -1567,7 +1568,7 @@ void launchGba(void) {
 	for (int i = 0; i < 60; i++) {
 		bgOperations(true);
 	}
-	
+
 	snd().stopStream();
 
 	ms().slot1Launched = false;
@@ -1672,7 +1673,7 @@ void mdRomTooBig(void) {
 		} else if (pressed & KEY_DOWN) {
 			bottomBright++;
 		}
-		
+
 
 
 		if (bottomBright < 0) bottomBright = 0;
@@ -1981,7 +1982,7 @@ bool donorRomMsg(const char *filename) {
 		}
 	}
 	clearText();
-	
+
 	showdialogbox = false;
 	if (ms().theme == TWLSettings::EThemeSaturn) {
 		snd().playLaunch();
@@ -2651,7 +2652,7 @@ bool selectMenu(void) {
 	int assignedOp[5] = {-1};
 	int selIconYpos = 96;
 	if (ms().kioskMode) {
-		if (dsiFeatures() && (bothSDandFlashcard() || !flashcardFound())) {
+		if (sdFound()) {
 			for (int i = 0; i < 3; i++) {
 				selIconYpos -= 14;
 			}
@@ -2680,7 +2681,7 @@ bool selectMenu(void) {
 			}
 		}
 	} else {
-		if (dsiFeatures() && (bothSDandFlashcard() || !flashcardFound())) {
+		if (sdFound()) {
 			for (int i = 0; i < 4; i++) {
 				selIconYpos -= 14;
 			}
@@ -4650,7 +4651,7 @@ std::string browseForFile(const std::vector<std::string_view> &extensionList) {
 					if (ms().theme == TWLSettings::EThemeDSi || ms().theme == TWLSettings::EThemeSaturn || ms().theme == TWLSettings::EThemeHBL) {
 						if (bothSDandFlashcard() && ((pressed & KEY_UP) || (pressed & KEY_DOWN))) {
 							switchDevice();
-							
+
 							return "null";
 						}
 					}
